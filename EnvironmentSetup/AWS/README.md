@@ -1,0 +1,128 @@
+# Amazon EKS WAS Setup
+
+## Introduction
+
+This document describes the setup of Amazon Kubernetes (EKS) and Wolfram Application Server (WAS).
+
+
+## Pre-Requisite Tools
+
+The following CLI tools are required to be installed on your local machine to complete the setup and installation:
+
+* **AWS CLI** - https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-install.html
+
+* **Kubectl** - https://kubernetes.io/docs/tasks/tools/install-kubectl/
+
+* **Docker v20.10 or newer** - https://docs.docker.com/get-docker/
+
+* **Docker Compose  v1.28.6 or newer** - https://docs.docker.com/compose/install/
+
+
+### Default Configuration
+The automated configuration tool will use the following default values when building EKS and configuring WAS.
+
+* Cluster Name: WAS
+* Region: us-east-1
+* AMI Instance Type: c5.2xlarge
+* Disk Size: 30GB
+* Node Group scaling configuration: [Minimum size: 2, Maximum size: 10, Desired size: 2]
+* Kubernetes Version: 1.19
+
+To change any of the above defaults open `Source/terraform/variables.tf`, modify accordingly and save file.
+
+
+## First Time Setup
+
+**Prerequisite:** Obtain an AWS IAM User with administrator priviledges, access key and secret key.
+
+To configure the AWS CLI run the following command:
+
+	aws configure
+
+This will interactively prompt for your AWS IAM user access key, secret key and preferred region. 
+
+**Note:** Your region needs to match the above default configuration else the setup will fail.
+
+## Setup
+
+**Step 1.** Change your directory to the directory containing `docker-compose.yml` directory and run the following command to set up EKS and deploy WAS:
+
+	mkdir -p ~/.kube && docker-compose up --build -d && clear && docker exec -it aws-setup-manager bash setup --create && sudo chown -R $USER ~/.kube
+
+**Note:** This can take approximately 45 minutes to complete.
+
+
+**Step 2.** Run the following command to retrieve your base URL and application URLs:
+
+	docker-compose up --build -d && clear && docker exec -it aws-setup-manager bash setup --endpoint-info
+
+
+The output of this command will follow this pattern:
+	
+	Base URL - Active Web Elements Server: http://<your-base-url>/
+	
+	Resource Manager: http://<your-base-url>/resources/
+	
+	Endpoints Manager: http://<your-base-url>/endpoints/
+	
+	Nodefiles: http://<your-base-url>/nodefiles/
+	
+	Endpoints Info: http://<your-base-url>/.applicationserver/info
+	
+	Restart AWES: http://<your-base-url>/.applicationserver/kernel/restart
+
+
+
+**Step 3.** After completion, run this command to shutdown the aws-setup-manager:
+
+	docker-compose down
+
+
+**Step 4.** Get a license file from your Wolfram Research sales representative.
+
+
+**Step 5.** This file needs to be deployed to WAS as a node file in the conventional location `.Wolfram/Licensing/mathpass`. From a Wolfram Language client, this may be achieved using the following code: 
+
+    was = ServiceConnect["WolframApplicationServer", "http://<your-base-url>"];
+	ServiceExecute[was, "DeployNodeFile",
+	{"Contents"-> File["path/to/mathpass"], "NodeFile" -> ".Wolfram/Licensing/mathpass"}]
+
+
+Alternatively you may use the [node files REST API](../../Documentation/API/NodeFilesManager.md) to install the license file.
+
+**Note:** In order to use the Wolfram Language functions, the WolframApplicationServer paclet must be installed and loaded. Run the following code:
+
+    PacletInstall["WolframApplicationServer"];
+    Needs["WolframApplicationServer`"]
+
+**Step 6.** Restart the application using the [restart API](../../Documentation/API/Utilities.md) to enable your Wolfram Engines.
+
+URL: `http://<your-base-url>/.applicationserver/kernel/restart`
+	
+The default credentials for this API are: 
+	
+	Username: applicationserver
+	
+	Password: P7g[/Y8v?KR}#YvN
+
+
+To change these, see the [configuration documentation](../../Configuration.md).
+
+**Note:** Active Web Elements Server will restart and activate using the mathpass. Upon successful activation, the application shall start. 
+
+Your setup is now complete.
+
+
+## Remove the cluster
+
+The following completely deletes everything including the kubernetes cluster, Wolfram Application Server and all resources:
+
+**Step 1.** Change your directory to the directory containing `docker-compose.yml` directory and run the following command to destroy your EKS cluster and WAS:
+
+	docker-compose up --build -d && clear && docker exec -it aws-setup-manager bash setup --delete
+
+**Warning:** All data will be destroyed.
+
+**Step 2.** After completion, shutdown the aws-setup-manager by running the following command:
+
+	docker-compose down	-v

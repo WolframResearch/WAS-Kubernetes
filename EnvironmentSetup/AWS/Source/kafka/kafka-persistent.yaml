@@ -1,0 +1,53 @@
+apiVersion: kafka.strimzi.io/v1beta1
+kind: Kafka
+metadata:
+  name: kafka-persistent
+  namespace: kafka
+spec:
+  kafka:
+    version: 2.7.0
+    replicas: 3
+    listeners:
+      plain: {}
+      tls: {}
+    resources:
+      requests:
+        cpu: 500m
+        memory: 500Mi
+      limits:
+        cpu: 1000m
+        memory: 2Gi
+    config:
+      offsets.topic.replication.factor: 3
+      transaction.state.log.replication.factor: 3
+      transaction.state.log.min.isr: 2
+      log.message.format.version: "2.7"
+    storage:
+      type: jbod
+      volumes:
+      - id: 0
+        type: persistent-claim
+        size: 10Gi
+        deleteClaim: false
+  zookeeper:
+    replicas: 3
+    jvmOptions:
+      javaSystemProperties:
+        - name: zookeeper.ssl.hostnameVerification
+          value: "false"
+        - name: zookeeper.ssl.quorum.hostnameVerification
+          value: "false"
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    storage:
+      type: persistent-claim
+      size: 10Gi
+      deleteClaim: false
+  entityOperator:
+    topicOperator: {}
+    userOperator: {}

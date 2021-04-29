@@ -1,0 +1,1146 @@
+#!/bin/bash
+# AWS Setup Script
+# 19-04-2021
+
+trap "exit" INT
+eks_Exists=""
+cleanup () {
+  # Make super duper sure we reap all the spinners
+  if [ ! -z "$allpids" ]; then
+    for pid in $allpids; do
+      kill "$pid" 1>/dev/null 2>&1
+    done
+    tput sgr0
+  fi
+  tput cnorm
+  return 1
+}
+# This tries to catch any exit, whether normal or forced (e.g. Ctrl-C)
+trap cleanup INT QUIT TERM EXIT
+
+# scolors - Color constants
+
+# do we have tput?
+if which 'tput' > /dev/null; then
+  # do we have a terminal?
+  if [ -t 1 ]; then
+    # does the terminal have colors?
+    ncolors=$(tput colors)
+    if [ "$ncolors" -ge 8 ]; then
+      RED=$(tput setaf 1)
+      GREEN=$(tput setaf 2)
+      YELLOW=$(tput setaf 3)
+      BLUE=$(tput setaf 4)
+      MAGENTA=$(tput setaf 5)
+      CYAN=$(tput setaf 6)
+      WHITE=$(tput setaf 7)
+      REDBG=$(tput setab 1)
+      GREENBG=$(tput setab 2)
+      YELLOWBG=$(tput setab 3)
+      BLUEBG=$(tput setab 4)
+      MAGENTABG=$(tput setab 5)
+      CYANBG=$(tput setab 6)
+      WHITEBG=$(tput setab 7)
+
+      BOLD=$(tput bold)
+      UNDERLINE=$(tput smul) # Many terminals don't support this
+      NORMAL=$(tput sgr0)
+    fi
+  fi
+else
+  echo "tput not found, colorized output disabled."
+  RED=''
+  GREEN=''
+  YELLOW=''
+  BLUE=''
+  MAGENTA=''
+  CYAN=''
+  WHITE=''
+  REDBG=''
+  GREENBG=''
+  YELLOWBG=''
+  BLUEBG=''
+  MAGENTABG=''
+  CYANBG=''
+
+  BOLD=''
+  UNDERLINE=''
+  NORMAL=''
+fi
+
+# LOG_PATH - Define $LOG_PATH in your script to log to a file, otherwise
+# just writes to STDOUT.
+
+# LOG_LEVEL_STDOUT - Define to determine above which level goes to STDOUT.
+# By default, all log levels will be written to STDOUT.
+LOG_LEVEL_STDOUT="INFO"
+
+# LOG_LEVEL_LOG - Define to determine which level goes to LOG_PATH.
+# By default all log levels will be written to LOG_PATH.
+LOG_LEVEL_LOG="INFO"
+
+# Useful global variables that users may wish to reference
+SCRIPT_ARGS="$*"
+SCRIPT_NAME="$0"
+SCRIPT_NAME="${SCRIPT_NAME#\./}"
+SCRIPT_NAME="${SCRIPT_NAME##/*/}"
+
+# Determines if we print colors or not
+if [ "$(tty -s)" ]; then
+    INTERACTIVE_MODE="off"
+else
+    INTERACTIVE_MODE="on"
+fi
+
+#--------------------------------------------------------------------------------------------------
+# Begin Logging Section
+if [ "${INTERACTIVE_MODE}" = "off" ]
+then
+    # Then we don't care about log colors
+    LOG_DEFAULT_COLOR=""
+    LOG_ERROR_COLOR=""
+    LOG_INFO_COLOR=""
+    LOG_SUCCESS_COLOR=""
+    LOG_WARN_COLOR=""
+    LOG_DEBUG_COLOR=""
+else
+    LOG_DEFAULT_COLOR=$(tput sgr0)
+    LOG_ERROR_COLOR=$(tput setaf 1)
+    LOG_INFO_COLOR=$(tput setaf 6)
+    LOG_SUCCESS_COLOR=$(tput setaf 2)
+    LOG_WARN_COLOR=$(tput setaf 3)
+    LOG_DEBUG_COLOR=$(tput setaf 4)
+fi
+
+# This function scrubs the output of any control characters used in colorized output
+# It's designed to be piped through with text that needs scrubbing.  The scrubbed
+# text will come out the other side!
+prepare_log_for_nonterminal() {
+    # Essentially this strips all the control characters for log colors
+    sed "s/[[:cntrl:]]\\[[0-9;]*m//g"
+}
+
+log() {
+  local log_text="$1"
+  local log_level="$2"
+  local log_color="$3"
+
+  # Levels for comparing against LOG_LEVEL_STDOUT and LOG_LEVEL_LOG
+  local LOG_LEVEL_DEBUG=0
+  local LOG_LEVEL_INFO=1
+  local LOG_LEVEL_SUCCESS=2
+  local LOG_LEVEL_WARNING=3
+  local LOG_LEVEL_ERROR=4
+
+  # Default level to "info"
+  [ -z "${log_level}" ] && log_level="INFO";
+  [ -z "${log_color}" ] && log_color="${LOG_INFO_COLOR}";
+
+  # Validate LOG_LEVEL_STDOUT and LOG_LEVEL_LOG since they'll be eval-ed.
+  case $LOG_LEVEL_STDOUT in
+    DEBUG|INFO|SUCCESS|WARNING|ERROR)
+      ;;
+    *)
+      LOG_LEVEL_STDOUT=INFO
+      ;;
+  esac
+  case $LOG_LEVEL_LOG in
+    DEBUG|INFO|SUCCESS|WARNING|ERROR)
+      ;;
+    *)
+      LOG_LEVEL_LOG=INFO
+      ;;
+  esac
+
+  # Check LOG_LEVEL_STDOUT to see if this level of entry goes to STDOUT.
+  # XXX This is the horror that happens when your language doesn't have a hash data struct.
+  eval log_level_int="\$LOG_LEVEL_${log_level}";
+  eval log_level_stdout="\$LOG_LEVEL_${LOG_LEVEL_STDOUT}"
+  # shellcheck disable=SC2154
+  if [ "$log_level_stdout" -le "$log_level_int" ]; then
+    # STDOUT
+    printf "%s[%s]%s %s\\n" "$log_color" "$log_level" "$LOG_DEFAULT_COLOR" "$log_text";
+  fi
+  # This is all very tricky; figures out a numeric value to compare.
+  eval log_level_log="\$LOG_LEVEL_${LOG_LEVEL_LOG}"
+  # Check LOG_LEVEL_LOG to see if this level of entry goes to LOG_PATH
+  # shellcheck disable=SC2154
+  if [ "$log_level_log" -le "$log_level_int" ]; then
+    # LOG_PATH minus fancypants colors
+    if [ ! -z "$LOG_PATH" ]; then
+      today=$(date +"%Y-%m-%d %H:%M:%S %Z")
+      printf "[%s] [%s] %s\\n" "$today" "$log_level" "$log_text" >> "$LOG_PATH"
+    fi
+  fi
+
+  return 0;
+}
+
+log_info()      { log "$@"; }
+log_success()   { log "$1" "SUCCESS" "${LOG_SUCCESS_COLOR}"; }
+log_error()     { log "$1" "ERROR" "${LOG_ERROR_COLOR}"; }
+log_warning()   { log "$1" "WARNING" "${LOG_WARN_COLOR}"; }
+log_debug()     { log "$1" "DEBUG" "${LOG_DEBUG_COLOR}"; }
+
+# End Logging Section
+#--------------------------------------------------------------------------------------------------
+
+
+# Config variables, set these after sourcing to change behavior.
+SPINNER_COLORNUM=2 # What color? Irrelevent if COLORCYCLE=1.
+SPINNER_COLORCYCLE=1 # Does the color cycle?
+SPINNER_DONEFILE="stopspinning" # Path/name of file to exit on.
+SPINNER_SYMBOLS="ASCII_PROPELLER" # Name of the variable containing the symbols.
+SPINNER_CLEAR=1 # Blank the line when done.
+
+spinner () {
+  # Safest option are one of these. Doesn't need Unicode, at all.
+  local ASCII_PROPELLER="/ - \\ |"
+
+  # Bigger spinners and progress type bars; takes more space.
+  local WIDE_ASCII_PROG="[>----] [=>---] [==>--] [===>-] [====>] [----<] [---<=] [--<==] [-<===] [<====]"
+  local WIDE_UNI_GREYSCALE="▒▒▒▒▒▒▒ █▒▒▒▒▒▒ ██▒▒▒▒▒ ███▒▒▒▒ ████▒▒▒ █████▒▒ ██████▒ ███████ ██████▒ █████▒▒ ████▒▒▒ ███▒▒▒▒ ██▒▒▒▒▒ █▒▒▒▒▒▒ ▒▒▒▒▒▒▒"
+  local WIDE_UNI_GREYSCALE2="▒▒▒▒▒▒▒ █▒▒▒▒▒▒ ██▒▒▒▒▒ ███▒▒▒▒ ████▒▒▒ █████▒▒ ██████▒ ███████ ▒██████ ▒▒█████ ▒▒▒████ ▒▒▒▒███ ▒▒▒▒▒██ ▒▒▒▒▒▒█"
+
+  local SPINNER_NORMAL
+  SPINNER_NORMAL=$(tput sgr0)
+
+  eval SYMBOLS=\$${SPINNER_SYMBOLS}
+
+  # Get the parent PID
+  SPINNER_PPID=$(echo $PPID)
+  while :; do
+    tput civis
+    for c in ${SYMBOLS}; do
+      if [ $SPINNER_COLORCYCLE -eq 1 ]; then
+        if [ $SPINNER_COLORNUM -eq 7 ]; then
+          SPINNER_COLORNUM=1
+        else
+          SPINNER_COLORNUM=$((SPINNER_COLORNUM+1))
+        fi
+      fi
+      local SPINNER_COLOR
+      SPINNER_COLOR=$(tput setaf ${SPINNER_COLORNUM})
+      tput sc
+      env printf "${SPINNER_COLOR}${c}${SPINNER_NORMAL}"
+      tput rc
+      if [ -f "${SPINNER_DONEFILE}" ]; then
+        if [ ${SPINNER_CLEAR} -eq 1 ]; then
+          tput el
+        fi
+	      rm -f ${SPINNER_DONEFILE}
+	      break 2
+      fi
+      # This is questionable. sleep with fractional seconds is not
+      # always available, but seems to not break things, when not.
+      env sleep .2
+      # Check to be sure parent is still going; handles sighup/kill
+      if [ ! -z "$SPINNER_PPID" ]; then
+        # This is ridiculous. ps prepends a space in the ppid call, which breaks
+        # this ps with a "garbage option" error.
+        # XXX Potential gotcha if ps produces weird output.
+        # shellcheck disable=SC2086
+        SPINNER_PARENTUP=$(ps $SPINNER_PPID | tail -n +2)
+        if [ -z "$SPINNER_PARENTUP" ]; then
+          break 2
+        fi
+      fi
+    done
+  done
+  tput rc
+  tput cnorm
+  return 0
+}
+
+# run_ok - function to run a command or function, start a spinner and print a confirmation
+# indicator when done.
+timestamp=$(date +"%Y%m%dT%H%M")
+touch /tmp/run-$timestamp.log
+RUN_LOG="/tmp/run-$timestamp.log"
+
+# Check for unicode support in the shell
+# This is a weird function, but seems to work. Checks to see if a unicode char can be
+# written to a file and can be read back.
+shell_has_unicode () {
+  # Write a unicode character to a file...read it back and see if it's handled right.
+  env printf "\\u2714"> unitest.txt
+
+  read -r unitest < unitest.txt
+  rm -f unitest.txt
+  if [ ${#unitest} -le 3 ]; then
+    return 0
+  else
+    return 1
+  fi
+}
+
+# Setup spinner with our prefs.
+SPINNER_COLORCYCLE=0
+SPINNER_COLORNUM=6
+if shell_has_unicode; then
+  SPINNER_SYMBOLS="WIDE_UNI_GREYSCALE2"
+else
+  SPINNER_SYMBOLS="WIDE_ASCII_PROG"
+fi
+SPINNER_CLEAR=0 # Don't blank the line, so our check/x can simply overwrite it.
+
+# Perform an action, log it, and print a colorful checkmark or X if failed
+# Returns 0 if successful, $? if failed.
+run_ok () {
+  # Shell is really clumsy with passing strings around.
+  # This passes the unexpanded $1 and $2, so subsequent users get the
+  # whole thing.
+  local cmd="${1}"
+  local msg="${2}"
+  local columns
+  columns=$(tput cols)
+  if [ "$columns" -ge 80 ]; then
+    columns=79
+  fi
+  # shellcheck disable=SC2004
+  COL=$((${columns}-${#msg}-7 ))
+
+  printf "%s%${COL}s" "$2"
+  # Make sure there some unicode action in the shell; there's no
+  # way to check the terminal in a POSIX-compliant way, but terms
+  # are mostly ahead of shells.
+  # Unicode checkmark and x mark for run_ok function
+  CHECK='\u2714'
+  BALLOT_X='\u2718'
+  spinner &
+  spinpid=$!
+  allpids="$allpids $spinpid"
+  echo "Spin pid is: $spinpid" >> ${RUN_LOG}
+  eval "${cmd}" 1>> ${RUN_LOG} 2>&1
+  local res=$?
+  touch ${SPINNER_DONEFILE}
+  env sleep .2 # It's possible to have a race for stdout and spinner clobbering the next bit
+  # Just in case the spinner survived somehow, kill it.
+  pidcheck=$(ps ${spinpid} | tail -n +2)
+  if [ ! -z "$pidcheck" ]; then
+    echo "Made it here...why?" >> ${RUN_LOG}
+    kill $spinpid 2>/dev/null
+    rm -rf ${SPINNER_DONEFILE} 2>/dev/null 2>&1
+    tput rc
+    tput cnorm
+  fi
+  # Log what we were supposed to be running
+  printf "${msg}: " >> ${RUN_LOG}
+  if shell_has_unicode; then
+    if [ $res -eq 0 ]; then
+      printf "Success.\\n" >> ${RUN_LOG}
+      env printf "${GREENBG}[  ${CHECK}  ]${NORMAL}\\n"
+      return 0
+    else
+      log_error "Failed with error: ${res}"
+      env printf "${REDBG}[  ${BALLOT_X}  ]${NORMAL}\\n"
+      if [ "$RUN_ERRORS_FATAL" ]; then
+        echo
+        log_fatal "Something went wrong. Exiting."
+        log_fatal "The last few log entries were:"
+        tail -15 ${RUN_LOG}
+        exit 1
+      fi
+      return ${res}
+    fi
+  else
+    if [ $res -eq 0 ]; then
+      printf "Success.\\n" >> ${RUN_LOG}
+      env printf "${GREENBG}[ OK! ]${NORMAL}\\n"
+      return 0
+    else
+      printf "Failed with error: ${res}\\n" >> ${RUN_LOG}
+      echo
+      env printf "${REDBG}[ERROR]${NORMAL}\\n"
+      if [ "$RUN_ERRORS_FATAL" ]; then
+        log_fatal "Something went wrong with the previous command. Exiting."
+        exit 1
+      fi
+      return ${res}
+    fi
+  fi
+}
+
+version=1.0.0
+# Temporary colors
+RED="$(tput setaf 1)"
+YELLOW="$(tput setaf 3)"
+CYAN="$(tput setaf 6)"
+NORMAL="$(tput sgr0)"
+
+banner=false
+touch /tmp/was-aws-setup-$timestamp.log
+log="/tmp/was-aws-setup-$timestamp.log"
+LOG_PATH="$log"
+# Setup run_ok
+# shellcheck disable=SC2034
+RUN_LOG="$log"
+# Exit on any failure during shell stage
+# shellcheck disable=SC2034
+RUN_ERRORS_FATAL=1
+
+# Console output level; ignore debug level messages.
+if [ "$VERBOSE" = "1" ]; then
+  # shellcheck disable=SC2034
+  LOG_LEVEL_STDOUT="DEBUG"
+else
+  # shellcheck disable=SC2034
+  LOG_LEVEL_STDOUT="INFO"
+fi
+# Log file output level; catch literally everything.
+# shellcheck disable=SC2034
+LOG_LEVEL_LOG="DEBUG"
+
+# log_fatal calls log_error
+log_fatal() {
+  log_error "$1"
+}
+
+success () {
+  log_success "$1 Succeeded."
+}
+
+
+install_msg() {
+
+cat <<EOF
+
+
+  Welcome to the Wolfram Application Server${NORMAL} AWS Setup Manager, version ${CYAN}$version${NORMAL}
+
+EOF
+cat <<EOF
+
+  Should any step ${RED}fail${NORMAL} the script shall halt. Completion of each step will be shown in ${GREEN}green${NORMAL}.
+
+  Anytime you can re-run this script with ${CYAN}--help${NORMAL} flag to see available options.
+
+EOF
+
+
+}
+install_msg
+
+SetupFunction()
+{
+	banner=true
+    cd Source/terraform
+    GET_CLUSTER_NAME=$(grep -A1 -i cluster-name variables.tf | grep -i default | awk '{print $3}' | sed -e 's/"//g' | tr -d '\n')
+    GET_CLUSTER_NAME=$(echo $GET_CLUSTER_NAME | tr -d '\r')
+    GET_REGION=$(grep -A1 -i aws_region variables.tf | grep -i default | awk '{print $3}' | sed -e 's/"//g' | tr -d '\n')
+    GET_REGION=$(echo $GET_REGION | tr -d '\r')
+
+	CFILE=~/.aws/credentials
+	if [ -f "$CFILE" ]; then
+		MINIO_ACCESS_KEY=$(cat ~/.aws/credentials | grep aws_access_key_id | awk '{print $3}')
+		MINIO_SECRET_KEY=$(cat ~/.aws/credentials | grep aws_secret_access_key | awk '{print $3}')
+	else
+		echo
+        log_error "Cannot find aws access key and secret key. Did you run 'aws configure' ?"
+        echo
+        exit 1
+	fi
+
+    cd ..
+	echo
+	log_debug "Phase 1 of 5: Prequisites Checks"   
+	printf "${YELLOW}☑${CYAN}□□□□${NORMAL} Phase ${YELLOW}1${NORMAL} of ${GREEN}5${NORMAL}: Prequisites Checks\\n"
+    run_ok "kubectlFunction" "Checking Kubectl Installed"
+    run_ok "terraformFunction" "Checking Terraform Installed"
+    run_ok "helmFunction" "Checking Helm Installed"
+    run_ok "NEWEKSCHECK" "Checking EKS Status"
+    val="yes"
+	if [ X"$eks_Exists" = X"$val" ]; then
+        echo
+        log_error "Cluster already exists."
+        echo
+        exit 1
+    fi
+
+	echo
+	log_debug "Phase 2 of 5: Build Amazon Kubernetes Cluster (EKS)"
+	printf "${GREEN}☑${YELLOW}☑${CYAN}□□□${NORMAL} Phase ${YELLOW}2${NORMAL} of ${GREEN}5${NORMAL}: Build Amazon Kubernetes Cluster (EKS)\\n"
+	
+	CFILE=~/.kube/config
+	if [ -f "$CFILE" ]; then
+		log_debug "Already has kubeconfig"
+		chmod 700 ~/.kube/config
+	else
+		mkdir -p ~/.kube
+		touch ~/.kube/config
+		chmod 700 ~/.kube/config
+	fi
+	
+	cd terraform
+    CURRENT_REGION_VAL=$(grep -A1 -i "region         =" main.tf | head -n 1 | awk '{print $3}')
+    sed -i -e 's/'"$CURRENT_REGION_VAL"'/"'"$GET_REGION"'"/g' main.tf
+    suffix="terraformtfstate"
+    lower_cluster_name=$(echo $GET_CLUSTER_NAME | tr '[:upper:]' '[:lower:]')
+    lower_cluster_name=$(echo $lower_cluster_name | tr -d '\r')
+    get_user_info=$(aws sts get-caller-identity)
+    account_id=$(echo $get_user_info | grep -oP '(?<="Account": ")[^"]*')
+    echo "variable \"terraform-s3-bucket-name\" { default = \"$suffix-$lower_cluster_name-$account_id\" } " >> variables.tf
+    terraform_bucket_name=$(grep -i terraform-s3-bucket-name variables.tf |  cut -d '"' -f 4)
+    CURRENT_BUCKET_VAL=$(grep -i "bucket         =" main.tf | awk '{print $3}' | head -n 1)
+    sed -i -e 's/'"$CURRENT_BUCKET_VAL"'/"'"$terraform_bucket_name"'"/g' main.tf
+
+    bucket_check=$(aws s3api list-buckets --output text | grep $terraform_bucket_name | awk '{print $3}')
+	
+	AWSCFILE=~/.aws/config
+	if [ -f "$AWSCFILE" ]; then
+		if grep -q "region" "$AWSCFILE"; then
+			log_debug "Already has region"
+			sed -i -e 's/region = .*/region = '"$GET_REGION"'/g' ~/.aws/config
+		fi
+	else
+		echo '[default]' >> ~/.aws/config
+		echo 'region = '"$GET_REGION"'' >> ~/.aws/config
+	fi
+	
+	if [ -z $bucket_check ]; then
+        if [ X"$GET_REGION" = X"us-east-1" ]; then
+			run_ok "aws s3api create-bucket --bucket $terraform_bucket_name --endpoint-url https://s3.us-east-1.amazonaws.com && sleep 10" "Creating Bucket for terraform"
+        else
+			run_ok "aws s3api create-bucket --bucket $terraform_bucket_name --region $GET_REGION --create-bucket-configuration LocationConstraint=$GET_REGION && sleep 10" "Creating Bucket for terraform"
+        fi
+        aws s3api put-bucket-encryption --bucket $terraform_bucket_name --server-side-encryption-configuration '{"Rules": [{"ApplyServerSideEncryptionByDefault": {"SSEAlgorithm": "AES256"}}]}'
+        aws s3api put-bucket-versioning --bucket $terraform_bucket_name --versioning-configuration Status=Enabled
+        aws s3api put-public-access-block --bucket $terraform_bucket_name --public-access-block-configuration "BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true"
+    fi
+
+
+    dynamodb_check=$(aws dynamodb list-tables --output text | grep "terraform-state-locking-was" | awk '{print $2}')
+    if [ -z $dynamodb_check ]; then
+        dynamodb_table="terraform-state-locking-was"
+        run_ok "aws dynamodb create-table --region $GET_REGION --table-name $dynamodb_table --attribute-definitions AttributeName=LockID,AttributeType=S --key-schema AttributeName=LockID,KeyType=HASH --provisioned-throughput ReadCapacityUnits=1,WriteCapacityUnits=1" "Creating terraform dynamodb table"
+    fi
+
+    run_ok "terraform init && terraform refresh && terraform plan && terraform apply -auto-approve" "Building EKS - (can take upto 30 minutes)"
+    run_ok "aws eks --region $GET_REGION update-kubeconfig --name $GET_CLUSTER_NAME" "Generate kubeconfig configuration"
+    cd ..
+    
+	echo
+	log_debug "Phase 3 of 5: Deploy Dependencies"
+	printf "${GREEN}☑☑${YELLOW}☑${CYAN}□□${NORMAL} Phase ${YELLOW}3${NORMAL} of ${GREEN}5${NORMAL}: Deploy Dependencies\\n"
+	run_ok "kubectl apply -f ingress-controller/" "Setup Ingress Controller"
+	run_ok "kubectl apply -f metrics-server/" "Setup Metrics Server"
+    sed -i -e 's/- --node-group-auto-discovery=asg:tag=k8s.io\/cluster-autoscaler\/enabled,k8s.io\/cluster-autoscaler\/.*/- --node-group-auto-discovery=asg:tag=k8s.io\/cluster-autoscaler\/enabled,k8s.io\/cluster-autoscaler\/'"$GET_CLUSTER_NAME"'/g' cluster-autoscaler/cluster-autoscaler-autodiscover.yaml
+	run_ok "kubectl apply -f cluster-autoscaler/" "Setup Cluster Autoscaler"
+    cd efs
+    kubectl patch storageclass gp2 -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"false"}}}' >> $LOG_PATH
+    kubectl apply -f namespace.yaml >> $LOG_PATH
+    kubectl config set-context --current --namespace=efs-sc  >> $LOG_PATH
+    cluster_name=$GET_CLUSTER_NAME
+    group_name="efs-mount-eks-$GET_CLUSTER_NAME"
+    description="efs-mount-eks-$GET_CLUSTER_NAME"
+    token_name="eks-efs-$GET_CLUSTER_NAME"
+    region=$GET_REGION
+    vpc_id=$(aws eks describe-cluster --name $cluster_name --query "cluster.resourcesVpcConfig.vpcId" --output text)
+    cidr_block=$(aws ec2 describe-vpcs --vpc-ids $vpc_id --query "Vpcs[].CidrBlock" --output text)
+    temp_group_id=$(aws ec2 create-security-group --description $description --group-name $group_name --vpc-id $vpc_id)
+    group_id=$(echo $temp_group_id | awk '{print $3}' | sed 's|["]||g')
+    nfs_inbound=$(aws ec2 authorize-security-group-ingress --group-id $group_id  --protocol tcp --port 2049 --cidr $cidr_block)
+    temp_file_systemid=$(aws efs create-file-system --throughput-mode bursting --encrypted --region $region --creation-token $token_name)
+    filesystem_id=$(echo $temp_file_systemid | grep -Po '"FileSystemId":.*?[^\\]",' | awk '{print $2}' | sed 's|[",]||g')
+    get_subnets=$(aws ec2 describe-subnets --region $region --filters "Name=vpc-id,Values=$vpc_id")
+    subnets=$(echo $get_subnets | grep -Po '"SubnetId":.*?[^\\]",' | awk '{print $2}' | sed 's|[",]||g')
+    for eachval in $subnets
+    do
+        output=$(aws efs create-mount-target --file-system-id $filesystem_id --subnet-id $eachval --security-group $group_id 2> /dev/null)
+        echo $output >> mountIDs.txt
+        sleep 10
+    done
+    install_chart_stable=$(helm repo add stable https://charts.helm.sh/stable  >> $LOG_PATH)
+    rm -rf values*
+cat <<EOF >> values.yaml
+---
+global:
+  deployEnv: prod
+
+image:
+  repository: quay.io/external_storage/efs-provisioner
+  tag: v2.4.0
+  pullPolicy: IfNotPresent
+
+busyboxImage:
+  repository: busybox
+  tag: latest
+  pullPolicy: IfNotPresent
+
+efsProvisioner:
+  efsFileSystemId: $filesystem_id
+  awsRegion: $region
+  path: /was-pv
+  provisionerName: was-provisioner/was-efs
+  reclaimPolicy: Delete
+  storageClass:
+    name: was-efs
+    isDefault: true
+
+podAnnotations:
+  iam.amazonaws.com/role: efs-provisioner-role
+EOF
+
+    run_ok "helm install -f values.yaml efs-provisioner stable/efs-provisioner && sleep 120" "Creating EFS Storage System"
+    run_ok "efspodStatus" "Setting up EFS Storage System"
+    cd ..
+
+	echo
+	log_debug "Phase 4 of 5: Wolfram Application Server Deployment"
+	printf "${GREEN}☑☑☑${YELLOW}☑${CYAN}□${NORMAL} Phase ${YELLOW}4${NORMAL} of ${GREEN}5${NORMAL}: Wolfram Application Server Deployment\\n"
+	run_ok "kubectl apply -f namespace/ && kubectl config set-context --current --namespace=kafka" "Creating Namespace"
+	run_ok "kubectl create -f strimzi-kafka-deployment/ && sleep 15 && kubectl wait --for=condition=ready --timeout=30m pod -l name=strimzi-cluster-operator && kubectl create -f kafka && sleep 15 && kubectl wait --for=condition=ready --timeout=30m pod -l statefulset.kubernetes.io/pod-name=kafka-persistent-zookeeper-0 && sleep 15 && kubectl wait --for=condition=ready --timeout=30m pod -l statefulset.kubernetes.io/pod-name=kafka-persistent-kafka-0 &&  sleep 15 && kubectl wait --for=condition=ready --timeout=30m pod -l app.kubernetes.io/name=entity-operator && kubectl create -f kafkabridge && sleep 15 && kubectl wait --for=condition=ready --timeout=30m pod -l app.kubernetes.io/name=kafka-bridge" "Deploying Kafka Cluster (can take upto 10 minutes)"	
+	run_ok "kafkaoperatorCheck" "Setting Up Kafka"
+	
+	run_ok "kubectl config set-context --current --namespace=was" "Set WAS Namespace as default"
+    run_ok "kubectl apply -f pvc/" "Setup Persistent Volume Claims"
+	run_ok "kubectl apply -f services/" "Setup Services"
+	run_ok "kubectl apply -f ingress/" "Setup Ingress"    
+    
+    while true;
+    do
+        currentregcred=$(kubectl get secret | grep basic-auth | awk '{print $1}')
+        if [ X"$currentregcred" = X"basic-auth" ]; then
+            log_debug "already basic-auth exists"
+            break;
+        else
+            log_debug "basic-auth doesn't exist"
+                run_ok "cd ingress/ && kubectl create secret generic basic-auth --from-file=auth -n was && cd .." "Setup NGINX Auth"
+        fi
+    done
+    
+    
+	
+    # Minio deployment setup
+    CURRENT_MINIO_ACCESS_KEY=$(grep -A1 -i MINIO_ACCESS_KEY deployments/minio-deployment.yaml | grep -i value: |  awk '{print $2}')
+    sed -i -e 's~'"$CURRENT_MINIO_ACCESS_KEY"'~'"$MINIO_ACCESS_KEY"'~g' deployments/minio-deployment.yaml
+    CURRENT_MINIO_SECRET_KEY=$(grep -A1 -i MINIO_SECRET_KEY deployments/minio-deployment.yaml | grep -i value: |  awk '{print $2}')
+    sed -i -e 's~'"$CURRENT_MINIO_SECRET_KEY"'~'"$MINIO_SECRET_KEY"'~g' deployments/minio-deployment.yaml
+
+	
+	# Resource Manger deployment setup
+    CURRENT_MINIOACCESSKEY=$(grep -A1 -i MINIOACCESSKEY deployments/resource-manager-deployment.yaml | grep -i value: |  awk '{print $2}')
+    sed -i -e 's~'"$CURRENT_MINIOACCESSKEY"'~'"$MINIO_ACCESS_KEY"'~g' deployments/resource-manager-deployment.yaml
+    CURRENT_MINIOSECRETKEY=$(grep -A1 -i MINIOSECRETKEY deployments/resource-manager-deployment.yaml | grep -i value: |  awk '{print $2}')
+    sed -i -e 's~'"$CURRENT_MINIOSECRETKEY"'~'"$MINIO_SECRET_KEY"'~g' deployments/resource-manager-deployment.yaml
+    resources_bucket_name="was-resources-$account_id"
+    nodefiles_bucket_name="was-nodefiles-$account_id"
+    CURRENT_RESOURCEINFOBUCKET=$(grep -A1 -i RESOURCEINFO.BUCKET deployments/resource-manager-deployment.yaml | grep -i value: |  awk '{print $2}')
+    sed -i -e 's~'"$CURRENT_RESOURCEINFOBUCKET"'~'"$resources_bucket_name"'~g' deployments/resource-manager-deployment.yaml
+    CURRENT_NODEFILESBUCKET=$(grep -A1 -i NODEFILES.BUCKET deployments/resource-manager-deployment.yaml | grep -i value: |  awk '{print $2}' |  cut -d ' ' -f 1)
+    CURRENT_NODEFILESBUCKET=$(echo $CURRENT_NODEFILESBUCKET | awk '{print $1}')
+	sed -i -e 's~'"$CURRENT_NODEFILESBUCKET"'~'"$nodefiles_bucket_name"'~g' deployments/resource-manager-deployment.yaml
+    CURRENT_RESOURCE_BUCKET_REGION=$(grep -A1 -i RESOURCE.BUCKET.REGION deployments/resource-manager-deployment.yaml | grep -i value: |  awk '{print $2}')
+    sed -i -e 's~'"$CURRENT_RESOURCE_BUCKET_REGION"'~'"$GET_REGION"'~g' deployments/resource-manager-deployment.yaml
+    CURRENT_NODEFILES_BUCKET_REGION=$(grep -A1 -i NODEFILES.BUCKET.REGION deployments/resource-manager-deployment.yaml | grep -i value: |  awk '{print $2}')
+    sed -i -e 's~'"$CURRENT_NODEFILES_BUCKET_REGION"'~'"$GET_REGION"'~g' deployments/resource-manager-deployment.yaml
+
+
+	# AWES deployment setup
+    BASE_URL=$(kubectl get svc -n ingress-nginx | awk '{print $4}' | sed -n '2p')
+	sed -i -e "s/domain.com/$BASE_URL/g" deployments/active-web-elements-server-deployment.yaml
+	
+	run_ok "kubectl apply -f deployments/" "Setup Deployments"
+	run_ok "deploymentStatus" "Waiting for Deployments To Be Ready"
+	run_ok "endpointStatus" "Checking Base URL Accessible"
+	
+	cd custom-metrics/
+	run_ok "custommetricsSetup" "Setup Custom Metrics"
+	cd ..
+	run_ok "kubectl config set-context --current --namespace=was && kubectl apply -f hpa/" "Setup Horizontal Pod Autoscaler"
+	
+    
+	echo
+	log_debug "Phase 5 of 5: Application URL Details"
+	printf "${GREEN}☑☑☑☑${YELLOW}☑${NORMAL} Phase ${YELLOW}5${NORMAL} of ${GREEN}5${NORMAL}: Application URL Details\\n\n"
+    BASE_URL=$(kubectl get svc -n ingress-nginx | awk '{print $4}' | sed -n '2p')
+    printf "${GREEN}Base URL - Active Web Elements Server:${NORMAL} http://$BASE_URL/\n\n"
+    printf "${GREEN}Resource Manager:${NORMAL} http://$BASE_URL/resources/\n\n"
+    printf "${GREEN}Endpoints Manager:${NORMAL} http://$BASE_URL/endpoints/\n\n"
+    printf "${GREEN}Nodefiles:${NORMAL} http://$BASE_URL/nodefiles/\n\n"
+    printf "${GREEN}Endpoints Info:${NORMAL} http://$BASE_URL/.applicationserver/info\n\n"
+    printf "${GREEN}Restart AWES:${NORMAL} http://$BASE_URL/.applicationserver/kernel/restart\n\n"
+    
+	echo
+    echo "EKS Cluster build complete and Wolfram Application Server Deployed. Our warmest appreciation to you for running Wolfram Application Server on Amazon environment. Enjoy!"
+	echo
+
+}
+
+
+custommetricsSetup()
+{
+	kubectl config set-context --current --namespace=monitoring >> $LOG_PATH
+	kubectl apply -f prometheus.yaml >> $LOG_PATH
+	sleep 15
+	kubectl wait --for=condition=ready --timeout=30m pod -l app=prometheus-server -n monitoring >> $LOG_PATH
+	helm repo add prometheus-community https://prometheus-community.github.io/helm-charts  >> $LOG_PATH
+	helm repo update >> $LOG_PATH
+	helm install was -f values.yaml prometheus-community/prometheus-adapter --namespace monitoring >> $LOG_PATH
+	sleep 15
+	kubectl wait --for=condition=ready --timeout=30m pod -l app=prometheus-adapter -n monitoring >> $LOG_PATH
+}
+
+deploymentStatus()
+{
+    while true;
+    do
+        currentawesStatus=$(kubectl get pods --field-selector=status.phase=Running -n was | grep -i "active-web-elements-server-deployment-" | awk '{print $2}' | head -qn1)
+        if [ X"$currentawesStatus" = X"1/1" ]; then
+            log_debug "awes ready"
+            break;
+        else
+            log_debug "awes not ready"
+            sleep 5;
+        fi
+    done
+
+}
+
+endpointStatus()
+{
+    BASE_URL=$(kubectl get svc -n ingress-nginx | awk '{print $4}' | sed -n '2p')
+    while true;
+    do
+        currentendpointStatus=$(curl -s -o /dev/null -I -w "%{http_code}" http://$BASE_URL/)
+        if [ X"$currentendpointStatus" = X"503" ]; then
+            log_debug "endpoint accessible"
+            break;
+        else
+            log_debug "endpoint not accessible yet"
+            sleep 5;
+        fi
+    done
+
+}
+
+kafkaoperatorCheck()
+{
+    while true;
+    do
+        currentKafkaoperatorStatus=$(kubectl get pods --field-selector=status.phase=Running -n kafka | grep -i "kafka-persistent-entity-operator-" | awk '{print $2}')
+        if [ X"$currentKafkaoperatorStatus" = X"3/3" ]; then
+            log_debug "kafka operator ready"
+            break;
+        else
+            log_debug "kafka operator not ready"
+            sleep 5;
+        fi
+    done
+}
+
+terraformFunction()
+{
+    while true; do
+      if [ -x "/usr/local/bin/terraform" ]; then
+        break
+      elif [ -x "/usr/bin/terraform" ]; then
+        break
+      else
+        printf "${RED}Terraform not installed. Cannot continue.${NORMAL}\\n"
+        exit 1
+      fi
+    done
+
+}
+
+helmFunction()
+{
+    while true; do
+      if [ -x "/usr/local/bin/helm" ]; then
+        break
+      elif [ -x "/usr/bin/helm" ]; then
+        break
+      else
+        printf "${RED}Helm not installed. Cannot continue.${NORMAL}\\n"
+        exit 1
+      fi
+    done
+
+}
+
+kubectlFunction()
+{
+    while true; do
+      if [ -x "/usr/local/bin/kubectl" ]; then
+        break
+      elif [ -x "/usr/bin/kubectl" ]; then
+        break
+      else
+        printf "${RED}Kubectl not installed. Cannot continue.${NORMAL}\\n"
+        exit 1
+      fi
+    done
+
+}
+
+efspodStatus()
+{
+    while true;
+    do
+        currentEFSStatus=$(kubectl get pods --field-selector=status.phase=Running -n efs-sc | awk '{print $2}' | sed 1,1d)
+        if [ X"$currentEFSStatus" = X"1/1" ]; then
+            log_debug "ready"
+            break;
+        else
+            log_debug "not ready"
+            sleep 5;
+        fi
+    done
+}
+
+kafkaShutdown()
+{
+    kubectl delete --ignore-not-found=true -f kafkabridge/ >> $LOG_PATH
+    kubectl delete --ignore-not-found=true -f kafka/ >> $LOG_PATH
+    sleep 60
+    while true;
+    do
+        current=$(kubectl get pods -n kafka | grep -i "kafka-persistent-kafka-0" | awk '{print $1}' | head -qn1)
+        if [ -z $current ]; then
+            log_debug "kafka 0 not running"
+            break;
+        else
+            log_debug "kafka 0 forcing shutdown"
+            kubectl delete pod kafka-persistent-kafka-0 -n kafka --grace-period=0 --force 2>/dev/null 2>&1
+        fi
+    done
+    while true;
+    do
+        current=$(kubectl get pods -n kafka | grep -i "kafka-persistent-kafka-1" | awk '{print $1}' | head -qn1)
+        if [ -z $current ]; then
+            log_debug "kafka 1 not running"
+            break;
+        else
+            log_debug "kafka 1 forcing shutdown"
+            kubectl delete pod kafka-persistent-kafka-1 -n kafka --grace-period=0 --force 2>/dev/null 2>&1
+        fi
+    done
+    while true;
+    do
+        current=$(kubectl get pods -n kafka | grep -i "kafka-persistent-kafka-2" | awk '{print $1}' | head -qn1)
+        if [ -z $current ]; then
+            log_debug "kafka 2 not running"
+            break;
+        else
+            log_debug "kafka 2 forcing shutdown"
+            kubectl delete pod kafka-persistent-kafka-2 -n kafka --grace-period=0 --force 2>/dev/null 2>&1
+        fi
+    done
+    
+    while true;
+    do
+        current=$(kubectl get pods -n kafka | grep -i "kafka-persistent-zookeeper-0" | awk '{print $1}' | head -qn1)
+        if [ -z $current ]; then
+            log_debug "zookeeper 0 not running"
+            break;
+        else
+            log_debug "zookeeper 0 forcing shutdown"
+            kubectl delete pod kafka-persistent-zookeeper-0 -n kafka --grace-period=0 --force 2>/dev/null 2>&1
+        fi
+    done
+
+    while true;
+    do
+        current=$(kubectl get pods -n kafka | grep -i "kafka-persistent-zookeeper-1" | awk '{print $1}' | head -qn1)
+        if [ -z $current ]; then
+            log_debug "zookeeper 1 not running"
+            break;
+        else
+            log_debug "zookeeper 1 forcing shutdown"
+            kubectl delete pod kafka-persistent-zookeeper-1 -n kafka --grace-period=0 --force 2>/dev/null 2>&1
+        fi
+    done
+    
+    while true;
+    do
+        current=$(kubectl get pods -n kafka | grep -i "kafka-persistent-zookeeper-2" | awk '{print $1}' | head -qn1)
+        if [ -z $current ]; then
+            log_debug "zookeeper 2 not running"
+            break;
+        else
+            log_debug "zookeeper 2 forcing shutdown"
+            kubectl delete pod kafka-persistent-zookeeper-2 -n kafka --grace-period=0 --force 2>/dev/null 2>&1
+        fi
+    done
+
+}
+
+DeleteFunction()
+{
+	banner=true
+	cd Source/terraform
+    GET_CLUSTER_NAME=$(grep -A1 -i cluster-name variables.tf | grep -i default | awk '{print $3}' | sed -e 's/"//g' | tr -d '\n')
+    GET_CLUSTER_NAME=$(echo $GET_CLUSTER_NAME | tr -d '\r')
+	GET_REGION=$(grep -A1 -i aws_region variables.tf | grep -i default | awk '{print $3}' | sed -e 's/"//g' | tr -d '\n')
+    GET_REGION=$(echo $GET_REGION | tr -d '\r')
+	cd ..
+	
+	echo
+	log_debug "Phase 1 of 5: Prequisites Checks"   
+	printf "${YELLOW}☑${CYAN}□□□□${NORMAL} Phase ${YELLOW}1${NORMAL} of ${GREEN}5${NORMAL}: Prequisites Checks\\n"
+    run_ok "kubectlFunction" "Checking Kubectl Installed"
+    run_ok "terraformFunction" "Checking Terraform Installed"
+    run_ok "helmFunction" "Checking Helm Installed"
+    run_ok "CURRENTEKSCHECK" "Checking EKS Status"
+	
+    val="no"
+	if [ X"$eks_Exists" = X"$val" ]; then
+        echo
+        log_error "Trying to delete Cluster when it doesn't exist. What are you trying to do?"
+        echo
+        exit 1
+    fi
+    
+	echo
+	log_debug "Phase 2 of 5: Delete Wolfram Application Server Deployments"
+	printf "${GREEN}☑${YELLOW}☑${CYAN}□□□${NORMAL} Phase ${YELLOW}2${NORMAL} of ${GREEN}5${NORMAL}: Delete Wolfram Application Server Deployments\\n"
+    
+    BASE_URL=$(kubectl get svc -n ingress-nginx | awk '{print $4}' | sed -n '2p')
+	sed -i -e "s/$BASE_URL/domain.com/g" deployments/active-web-elements-server-deployment.yaml
+	
+	run_ok "kubectl delete --ignore-not-found=true -f deployments/" "Deleting Deployments"
+    # Minio deployment setup
+    CURRENT_MINIO_ACCESS_KEY=$(grep -A1 -i MINIO_ACCESS_KEY deployments/minio-deployment.yaml | grep -i value: |  awk '{print $2}')
+    sed -i -e 's~'"$CURRENT_MINIO_ACCESS_KEY"'~<your-access-key>~g' deployments/minio-deployment.yaml
+    CURRENT_MINIO_SECRET_KEY=$(grep -A1 -i MINIO_SECRET_KEY deployments/minio-deployment.yaml | grep -i value: |  awk '{print $2}')
+    sed -i -e 's~'"$CURRENT_MINIO_SECRET_KEY"'~<your-secret-key>~g' deployments/minio-deployment.yaml
+    # Resource Manger deployment setup
+    CURRENT_MINIOACCESSKEY=$(grep -A1 -i MINIOACCESSKEY deployments/resource-manager-deployment.yaml | grep -i value: |  awk '{print $2}')
+    sed -i -e 's~'"$CURRENT_MINIOACCESSKEY"'~<your-access-key>~g' deployments/resource-manager-deployment.yaml
+    CURRENT_MINIOSECRETKEY=$(grep -A1 -i MINIOSECRETKEY deployments/resource-manager-deployment.yaml | grep -i value: |  awk '{print $2}')
+    sed -i -e 's~'"$CURRENT_MINIOSECRETKEY"'~<your-secret-key>~g' deployments/resource-manager-deployment.yaml
+    CURRENT_RESOURCEINFOBUCKET=$(grep -A1 -i RESOURCEINFO.BUCKET deployments/resource-manager-deployment.yaml | grep -i value: |  awk '{print $2}')
+    sed -i -e 's~'"$CURRENT_RESOURCEINFOBUCKET"'~<your-resourceinfo-bucketname>~g' deployments/resource-manager-deployment.yaml
+    CURRENT_NODEFILESBUCKET=$(grep -A1 -i NODEFILES.BUCKET deployments/resource-manager-deployment.yaml | grep -i value: |  awk '{print $2}')
+    CURRENT_NODEFILESBUCKET=$(echo $CURRENT_NODEFILESBUCKET | awk '{print $1}')
+	sed -i -e 's~'"$CURRENT_NODEFILESBUCKET"'~<your-nodefiles-bucketname>~g' deployments/resource-manager-deployment.yaml
+    CURRENT_RESOURCE_BUCKET_REGION=$(grep -A1 -i RESOURCE.BUCKET.REGION deployments/resource-manager-deployment.yaml | grep -i value: |  awk '{print $2}')
+    sed -i -e 's~'"$CURRENT_RESOURCE_BUCKET_REGION"'~<your-resource-bucket-region>~g' deployments/resource-manager-deployment.yaml
+    CURRENT_NODEFILES_BUCKET_REGION=$(grep -A1 -i NODEFILES.BUCKET.REGION deployments/resource-manager-deployment.yaml | grep -i value: |  awk '{print $2}')
+    sed -i -e 's~'"$CURRENT_NODEFILES_BUCKET_REGION"'~<your-nodefiles-bucket-region>~g' deployments/resource-manager-deployment.yaml
+
+	
+    run_ok "kafkaShutdown" "Deleting Kafka Cluster"
+    run_ok "kubectl delete secret generic basic-auth --ignore-not-found=true" "Deleting NGINX Auth"
+    
+	run_ok "kubectl delete --ignore-not-found=true -f ingress/" "Deleting Ingress"
+	run_ok "kubectl delete --ignore-not-found=true -f hpa/" "Deleting Horizontal Pod Autoscaler"
+    run_ok "kubectl delete --ignore-not-found=true -f services/" "Deleting Services"
+	run_ok "kubectl delete --ignore-not-found=true -f pvc/" "Deleting Persistent Volume Claims"
+	run_ok "kubectl delete --ignore-not-found=true -f strimzi-kafka-deployment/ && kubectl delete --ignore-not-found=true -f kafka && kubectl delete --ignore-not-found=true -f kafkabridge" "Deleting Kafka Cluster Operator"
+	run_ok "kubectl delete --ignore-not-found=true apiservice v1beta1.custom.metrics.k8s.io && kubectl delete --ignore-not-found=true -f namespace/" "Deleting WAS Namespace"
+	run_ok "kubectl config set-context --current --namespace=default" "Reset Namespace"
+      
+	echo
+	log_debug "Phase 3 of 5: Delete Dependencies"
+	printf "${GREEN}☑☑${YELLOW}☑${CYAN}□□${NORMAL} Phase ${YELLOW}3${NORMAL} of ${GREEN}5${NORMAL}: Delete Dependencies\\n"
+	run_ok "kubectl delete --ignore-not-found=true -f ingress-controller/" "Deleting Ingress Controller"
+	run_ok "kubectl delete --ignore-not-found=true -f metrics-server/" "Deleting Metrics Server"
+	run_ok "kubectl delete --ignore-not-found=true -f cluster-autoscaler/" "Deleting Cluster Autoscaler"
+    sed -i -e 's/- --node-group-auto-discovery=asg:tag=k8s.io\/cluster-autoscaler\/enabled,k8s.io\/cluster-autoscaler\/.*/- --node-group-auto-discovery=asg:tag=k8s.io\/cluster-autoscaler\/enabled,k8s.io\/cluster-autoscaler\/name/g' cluster-autoscaler/cluster-autoscaler-autodiscover.yaml
+	cd efs
+    set -e
+    kubectl patch storageclass gp2 -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}' >> $LOG_PATH
+    run_ok "kubectl delete --ignore-not-found=true daemonsets,replicasets,deployments,pods,statefulsets,rc,svc,sc,pv,pvc,ingress,hpa --all --all-namespaces" "Deleting all namespace resources"
+	efs_id=$(cat values.yaml | grep "efsFileSystemId:" | cut -d ' ' -f 4)
+	efs_mounts=$(aws efs describe-mount-targets --file-system-id $efs_id --profile default --region $GET_REGION | grep "MountTargetId" | cut -d '"' -f 4)
+
+    for eachval in $efs_mounts
+    do
+		aws efs delete-mount-target --mount-target-id $eachval
+		sleep 5
+    done
+
+    run_ok "sleep 15 && aws efs delete-file-system --file-system-id $efs_id" "Deleting EFS Storage System"
+    rm -rf values*
+    kubectl delete --ignore-not-found=true -f namespace.yaml >> $LOG_PATH
+	suffix_efs_sc="efs-mount-eks-"
+	efs_sc_id=$(aws ec2 describe-security-groups --output text | grep $suffix_efs_sc$GET_CLUSTER_NAME | awk '{print $3}')
+	aws ec2 delete-security-group --group-id $efs_sc_id >> $LOG_PATH
+	cd ..
+
+	echo
+	log_debug "Phase 4 of 5: Delete Amazon Kubernetes Cluster (EKS)"
+	printf "${GREEN}☑☑☑${YELLOW}☑${CYAN}□${NORMAL} Phase ${YELLOW}4${NORMAL} of ${GREEN}5${NORMAL}: Delete Amazon Kubernetes Cluster (EKS)\\n"
+    cd terraform
+	run_ok "sleep 5 && terraform init && terraform refresh && terraform destroy -auto-approve || true" "Deleting EKS"
+	set +e
+	terraform_bucket_name=$(grep -i terraform-s3-bucket-name variables.tf |  cut -d '"' -f 4)
+
+	echo
+	log_debug "Phase 5 of 5: Cleanup"
+	printf "${GREEN}☑☑☑☑${YELLOW}☑${NORMAL} Phase ${YELLOW}5${NORMAL} of ${GREEN}5${NORMAL}: Cleanup\\n"
+    run_ok "deleteAWSBucket" "Deleting Terraform S3 Bucket"
+    run_ok "aws dynamodb delete-table --table-name terraform-state-locking-was" "Deleting Dynamodb Terraform Table"
+	awk '!/terraform-s3-bucket-name/' variables.tf  > tmpfile && mv tmpfile variables.tf >> $LOG_PATH
+	rm -rf .terraform
+	cd ../..
+	run_ok "cleanconfiguration" "Cleaning Configuration - Resetting Back To Default"
+
+
+	echo
+    echo "Deleted EKS Cluster and Wolfram Application Server. Our warmest appreciation to you for running Wolfram Application Server on Amazon environment. Thank You!"
+	echo
+    
+}
+
+cleanconfiguration()
+{
+	banner=true
+	cd Source/terraform
+
+	echo
+	log_debug "Phase 1 of 1: Clean Configuration"
+	
+    CURRENT_REGION_VAL=$(grep -A1 -i "region         =" main.tf | head -n 1 | awk '{print $3}')
+    sed -i -e 's/'"$CURRENT_REGION_VAL"'/"${var.cluster-name}"/g' main.tf
+	CURRENT_BUCKET_VAL=$(grep -i "bucket         =" main.tf | awk '{print $3}' | head -n 1)
+    sed -i -e 's/'"$CURRENT_BUCKET_VAL"'/"terraform-tfstate-${var.cluster-name}"/g' main.tf
+	GET_REGION=$(grep -A1 -i aws_region variables.tf | grep -i default | awk '{print $3}' | sed -e 's/"//g' | tr -d '\n')
+    GET_REGION=$(echo $GET_REGION | tr -d '\r')
+    sed -i -e 's/'"$GET_REGION"'/us-east-1/g' variables.tf
+	awk '!/terraform-s3-bucket-name/' variables.tf  > tmpfile && mv tmpfile variables.tf >> $LOG_PATH
+	rm -rf .terraform*
+	rm -rf stopspinning*
+	cd ..
+	rm -rf stopspinning
+    rm -rf efs/mountIDs.txt
+    rm -rf efs/stopspinning
+    rm -rf custom-metrics/stopspinning
+	rm -rf tmpfile	
+	
+	
+	# clean deployments
+	currentDomain=$(grep -Eo '(http|https)://[^/"]+' deployments/active-web-elements-server-deployment.yaml | head -n 1)
+	sed -i -e "s~$currentDomain~http:\/\/domain.com~g" deployments/active-web-elements-server-deployment.yaml
+    # Minio deployment setup
+    CURRENT_MINIO_ACCESS_KEY=$(grep -A1 -i MINIO_ACCESS_KEY deployments/minio-deployment.yaml | grep -i value: |  awk '{print $2}')
+    sed -i -e 's~'"$CURRENT_MINIO_ACCESS_KEY"'~<your-access-key>~g' deployments/minio-deployment.yaml
+    CURRENT_MINIO_SECRET_KEY=$(grep -A1 -i MINIO_SECRET_KEY deployments/minio-deployment.yaml | grep -i value: |  awk '{print $2}')
+    sed -i -e 's~'"$CURRENT_MINIO_SECRET_KEY"'~<your-secret-key>~g' deployments/minio-deployment.yaml
+    # Resource Manger deployment setup
+    CURRENT_MINIOACCESSKEY=$(grep -A1 -i MINIOACCESSKEY deployments/resource-manager-deployment.yaml | grep -i value: |  awk '{print $2}')
+    sed -i -e 's~'"$CURRENT_MINIOACCESSKEY"'~<your-access-key>~g' deployments/resource-manager-deployment.yaml
+    CURRENT_MINIOSECRETKEY=$(grep -A1 -i MINIOSECRETKEY deployments/resource-manager-deployment.yaml | grep -i value: |  awk '{print $2}')
+    sed -i -e 's~'"$CURRENT_MINIOSECRETKEY"'~<your-secret-key>~g' deployments/resource-manager-deployment.yaml
+    CURRENT_RESOURCEINFOBUCKET=$(grep -A1 -i RESOURCEINFO.BUCKET deployments/resource-manager-deployment.yaml | grep -i value: |  awk '{print $2}')
+    sed -i -e 's~'"$CURRENT_RESOURCEINFOBUCKET"'~<your-resourceinfo-bucketname>~g' deployments/resource-manager-deployment.yaml
+    CURRENT_NODEFILESBUCKET=$(grep -A1 -i NODEFILES.BUCKET deployments/resource-manager-deployment.yaml | grep -i value: |  awk '{print $2}')
+    CURRENT_NODEFILESBUCKET=$(echo $CURRENT_NODEFILESBUCKET | awk '{print $1}')
+	sed -i -e 's~'"$CURRENT_NODEFILESBUCKET"'~<your-nodefiles-bucketname>~g' deployments/resource-manager-deployment.yaml
+    CURRENT_RESOURCE_BUCKET_REGION=$(grep -A1 -i RESOURCE.BUCKET.REGION deployments/resource-manager-deployment.yaml | grep -i value: |  awk '{print $2}')
+    sed -i -e 's~'"$CURRENT_RESOURCE_BUCKET_REGION"'~<your-resource-bucket-region>~g' deployments/resource-manager-deployment.yaml
+    CURRENT_NODEFILES_BUCKET_REGION=$(grep -A1 -i NODEFILES.BUCKET.REGION deployments/resource-manager-deployment.yaml | grep -i value: |  awk '{print $2}')
+    sed -i -e 's~'"$CURRENT_NODEFILES_BUCKET_REGION"'~<your-nodefiles-bucket-region>~g' deployments/resource-manager-deployment.yaml
+
+	cd ..
+	
+	echo "Complete!"
+
+}
+
+
+deleteAWSBucket()
+{
+aws s3api delete-objects --bucket $terraform_bucket_name --delete "$(aws s3api list-object-versions --bucket $terraform_bucket_name --query='{Objects: Versions[].{Key:Key,VersionId:VersionId}}')"
+aws s3api delete-objects --bucket $terraform_bucket_name --delete "$(aws s3api list-object-versions --bucket $terraform_bucket_name --query='{Objects: DeleteMarkers[].{Key:Key,VersionId:VersionId}}')"
+aws s3 rb s3://$terraform_bucket_name --force
+}
+
+NEWEKSCHECK()
+{
+    clusterExists=$(aws eks describe-cluster --name $GET_CLUSTER_NAME 2>/dev/null 2>&1 )
+	if [[ $clusterExists =~ "{" ]]; then
+		printf "cluster found"
+		eks_Exists="yes"
+	else
+	    printf "no cluster found" 2>/dev/null 2>&1
+		eks_Exists="no"
+	fi
+}
+
+CURRENTEKSCHECK()
+{
+    cd terraform
+    GET_CLUSTER_NAME=$(grep -A1 -i cluster-name variables.tf | grep -i default | awk '{print $3}' | sed -e 's/"//g' | tr -d '\n')
+    GET_CLUSTER_NAME=$(echo $GET_CLUSTER_NAME | tr -d '\r')
+    clusterExists=$(aws eks describe-cluster --name $GET_CLUSTER_NAME 2>/dev/null 2>&1 )
+	if [[ $clusterExists =~ "ACTIVE" ]]; then
+		printf "cluster found"
+		eks_Exists="yes"
+	else
+	    printf "no cluster found" 2>/dev/null 2>&1
+		eks_Exists="no"
+	fi
+    cd ..
+}
+
+URLFunction()
+{
+    banner=true
+	echo
+	log_debug "Phase 1 of 1: Application URL Details"
+	printf "${GREEN}${YELLOW}☑${CYAN}${NORMAL} Phase ${YELLOW}1${NORMAL} of ${GREEN}1${NORMAL}: Application URL Details\\n\n"
+    BASE_URL=$(kubectl get svc -n ingress-nginx | awk '{print $4}' | sed -n '2p')
+    printf "${GREEN}Base URL - Active Web Elements Server:${NORMAL} http://$BASE_URL/\n\n"
+    printf "${GREEN}Resource Manager:${NORMAL} http://$BASE_URL/resources/\n\n"
+    printf "${GREEN}Endpoints Manager:${NORMAL} http://$BASE_URL/endpoints/\n\n"
+    printf "${GREEN}Nodefiles:${NORMAL} http://$BASE_URL/nodefiles/\n\n"
+    printf "${GREEN}Endpoints Info:${NORMAL} http://$BASE_URL/.applicationserver/info\n\n"
+    printf "${GREEN}Restart AWES:${NORMAL} http://$BASE_URL/.applicationserver/kernel/rollout-restart\n\n"
+	
+}
+
+
+helpFunction()
+{
+  banner=true
+  printf "Usage: %s %s [options]\\n" "${CYAN}" $(basename "$0")
+  echo
+  printf "  ${YELLOW}--create${NORMAL} \t\t- Setup EKS and Deploy Wolfram Application Server on AWS\\n"
+  printf "  ${YELLOW}--delete${NORMAL} \t\t- Delete EKS and Wolfram Application Server from AWS\\n"
+  printf "  ${YELLOW}--endpoint-info${NORMAL} \t- Get Your Application URL Endpoints Information\\n"
+  printf "  ${YELLOW}--clean-configuration${NORMAL} \t- Clean any custom configuration for buckets and regions\\n"
+  printf "  ${YELLOW}--help${NORMAL} \t\t- Help\\n"
+  echo
+}
+
+
+invalidoptionsFunction()
+{
+    log_error "Invalid flags given."
+	echo
+	helpFunction
+    exit 1
+}
+
+while test $# -gt 0
+do
+    case "$1" in
+        --create) SetupFunction
+            ;;
+        --delete) DeleteFunction
+            ;;
+        --endpoint-info) URLFunction
+            ;;
+        --clean-configuration) cleanconfiguration
+            ;;
+        --help) helpFunction
+            ;;
+        --*) invalidoptionsFunction
+            ;;
+        *) invalidoptionsFunction
+            ;;
+    esac
+    shift
+done
+
+if [ "$banner" = false ] ; then
+    log_error "Missing required flags."
+	echo
+	helpFunction
+    exit 1
+fi
+
+exit 0

@@ -1,0 +1,47 @@
+apiVersion: kafka.strimzi.io/v1beta1
+kind: KafkaTopic
+metadata:
+  name: endpoint-info
+  labels:
+    strimzi.io/cluster: kafka-persistent
+spec:
+  partitions: 2
+  replicas: 3
+  config:
+    retention.bytes: -1
+    retention.ms: -1
+    cleanup.policy: compact
+    min.cleanable.dirty.ratio: 0.05
+  topicName: endpoint-info
+---
+apiVersion: kafka.strimzi.io/v1beta1
+kind: KafkaTopic
+metadata:
+  name: resource-info
+  labels:
+    strimzi.io/cluster: kafka-persistent
+spec:
+  partitions: 2
+  replicas: 3
+  config:
+    retention.bytes: -1
+    retention.ms: -1
+    cleanup.policy: compact
+    min.cleanable.dirty.ratio: 0.05
+  topicName: resource-info
+---
+apiVersion: kafka.strimzi.io/v1beta1
+kind: KafkaTopic
+metadata:
+  name: nodefile-info
+  labels:
+    strimzi.io/cluster: kafka-persistent
+spec:
+  partitions: 2
+  replicas: 3
+  config:
+    retention.bytes: -1
+    retention.ms: -1
+    cleanup.policy: compact
+    min.cleanable.dirty.ratio: 0.05
+  topicName: nodefile-info

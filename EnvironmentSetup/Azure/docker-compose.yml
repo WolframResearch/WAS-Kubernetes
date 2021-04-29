@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  azure-setup-manager:
+    build:
+      context: Source
+      dockerfile: Dockerfile
+    image: azure-setup-manager:latest
+    stdin_open: true
+    tty: true
+    pid: "host"
+    container_name: azure-setup-manager
+    volumes:
+      - ./Source:/Source
+      - type: bind
+        source: ./Source/setup
+        target: /setup
+      - type: bind
+        source: ~/.azure
+        target: /root/.azure
+      - type: bind
+        source: ~/.kube
+        target: /root/.kube
+      - tmp:/tmp
+      - terraform-state:/terraform-state
+        
+volumes:
+  terraform-state:
+  tmp:

@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  aws-setup-manager:
+    build:
+      context: Source
+      dockerfile: Dockerfile
+    image: aws-setup-manager:latest
+    stdin_open: true
+    tty: true
+    pid: "host"
+    container_name: aws-setup-manager
+    volumes:
+      - ./Source:/Source
+      - type: bind
+        source: ./Source/setup
+        target: /setup
+      - type: bind
+        source: ~/.aws
+        target: /root/.aws
+      - type: bind
+        source: ~/.kube
+        target: /root/.kube
+      - tmp:/tmp
+      - terraform-state:/terraform-state
+        
+volumes:
+  terraform-state:
+  tmp:

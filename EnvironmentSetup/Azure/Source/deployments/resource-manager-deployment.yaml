@@ -1,0 +1,83 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: resource-manager-deployment
+  namespace: was
+  labels:
+    app: resource-manager
+spec:
+  selector:
+    matchLabels:
+      app: resource-manager
+  minReadySeconds: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 50%
+      maxUnavailable: 50%
+  template:
+    metadata:
+      labels:
+        app: resource-manager
+    spec:
+      restartPolicy: Always
+      containers:
+      - env:
+        - name: SPRING_PROFILES_ACTIVE
+          value: docker
+        - name: LOG_LOCATION
+          value: /opt/app/logs
+        - name: KAFKA.BOOTSTRAP-SERVERS
+          value: kafka-persistent-kafka-bootstrap.kafka.svc.cluster.local:9092
+        - name: MINIOACCESSKEY
+          value: <your-access-key>
+        - name: MINIOSECRETKEY
+          value: <your-secret-key>
+        - name: RESOURCEINFO.BUCKET
+          value: <your-resourceinfo-bucketname>
+        - name: NODEFILES.BUCKET
+          value: <your-nodefiles-bucketname>
+        image: wolframapplicationserver/resource-manager:1.0.0
+        name: resource-manager
+        ports:
+        - containerPort: 9090
+        resources:
+          limits:
+            cpu: "1000m"
+            memory: 1Gi
+          requests:
+            cpu: "500m"
+            memory: 500Mi
+        readinessProbe:
+          tcpSocket:
+            port: 9090
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        livenessProbe:
+          tcpSocket:
+            port: 9090
+          initialDelaySeconds: 15
+          periodSeconds: 20   
+        volumeMounts:
+        - mountPath: "/opt/app/logs"
+          name: resources-logs-storage
+      initContainers:
+      - name: init-minio
+        image: bash
+        command: ["bash", "-c", "for i in $(seq 1 3000); do nc -zvw1 minio 9000 && exit 0 || sleep 3; done; exit 1"]
+      - name: init-kafka
+        image: bash
+        command: ["bash", "-c", "for i in $(seq 1 3000); do nc -zvw1 kafka-persistent-kafka-bootstrap.kafka.svc.cluster.local 9092 && exit 0 || sleep 3; done; exit 1"]
+      - name: init-kafka-resources-topic
+        image: bash
+        command: ["bash", "-c", "apk --update add curl; set -x; while true; do response=$(curl -s kafka-bridge-service.kafka.svc.cluster.local:9092/topics); if [[ ${response} =~ .*\"resource-info\".* ]]; then break; else sleep 5; fi; done" ]
+      - name: init-kafka-endpoints-topic
+        image: bash
+        command: ["bash", "-c", "apk --update add curl; set -x; while true; do response=$(curl -s kafka-bridge-service.kafka.svc.cluster.local:9092/topics); if [[ ${response} =~ .*\"endpoint-info\".* ]]; then break; else sleep 5; fi; done" ]
+      - name: init-kafka-nodefiles-topic
+        image: bash
+        command: ["bash", "-c", "apk --update add curl; set -x; while true; do response=$(curl -s kafka-bridge-service.kafka.svc.cluster.local:9092/topics); if [[ ${response} =~ .*\"nodefile-info\".* ]]; then break; else sleep 5; fi; done" ]
+      volumes:
+        - name: resources-logs-storage
+          persistentVolumeClaim:
+            claimName: resources-logs
