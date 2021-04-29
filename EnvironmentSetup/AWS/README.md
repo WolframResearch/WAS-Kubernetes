@@ -85,7 +85,7 @@ The output of this command will follow this pattern:
 
     was = ServiceConnect["WolframApplicationServer", "http://<your-base-url>"];
 	ServiceExecute[was, "DeployNodeFile",
-	{"Contents"-> File["path/to/mathpass"], "NodeFile" -> ".Wolfram/Licensing/mathpass"}]
+	{"Contents"-> File["/path/to/mathpass"], "NodeFile" -> ".Wolfram/Licensing/mathpass"}]
 
 
 Alternatively you may use the [node files REST API](../../Documentation/API/NodeFilesManager.md) to install the license file.
