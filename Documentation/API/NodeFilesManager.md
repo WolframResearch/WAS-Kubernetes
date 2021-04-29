@@ -66,7 +66,16 @@ Posts a new node file to the shared location. The Content-Type of this request i
  		{
   			"location": "WebPackages/Kernel/init.m"
   		}
+* If the file already exist, Response 400 Bad Request (application/json)
 
+		[{
+ 			"timestamp": "2019-08-28T17:11:30.427+0000",
+ 			"status": 400,
+ 			"error": "Bad Request",
+			"message": "NodeFile already exist at path : .Wolfram/Kernel/init.m",
+ 			"path": "/nodefiles/"
+		}]
+		
 ## Node Files [/nodefiles/{location}]
 
 ### GET
