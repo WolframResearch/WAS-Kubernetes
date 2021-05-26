@@ -23,7 +23,7 @@ variable "max_pods" {
 }
 
 variable "cluster-version" {
-  default = "1.19.9"
+  default = "1.20.5"
 }
 
 variable "disk-size" {
