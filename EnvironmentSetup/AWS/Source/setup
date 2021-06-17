@@ -420,6 +420,7 @@ EOF
 
 }
 install_msg
+export AWS_DEFAULT_OUTPUT="json"
 
 SetupFunction()
 {
