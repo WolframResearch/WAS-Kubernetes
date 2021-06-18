@@ -1089,7 +1089,7 @@ URLFunction()
     printf "${GREEN}Endpoints Manager:${NORMAL} http://$BASE_URL/endpoints/\n\n"
     printf "${GREEN}Nodefiles:${NORMAL} http://$BASE_URL/nodefiles/\n\n"
     printf "${GREEN}Endpoints Info:${NORMAL} http://$BASE_URL/.applicationserver/info\n\n"
-    printf "${GREEN}Restart AWES:${NORMAL} http://$BASE_URL/.applicationserver/kernel/rollout-restart\n\n"
+    printf "${GREEN}Restart AWES:${NORMAL} http://$BASE_URL/.applicationserver/kernel/restart\n\n"
 	
 }
 
