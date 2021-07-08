@@ -37,7 +37,7 @@ spec:
           value: <your-resourceinfo-bucketname>
         - name: NODEFILES.BUCKET
           value: <your-nodefiles-bucketname>
-        image: wolframapplicationserver/resource-manager:1.0.1
+        image: wolframapplicationserver/resource-manager:1.1.0
         name: resource-manager
         ports:
         - containerPort: 9090
