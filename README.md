@@ -16,7 +16,11 @@ Instantiate a cluster in Azure, check out the following repository (EnvironmentS
 Contact Wolfram Technical Support for options and documentation.
 
 # Activation
-Obtain a license file from your sales representative. This file needs to be deployed to the WAS as a node file in the conventional location `.Wolfram/Licensing/mathpass`. From a Wolfram Language client, this may be achieved using the following code: 
+Obtain a license file from your sales representative. This file needs to be deployed to the WAS as a node file in the conventional location `.Wolfram/Licensing/mathpass`. From a Wolfram Language client load the Wolfram Application Server package (you need do this only once in a Wolfram Language session to enable WAS service functions)
+
+	Needs["WolframApplicationServer`"]
+
+then evaluate the following code:
 
     was = ServiceConnect["WolframApplicationServer", "http://<your-base-url>"];
 	ServiceExecute[was, "DeployNodeFile",
