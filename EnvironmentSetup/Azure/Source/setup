@@ -639,7 +639,7 @@ custommetricsSetup()
 	helm repo update >> $LOG_PATH
 	helm install was -f values.yaml prometheus-community/prometheus-adapter --namespace monitoring >> $LOG_PATH
 	sleep 15
-	kubectl wait --for=condition=ready --timeout=30m pod -l app=prometheus-adapter -n monitoring >> $LOG_PATH
+	kubectl wait --for=condition=ready --timeout=30m pod -l app.kubernetes.io/name=prometheus-adapter -n monitoring >> $LOG_PATH
 }
 
 
