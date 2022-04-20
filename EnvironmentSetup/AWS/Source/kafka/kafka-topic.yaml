@@ -43,5 +43,5 @@ spec:
     retention.bytes: -1
     retention.ms: -1
     cleanup.policy: compact
-    min.cleanable.dirty.ratio: 0.05
+    min.cleanable.dirty.ratio: 0
   topicName: nodefile-info
