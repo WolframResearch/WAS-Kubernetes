@@ -44,4 +44,5 @@ spec:
     retention.ms: -1
     cleanup.policy: compact
     min.cleanable.dirty.ratio: 0
+    segment.ms: 100
   topicName: nodefile-info
