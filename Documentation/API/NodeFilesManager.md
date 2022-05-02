@@ -12,7 +12,7 @@ Retrieves all the available node files. The API returns list of node file paths 
 		GET /nodefiles
 	Example:
 
-		GET "http://nodefilesmanager.wolfram.com/nodefiles"
+		GET "http://applicationserver.wolfram.com/nodefiles"
 
 * Response 200 (application/json):
 
@@ -24,7 +24,7 @@ Retrieves all the available node files. The API returns list of node file paths 
 			  "hashMD5":"e65a396cca1a0e502d676c20f5f29b21",
 			  "uploaded":"2019-04-30 12:40:05.0"
 			},
-			"WebPackages/Kernel/init.m":{
+			".Wolfram/Kernel/init.m":{
 			  "size":"20971520",
 			  "hashMD5":"9bb5c73e11f0731e2de05874b26532d8",
 			  "uploaded":"2019-01-15 09:30:15.0"
@@ -38,26 +38,26 @@ Retrieves all the available node files. The API returns list of node file paths 
 
 ### POST
 
-Posts a new node file to the shared location. The Content-Type of this request is `multipart/form-data`. We should upload a node file using `nodeFile` parameter and provide node file location in the `path` parameter. Once the node file is successfully uploaded the API returns location of the newly created node file.
+Posts a new node file to the shared location. The Content-Type of this request is `multipart/form-data`. We should upload a node file using `nodeFile` parameter and also provide the path in the `path` parameter. Once the node file is successfully uploaded the API returns location of the newly created node file. We can upload multiple files in the same path. The path parameter along with nodefile name uniquely identify a nodefile location.
 
 * Request
 
  		POST /nodefiles
  	Example:
 
-		POST "http://nodefilesmanager.wolfram.com/nodefiles"
+		POST "http://applicationserver.wolfram.com/nodefiles"
 * Parameters
 
 	* nodeFile(required, file): This parameter use to upload a node file which will get stored in the shared storage
 
 	 	Example:
 
-	 		name="nodeFile"; filename="file.m"
+	 		name="nodeFile"; filename="init.m"
 
 	* path(required, string): This parameter use to specify the relative node file path.
  		Example:
 
-	 		name="path"; value="WebPackages/Kernel/init.m"
+	 		name="path"; value=".Wolfram/Kernel"
 
 * Response 201 Created (application/json)
 
@@ -89,7 +89,7 @@ Gets the actual node file. If we wanted to download the actual node file we can 
 
 	Example:
 
-		GET "http://nodefilesmanager.wolfram.com/nodefiles/WebPackages/Kernel/init.m"
+		GET "http://applicationserver.wolfram.com/nodefiles/.Wolfram/Kernel/init.m"
 
 The response Content-Type corresponds to the file MIME type, and the response body is the raw file content.
 
@@ -121,7 +121,7 @@ Updates an existing node file. Provide the node file location in the request par
 
 	Example:
 
-		PUT "http://nodefilesmanager.wolfram.com/nodefiles/WebPackages/Kernel/init.m"
+		PUT "http://applicationserver.wolfram.com/nodefiles/.Wolfram/Kernel/init.m"
 
 
 * Response 202 Accepted
@@ -148,7 +148,7 @@ Deletes an existing node file. Provide the node file location in the request par
 		DELETE /nodefiles/{location}
 	Example:
 
-		DELETE "http://nodefilesmanager.wolfram.com/nodefiles/WebPackages/Kernel/init.m"
+		DELETE "http://applicationserver.wolfram.com/nodefiles/.Wolfram/Kernel/init.m"
 * Response 202 Accepted
 
 ## NodeFile Health Check [/nodefiles/.applicationserver/info]
@@ -162,7 +162,7 @@ Retrieves information for the node file manager and provides a way to confirm th
 		GET /nodefiles/.applicationserver/info
 	Example:
 
-		GET "http://nodefilesmanager.wolfram.com/nodefiles/.applicationserver/info"
+		GET "http://applicationserver.wolfram.com/nodefiles/.applicationserver/info"
 * Response 200 (application/json):
 
 	Example:
