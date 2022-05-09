@@ -116,7 +116,7 @@ Use this to create or modify an endpoint for a specified resource file. The Endp
 
 Use this to get information about a specific endpoint. The API takes an endpointPath as a path variable and returns an EndpointInfo object in JSON format.
 * Parameter
-	* endpointPath (String) : This path uniquely identify an endpoint
+	* endpointPath (String) : This path uniquely identify an endpoint.
 
 * Request
 
@@ -147,7 +147,7 @@ Use this to get information about a specific endpoint. The API takes an endpoint
 Use this to delete an existing endpoint. The API takes the path of the endpoint as a path variable and returns nothing.
 
 * Parameter
-	* endpointPath (String) : This path uniquely identify an endpoint
+	* endpointPath (String) : This path uniquely identifies an endpoint.
 * Request
 
 		DELETE /endpoints/{path}
@@ -160,7 +160,7 @@ Use this to delete an existing endpoint. The API takes the path of the endpoint 
 
 ### GET
 
-This retrieves information about the endpoint manager providing an API to confirm that the endpoint manager is running.
+Use this to retrieve information about the endpoint manager. The API may be used to confirm that the endpoint manager is running.
 
 * Request
 

@@ -1,11 +1,12 @@
 # Node Files Manager API
-Node Files Manager component can be used to deploy shared source libraries that may be accessed by multiple resources or other system files used for configuration of components. The Node Files manager coordinates with other components to deliver local instances of node files.
+
+This API covers the node file lifecycle required for deploying content that resides on the node local file system. Using this API we can install, modify, and remove files which may be directly accessed by the Wolfram Engine.
 
 ## Node Files [/nodefiles]
 
 ### GET
 
-Retrieves all the available node files. The API returns list of node file paths along with the nodeFileName and location in the JSON format. Node file paths are relative to a specific directory in Active web element server.
+Use this to retrieve a listing of all the resident node files. The API returns list of node file paths along with the nodeFileName and location in JSON format. Node file paths are relative to the configured node files root directory in Active web element server.
 
 * Request
 
@@ -38,7 +39,7 @@ Retrieves all the available node files. The API returns list of node file paths 
 
 ### POST
 
-Posts a new node file to the shared location. The Content-Type of this request is `multipart/form-data`. We should upload a node file using `nodeFile` parameter and also provide the path in the `path` parameter. Once the node file is successfully uploaded the API returns location of the newly created node file. We can upload multiple files in the same path. The path parameter along with nodefile name uniquely identify a nodefile location.
+Use this to create a new node file to the local node files directory. The Content-Type of this request is `multipart/form-data`. The `nodeFile` parameter with the file name should be provided along with the directory path in the `path` parameter (use the value of '/' for files to be placed in the root directory). Once the node file is successfully uploaded the API returns location of the newly created node file. The path parameter combined with node file name uniquely identifies a node file location.
 
 * Request
 
@@ -48,13 +49,13 @@ Posts a new node file to the shared location. The Content-Type of this request i
 		POST "http://applicationserver.wolfram.com/nodefiles"
 * Parameters
 
-	* nodeFile(required, file): This parameter use to upload a node file which will get stored in the shared storage
+	* nodeFile(required, file): This is the file name for the uploaded file.
 
 	 	Example:
 
 	 		name="nodeFile"; filename="init.m"
 
-	* path(required, string): This parameter use to specify the relative node file path.
+	* path(required, string): This is the directory in which the uploaded file should be placed.
  		Example:
 
 	 		name="path"; value=".Wolfram/Kernel"
@@ -66,7 +67,7 @@ Posts a new node file to the shared location. The Content-Type of this request i
  		{
   			"location": "WebPackages/Kernel/init.m"
   		}
-* If the file already exist, Response 400 Bad Request (application/json)
+* If the file already exists: Response 400 Bad Request (application/json)
 
 		[{
  			"timestamp": "2019-08-28T17:11:30.427+0000",
@@ -79,10 +80,10 @@ Posts a new node file to the shared location. The Content-Type of this request i
 ## Node Files [/nodefiles/{location}]
 
 ### GET
-Gets the actual node file. If we wanted to download the actual node file we can send location as the input parameter. The API will return the source of the node file.
+Use this to get the contents of a node file. The API takes the location of the node file as a path variable and returns the contents of the node file.
 
 * Parameter
-	* location(String) : This location define the node files directory where node files get stored
+	* location(String) : This location specifies the full path to the node file.
 * Request
 
 		GET /nodefiles/{location}
@@ -95,7 +96,7 @@ The response Content-Type corresponds to the file MIME type, and the response bo
 
 * Response 200
 
-* If the location not exist, Response 404 Not Found (application/json)
+* If the location does not exist: Response 404 Not Found (application/json)
 
 		[{
     		"timestamp": "2019-08-28T17:11:30.427+0000",
@@ -106,11 +107,11 @@ The response Content-Type corresponds to the file MIME type, and the response bo
 		}]
 
 ### PUT
-Updates an existing node file. Provide the node file location in the request parameter. The Content-Type of this request is `multipart/form-data`. Upload a new node file to update, using `nodeFile` parameter. The API returns response status Accepted. To view the updated file call, GET `/nodefiles/{location}`.
+Use this to update an existing node file. The API takes the node file location as a path variable and a local file with the source contents to be uploaded specified with the `nodeFile` parameter. The Content-Type of this request is `multipart/form-data`. The API returns nothing.
 
 * Parameter
-	* location (String) : This location define the file directory where node files get stored
-	* nodeFile (required, file): This parameter use to upload new node file which will get stored in the shared storage
+	* location (String) : This location specifies the full path to the node file.
+	* nodeFile (required, file): This is the location of a local file to upload as the replacement contents of the existing node file.
 
 	 	Example:
 
@@ -139,10 +140,10 @@ Updates an existing node file. Provide the node file location in the request par
 
 ### DELETE
 
-Deletes an existing node file. Provide the node file location in the request parameter. After deletion the API returns response status Accepted. To verify, call, GET `/nodefiles/{location}` .
+Use this to delete an existing node file. This API takes the node file location as a path variable and returns nothing.
 
 * Parameter
-	* location (String) : This path define the node file directory where files get stored
+	* location (String) : This location specifies the full path to the node file.
 * Request
 
 		DELETE /nodefiles/{location}
@@ -155,7 +156,7 @@ Deletes an existing node file. Provide the node file location in the request par
 
 ### GET
 
-Retrieves information for the node file manager and provides a way to confirm that the node file manager is running.
+Use this to retrieve information about the node files manager. The API may be used to confirm that the endpoint manager is running.
 
 * Request
 
