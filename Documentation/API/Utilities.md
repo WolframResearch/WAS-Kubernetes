@@ -1,42 +1,49 @@
 # WAS Utility APIs
 
-The purpose of this document is to detail all APIs provided by the Wolfram Application Server which are used in a general informative or administrative purpose.
+These APIs provide general information about the Wolfram Application Server instance and offer administrative services.
 
 ## Information [.applicationserver/info]
 
 ### Retrieve Server Information [GET]
 
-Used to retrieve general information about the WAS instance. This API should be served without any subdomain or extraneous path elements. For the example below, the request URL would be `http://devel.applicationserver.wolfram.com/.applicationserver/info`.
+Use this to retrieve general information about the Wolfram Application Server cluster.
 
-+ Response 200 (application/json)
+* Request
 
-    + Response
-        ```
-        {
-            "resourceManager": "http://resources.devel.applicationserver.wolfram.com",
-            "endpointManager": "http://endpoints.devel.applicationserver.wolfram.com",
-            "nodefileManager": "http://nodefiles.devel.applicationserver.wolfram.com",
-            "canonicalBaseURL": "http://devel.applicationserver.wolfram.com",
-            "restartURL": "http://devel.applicationserver.wolfram.com/.applicationserver/kernel/restart",
-            "wasVersion": "1.0",
-            "wolframEngineVersion": "12.1"
-        }
-        ```
+		GET /.applicationserver/info
+	Example:
+
+		GET "http://applicationserver.wolfram.com/.applicationserver/info"
+
+* Response 200 (application/json)
+
+    * Example:
+ 
+			{
+				"resourceManager": "http://resources.applicationserver.wolfram.com",
+				"endpointManager": "http://endpoints.applicationserver.wolfram.com",
+				"nodefileManager": "http://nodefiles.applicationserver.wolfram.com",
+				"canonicalBaseURL": "http://applicationserver.wolfram.com",
+				"restartURL": "http://applicationserver.wolfram.com/.applicationserver/kernel/restart",
+				"wasVersion": "3.0",
+				"wolframEngineVersion": "13."
+			}
 
 ## Restart Container [GET]
 
 ### Restart [.applicationserver/kernel/restart]
 
-This api used for administrative purpose. Admin can restart the containers using this api url. In order to restart the container first we need to provide username and password. Once authenticated container will get restarted and user will receive message as "Container restarted successfully!". This API should be served without any subdomain or extraneous path elements. For example below, the request URL would be `https://test.applicationserver.wolfram.com/.applicationserver/kernel/restart`.
+Use this to initiate a rolling restart of the Active Web Element Server instances (other services will not be affected). The API uses basic authentication and requires a username and password (set during cluster initiation). It returns a success message string.
 
-Restart - Basic Auth Details:
+* Request
 
-	Username: applicationserver
+		GET /.applicationserver/kernel/restart
+	Example:
 
-	Password: P7g[/Y8v?KR}#YvN
+		GET "http://applicationserver.wolfram.com/.applicationserver/kernel/restart"
 
-+ Response 200 (application/json)
+* Response 200 OK
 
-    + Response String
+    * Example:
     		
     		Container restarted successfully!
