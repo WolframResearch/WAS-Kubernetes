@@ -7,7 +7,7 @@ ENV TF_DATA_DIR=/terraform-state
 RUN apt-get update && apt-get install awscli software-properties-common apt-transport-https locales curl tar git procps libncurses-dev -y && \
 	locale-gen en_US.utf8 && locale -a  && \
 	update-locale LANG=en_US.UTF-8 LANG=en_US.UTF8 LC_CTYPE=en_US.UTF8 LC_COLLATE=en_US.UTF8 && \
-	curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" && \
+	curl -LO "https://dl.k8s.io/release/v1.23.0/bin/linux/amd64/kubectl" && \
     chmod +x ./kubectl && \
     mv ./kubectl /usr/local/bin/kubectl  && \
     kubectl version --client  && \
