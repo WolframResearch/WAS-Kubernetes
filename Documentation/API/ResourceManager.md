@@ -1,6 +1,6 @@
 # Resource Manager API
 
-This API deals with all the resource creation required for Wolfram Application Server. The resource encapsulates metadata that specifies how it is to be evaluated by the active web element server application and a reference to the stored source data that may be used to access it.
+This API covers resource lifecycle required for deploying public content. A resource encapsulates code to evaluate or content to display along with metadata which specifies how it is to be interpreted by the Active Web Elements server application. Using this API we can create, configure, modify, and delete user facing content.
 
 ## General notes and definitions
 ### API Model
@@ -14,20 +14,19 @@ This API deals with all the resource creation required for Wolfram Application S
 				timeout : integer
 			}
 
-This API uses a `ResourceInfo` JSON model for creation of resources. This model contains information like resourcePath, poolName, timeout and content type etc. Use of each parameter is described below:
+This API uses a `ResourceInfo` JSON model for the specification of resources. This model contains information like resourcePath, poolName, timeout and content type etc. Use of each parameter is described below:
 
-* **resourcePath** (required, string) : This path uniquely identify particular resource. This resourcePath is the name of the file name we are going to upload in the shared storage system. For example, if we are uploading a file named `add.wl` then resourcePath is `add.wl` which is the unique key in the shared storage system.
-
-* **resourceType** (required, string): This field accepts values, `Active `, `MSP` and `Static `. The value `Active ` is used to evaluate active web elements which include `APIFunction`, `FormFunction` and `AskFunction` etc. The value `MSP ` is used for evaluating all MSPs. The value `Static` is used for raw asset files that are not evaluated, e.g. HTML files, CSS files, images, etc. This field cannot be null.
-* **mimeType** (optional, string): This field used to specify the mime type of the contents send as part of the request body for the POST API call. The value will be `Automatic` by default.
-* **poolName** (required, string): This field is required for MSP requests and the value should be set to `MSP`. For all other resource, the poolName is `Public`, and if we don't specify any value, the 'default' pool will be used.
-* **timeout** (optional): The number of seconds to wait for a resource to respond. The default timeout is 30 seconds, which can be specified with the value `null`.
+* **resourcePath** (required, string) : This path uniquely identifies a deployed resource.
+* **resourceType** (required, string): This field specifies how the resource will be interpreted by the Wolfram Web Engine. It accepts values from an enumeration: `Active `, `MSP` and `Static `. The value `Active ` is used when deploying Active Web Elements such as `APIFunction`, `FormFunction` and `AskFunction`, etc. The value `MSP ` is used when deploying legacy MSP content. The value `Static` is used for raw asset files which are not processed before serving, e.g. HTML files, CSS files, images, etc. This field cannot be null.
+* **mimeType** (optional, string): This field specifies the mime type of the contents to be uploaded. The value will be `Automatic` by default.
+* **poolName** (required, string): This field names the kernel pool to be used to process a request for the resource. The 'default' pool is `Public` which is configured to handle Active Web Element content. Legacy MSP resources must use the pool `MSP` or a custom pool configured specifically for this type of content (and not any pool configured for handling Active Web Elements). This field is ignored for static resources.
+* **timeout** (optional): This field specifies the maximum number of seconds to wait to process a resource. The default timeout is 30 seconds, which can be specified with the value `null`.
 
 ## Resources [/resources]
 
 ### GET
 
-Retrieves all the resource created. The API returns list of ResourceInfo objects along with resourcePath in a JSON format.
+Use this to retrieve information on all deployed resources. The API returns list of ResourceInfo objects along with the resource path in a JSON format.
 
 * Request
 
@@ -53,7 +52,7 @@ Retrieves all the resource created. The API returns list of ResourceInfo objects
 
 ### POST
 
-Posts a new resource to the shared location. The Content-Type of this request is `multipart/form-data`. We should upload a file using `resource` parameter and provide file meta information in the `resourceInfo` parameter, which should an JSON format object converted into string. The API returns the resource path of the newly uploaded resource.
+Use this to deploy a new resource. The Content-Type of this request is `multipart/form-data`. Name the file to upload using `resource` parameter and provide file meta information in the `resourceInfo` parameter as a JSON object converted into string. The API returns the resource path of the newly uploaded resource.
 
 * Request
 
@@ -63,13 +62,13 @@ Posts a new resource to the shared location. The Content-Type of this request is
 		POST "http://wasresourcemanager.wolfram.com/resources"
 * Parameters
 
-	* resource(required, file): This parameter use to upload input file which will get stored in the shared storage
+	* resource(required, file): This parameter specifies a local file to upload that will be deployed as the resource source.
 
 	 	Example:
 
 	 		name="resource"; filename="add.wl"
 
-	* resourceInfo(required, string): This parameter has the meta data about the resource. The value should be provided in JSON format.
+	* resourceInfo(required, string): This parameter provides the meta data describing the resource. The value should be provided in JSON format.
 
 		Example:
 
@@ -113,7 +112,7 @@ Posts a new resource to the shared location. The Content-Type of this request is
 		{
 			"resourcePath": "add.wl"
 		}
-* If we provide invalid JSON format in the requestInfo parameter, Response 400 Bad Request (application/json)
+* If the JSON provided in the requestInfo parameter is invalid: Response 400 Bad Request (application/json)
 
 		[{
     		"timestamp": "2019-02-08T18:29:49.597+0000",
@@ -122,7 +121,7 @@ Posts a new resource to the shared location. The Content-Type of this request is
     		"message": "Expected the request body in JSON format."
 		}]
 
-* If we provide invalid `resourceType`, Response 400 Bad Request (application/json):
+* If the `resourceType` provided is invalid: Response 400 Bad Request (application/json):
 
 	 	[{
     		"timestamp": "2019-02-06T17:53:50.227+0000",
@@ -131,7 +130,7 @@ Posts a new resource to the shared location. The Content-Type of this request is
     		"message": "The resourceType is not one of Active, MSP, or Static."
 		}]
 
-* If the `resourceType` is null, Response 400 (application/json)
+* If the `resourceType` is null: Response 400 (application/json)
 
 		[ {
     		"timestamp": "2019-02-06T18:20:52.052+0000",
@@ -143,18 +142,18 @@ Posts a new resource to the shared location. The Content-Type of this request is
 
 ## Resources [/resources/contents/{path}]
 ### GET
-Gets the actual resource. If we wanted to download the actual resource we can send resource path as input parameter, the API will return the source file.
+Use this to get the resource source. The API takes resource path as a path parameter and returns the source.
 * Parameter
-	* resourcePath(String) : This path uniquely identify a resource in the shared storage
+	* resourcePath(String) : This path uniquely identifies a resource.
 * Request
 
 		GET /resource/contents/{path}
 	Example:
 
 		GET "http://wasresourcemanager.wolfram.com/resources/contents/add.wl"
-The response Content-Type corresponds to the file MIME type, and the response body is the raw file content.
+The response Content-Type corresponds to the source MIME type, and the response body is the raw source content.
 * Response 200
-* If the file not exist. Response 404 Not Found (application/json)
+* If the resource does not exist: Response 404 Not Found (application/json)
 
 		[{
     		"timestamp": "2019-02-06T18:32:17.516+0000",
@@ -166,9 +165,9 @@ The response Content-Type corresponds to the file MIME type, and the response bo
 ## Resources [/resources/metadata/{path}]
 ### GET
 
-Gets a specific resource meta information. The API will take resource path as input parameter and return ResourceInfo object as JSON format.
+Use this to get meta information concerning a specific resource. The API takes resource path as path variable and returns a ResourceInfo object in JSON format.
 * Parameter
-	* resourcePath(String) : This path uniquely identify a resource in the shared storage
+	* resourcePath(String) : This path uniquely identifies a resource.
 
 * Request
 
@@ -187,7 +186,7 @@ Gets a specific resource meta information. The API will take resource path as in
     		"timeout": null,
     		"mimeType": "Automatic"
 		}
-* If the `resourcePath` not exist, Response 404 Not Found (application/json)
+* If the resource does not exist: Response 404 Not Found (application/json)
 
 		[{
     		"timestamp": "2019-02-06T18:32:17.516+0000",
@@ -199,17 +198,17 @@ Gets a specific resource meta information. The API will take resource path as in
 
 ## Resources [/resources/{path}]
 ### PUT
-Updates an existing resource. In order to update we need to provide resource path as input parameter. The Content-Type of this request is `multipart/form-data`. Upload a new file to update the file, using `resource` parameter and provide the updated file meta information in the `resourceInfo` parameter, which should be a JSON format object converted into string. We cannot modify `resourcePath` inside the `resourceInfo`. The API returns response status Accepted. To view the updated changes call, GET `/resources/{path}`.
+Use this to replace an existing resource. The API takes the resource path as input parameter. The Content-Type of this request is `multipart/form-data`. Name the file to upload as the new resource source using the `resource` parameter and provide the updated resource meta information using the `resourceInfo` parameter as a JSON object converted into string. The`resourcePath` field inside the `resourceInfo` is required and must match the resource path given in the path variable. The API returns nothing.
 
 * Parameter
-	* resourcePath (String) : This path uniquely identify a resource in the shared storage
-	* resource (required, file): This parameter use to upload input file which will get stored in the shared storage
+	* resourcePath (String) : This path uniquely identifies a resource in the shared storage.
+	* resource (required, file): This parameter specifies a local file to upload that will be deployed as the resource source.
 
 	 	Example:
 
 	 		name="resource"; filename="add.wl"
 
-	* resourceInfo(required, string): This parameter has the meta data about the resource. The value should be provided in JSON format.
+	* resourceInfo(required, string): This parameter provides the meta data about the resource. The value should be given in JSON format.
 
 		Example:
 
@@ -257,7 +256,7 @@ Updates an existing resource. In order to update we need to provide resource pat
 
 * Response 202 Accepted
 
-* If the `resourcePath` not exist, Response 404 Not Found (application/json)
+* If the `resourcePath` does not exist: Response 404 Not Found (application/json)
 
 		[{
     		"timestamp": "2019-02-06T18:32:17.516+0000",
@@ -266,7 +265,7 @@ Updates an existing resource. In order to update we need to provide resource pat
     		"message": "Unknown resource",
     		"path": "/resources/addOne.wl"
 		}]
-* If we try to modify  `resourcePath`, Response 404 Bad Request (application/json)
+* If the `resourcePath` does not match the path variable: Response 404 Bad Request (application/json)
 
 		[{
     		"timestamp": "2019-06-17T13:42:52.846+000",
@@ -278,10 +277,10 @@ Updates an existing resource. In order to update we need to provide resource pat
 
 ### DELETE
 
-Deletes an existing resource. Provide the resource path in the request parameter. After deletion the API returns response status Accepted. To verify, call, GET `/resources/{path}` .
+Use this to delete an existing resource. The api takes the resource path as a path variable and returns nothing.
 
 * Parameter
-	* resourcePath(String) : This path uniquely identify a resource in the shared storage
+	* resourcePath(String) : This path uniquely identifies a resource.
 * Request
 
 		DELETE /resources/{path}
@@ -292,17 +291,17 @@ Deletes an existing resource. Provide the resource path in the request parameter
 
 ### PATCH
 
-Patches an existing resource. Provide resource path in the input parameter.The Content-Type of this request is `multipart/form-data`. We should upload a new file if we are updating the file, using `resource` parameter . If we are updating file meta information update the particular field in the `resourceInfo` parameter, which should be a JSON format object converted into string. We cannot modify `resourcePath` inside the `resourceInfo`. The API returns response status Accepted. To view the updated changes call, GET `/resources/{path}`.
+Use this to modify an existing resource. The API takes the resource path as input parameter. The Content-Type of this request is `multipart/form-data`. If the resource source is to be modified, name the file to upload as the new resource source using the `resource` parameter. If the resource meta information is to be updated modify the desired fields using the `resourceInfo` parameter as a JSON object converted into string. Unmodified fields of the ResourceInformation structure may be omitted with the exception of the`resourcePath` field which is required and must match the resource path given in the path variable. The API returns nothing.
 
 * Parameter
-	* resourcePath(String) : This path uniquely identify a resource in the shared storage
-	* resource(optional, file): This parameter use to upload input file which will get stored in the shared storage
+	* resourcePath(String) : This path uniquely identifies a resource.
+	* resource(optional, file): This parameter specifies a local file to upload that will be deployed as modified the resource source.
 
 	 	Example:
 
 	 		name="resource"; filename="add.wl"
 
-	* resourceInfo(optional, string): This parameter has the meta data about the resource. The value should be provided in JSON format.
+	* resourceInfo(optional, string): This parameter provides the meta data about the resource. The value should be given in JSON format.
 
 		Example:
 
@@ -336,7 +335,7 @@ Patches an existing resource. Provide resource path in the input parameter.The C
 
 * Response 202 Accepted
 
-* If the `resourcePath` not exist, Response 404 Not Found (application/json)
+* If the resource does not exist: Response 404 Not Found (application/json)
 
 		[{
     		"timestamp": "2018-12-11T18:32:17.516+0000",
@@ -346,7 +345,7 @@ Patches an existing resource. Provide resource path in the input parameter.The C
     		"path": "/resources/add.wl"
 		}]
 
-* If we try to modify  `resourcePath`, Response 404 Bad Request (application/json)
+* If the `resourcePath` does not match the path variable: Response 404 Bad Request (application/json)
 
 		[{
     		"timestamp": "2019-06-17T13:42:52.846+000",
@@ -360,7 +359,7 @@ Patches an existing resource. Provide resource path in the input parameter.The C
 
 ### GET
 
-Retrieves information for the resource manager and provides a way to confirm that the resource manager is running.
+Use this to retrieve information about the resource manager. The API may be used to confirm that the resource manager is running.
 
 * Request
 
