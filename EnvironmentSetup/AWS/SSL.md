@@ -1,8 +1,14 @@
 ## Adding SSL certificate to AWS WAS
 
-In this document, we will use
+### Prerequirements
 
-- [Nginx Ingress Controller](https://kubernetes.github.io/ingress-nginx/)
+* A domain address for SSL(Not the amazon one)
+* Pre-installed [AWS CLI](https://aws.amazon.com/cli/) for local
+* FullAccess admin privilege for the user
+* Running AWS EKS cluster which has WAS
+
+
+### Will use
 
 - [cert-manager](https://cert-manager.io/docs/installation/)
 
@@ -255,6 +261,149 @@ spec:
           - aws.applicationserver.wolfram.com
         secretName: was-tls-secret
 
+```
+
+**was-ingress-endpoints.yaml**
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/rewrite-target: /endpoints/$1
+    nginx.ingress.kubernetes.io/use-regex: "true"
+  labels:
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/part-of: ingress-nginx
+  name: was-ingress-endpoints
+  namespace: was
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: aws.applicationserver.wolfram.com
+      http:
+        paths:
+        - backend:
+            service:
+              name: endpoint-manager
+              port:
+                number: 8085
+          path: /endpoints/?(.*)
+          pathType: Prefix
+  tls:
+      - hosts:
+          - aws.applicationserver.wolfram.com
+        secretName: was-tls-secret
+
+```
+
+**was-ingress-nodefiles.yaml**
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/rewrite-target: /nodefiles/$1
+    nginx.ingress.kubernetes.io/use-regex: "true"
+  labels:
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/part-of: ingress-nginx
+  name: was-ingress-nodefiles
+  namespace: was
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: aws.applicationserver.wolfram.com
+      http:
+        paths:
+        - backend:
+            service:
+              name: resource-manager
+              port:
+                number: 9090
+          path: /nodefiles/?(.*)
+          pathType: Prefix
+  tls:
+      - hosts:
+          - aws.applicationserver.wolfram.com
+        secretName: was-tls-secret
+```
+
+**was-ingress-resource.yaml**
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/rewrite-target: /resources/$1
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    cert-manager.io/cluster-issuer: letsencrypt-cluster-issuer
+    cert-manager.io/acme-challenge-type: "http01"
+  labels:
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/part-of: ingress-nginx
+  name: was-ingress-resources
+  namespace: was
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: aws.applicationserver.wolfram.com
+      http:
+        paths:
+        - backend:
+            service:
+              name: resource-manager
+              port:
+                number: 9090
+          path: /resources/?(.*)
+          pathType: Prefix
+  tls:
+      - hosts:
+          - aws.applicationserver.wolfram.com
+        secretName: was-tls-secret
+
+```
+
+**was-ingress-restart-rollout.yaml**
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/auth-realm: Authentication Required
+    nginx.ingress.kubernetes.io/auth-secret: basic-auth
+    nginx.ingress.kubernetes.io/auth-type: basic
+    nginx.ingress.kubernetes.io/rewrite-target: /restart/kubernetes/active-web-elements-server-deployment
+    nginx.ingress.kubernetes.io/use-regex: "true"
+  labels:
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/part-of: ingress-nginx
+  name: was-ingress-endpoints-restart-rollout
+  namespace: was
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: aws.applicationserver.wolfram.com
+      http:
+        paths:
+        - backend:
+            service:
+              name: endpoint-manager
+              port:
+                number: 8085
+          path: /.applicationserver/kernel/restart
+          pathType: Prefix
+  tls:
+      - hosts:
+          - aws.applicationserver.wolfram.com
+        secretName: was-tls-secret
 ```
 
 Run `kubectl apply -f <INGRESS>.yaml` command to update ingress files.

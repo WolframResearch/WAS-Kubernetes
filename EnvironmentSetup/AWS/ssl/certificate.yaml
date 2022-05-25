@@ -1,0 +1,12 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: was-certificate
+  namespace: was
+spec:
+  dnsNames:
+    - <DOMAIN_WITHOUT_WWW> # change here
+  secretName: was-tls-secret
+  issuerRef:
+    name: letsencrypt-cluster-issuer
+    kind: ClusterIssuer
