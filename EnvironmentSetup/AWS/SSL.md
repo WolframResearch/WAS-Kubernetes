@@ -204,12 +204,29 @@ kubectl apply -f certificate.yaml
 
 ### Configure Ingress
 
+There are 5 ingress objects as 
+
+* was-ingress-awes
+* was-ingress-endpoints
+* was-ingress-nodefiles
+* was-ingress-resources
+
+You can list the ingress objects with `kubectl get ingress`
+
+You need to get the current ingress objects configuration with
+
+`kubectl get ingress <INGRESS_NAME> -o yaml > <INGRESS_NAME>.yaml`
+
+It will export the current ingress file from the cluster.
+
+So you can edit them as below and use `kubectl apply -f <INGRESS_NAME>.yaml` for apply changes.
+
 Add **host** under **spec.rules** as
 
 ```
 spec:
-ingressClassName: nginx
-rules:
+  ingressClassName: nginx
+  rules:
     - host: <DOMAIN_WITHOUT_WWW>
       http:
         paths:
@@ -228,6 +245,16 @@ spec:
         - <DOMAIN_WITHOUT_WWW>
       secretName: was-tls-secret
 ```
+
+**ps: Indentation is very important when updating YAML files. You can check the YAML file errors with**
+
+**`kubectl apply -f <INGRESS_NAME>.yaml --dry-run=server`**
+
+**This command doesn't make change on the cluster, only checks for errors.**
+
+---
+
+These are the sample ingress files
 
 **was-ingress-awes.yaml**
 
@@ -332,7 +359,7 @@ spec:
         secretName: was-tls-secret
 ```
 
-**was-ingress-resource.yaml**
+**was-ingress-resources.yaml**
 
 ```yaml
 apiVersion: networking.k8s.io/v1
@@ -369,7 +396,7 @@ spec:
 
 ```
 
-**was-ingress-restart-rollout.yaml**
+**was-ingress-endpoints-restart-rollout.yaml**
 
 ```yaml
 apiVersion: networking.k8s.io/v1
@@ -406,7 +433,7 @@ spec:
         secretName: was-tls-secret
 ```
 
-Run `kubectl apply -f <INGRESS>.yaml` command to update ingress files.
+Run `kubectl apply -f <INGRESS_NAME>.yaml` command to update ingress files.
 
 
 SSL certificate should be added in couple of minutes.
