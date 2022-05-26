@@ -63,6 +63,7 @@ There are 5 ingress objects as
 * was-ingress-endpoints
 * was-ingress-nodefiles
 * was-ingress-resources
+* was-ingress-endpoints-restart-rollout
 
 You can list the ingress objects with `kubectl get ingress`
 
