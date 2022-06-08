@@ -1,23 +1,25 @@
-## Adding SSL certificate to AWS WAS
+## HTTP over SSL Configuration Guide for WAS
+### Introduction
+There are different ways to add Secure Sockets Layer(SSL) certificate for your application. This document describes how to add SSL support for Wolfram Application Server(WAS) using Kubernetes cert-manager. 
 
-### Prerequirements
+**Note:** This  is not a mandatory setup guide. This is only a reference guide to configure SSL certificate for WAS.
+### Pre-Requisite
 
-* A domain address for SSL
-  * SSL certificate has 64 character limit so we can't use AWS EKS default domain(it has more than ~70 characters)
-* Running AWS EKS cluster which has WAS
-* Need access to WAS cluster on [kubect](https://kubernetes.io/docs/tasks/tools/)l
+* A valid domain address for SSL
+  * SSL certificate has 64character limit, so we can't use default cluster domain(it has more than ~70 characters)
+* A running WAS Cluster
+* Admin Role access to the WAS Cluster
+* Needed the Kubernetes command-line tool, [kubect](https://kubernetes.io/docs/tasks/tools/)
 
 
-### Will use
-
+### Tools needed for SSL Certificate
+We need the following tools to create SSL certifcate for our WAS Cluster.
 - [cert-manager](https://cert-manager.io/docs/installation/)
-
+  - Cert-Manager automates the provisioning of certificates within Kubernetes clusters. It provides a set of custom resources to issue certificates and attach them to services.
 - [Let's Encrypt](https://letsencrypt.org/)
-
-  to create SSL certificate for our WAS cluster.
-
+  - To enable HTTPS on your website, you need to get a certificate (a type of file) from a Certificate Authority (CA). Let’s Encrypt is a CA.In order to get a certificate for your website’s domain from Let’s Encrypt, you have to demonstrate control over the domain. With Let’s Encrypt, you do this using software that uses the ACME protocol which typically runs on your web host.
+  
 ---
-
 ### Install [cert-manager](https://cert-manager.io/docs/installation/)
 
 ```bash
