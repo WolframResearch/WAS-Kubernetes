@@ -9,7 +9,7 @@ There are different ways to add Secure Sockets Layer(SSL) certificate for your a
   * SSL certificate has 64character limit, so we can't use default cluster domain(it has more than ~70 characters)
 * A running WAS Cluster
 * Admin Role access to the WAS Cluster
-* Needed the Kubernetes command-line tool, [kubect](https://kubernetes.io/docs/tasks/tools/)
+* The Kubernetes command-line tool, [kubect](https://kubernetes.io/docs/tasks/tools/)
 
 
 ### Tools needed for SSL Certificate
@@ -17,7 +17,7 @@ We need the following tools to create SSL certifcate for our WAS Cluster.
 - [cert-manager](https://cert-manager.io/docs/installation/)
   - Cert-Manager automates the provisioning of certificates within Kubernetes clusters. It provides a set of custom resources to issue certificates and attach them to services.
 - [Let's Encrypt](https://letsencrypt.org/)
-  - To enable HTTPS on your website, you need to get a certificate (a type of file) from a Certificate Authority (CA). Let’s Encrypt is a CA.In order to get a certificate for your website’s domain from Let’s Encrypt, you have to demonstrate control over the domain. With Let’s Encrypt, you do this using software that uses the ACME protocol which typically runs on your web host.
+  - To enable HTTPS on your website, you need to get a certificate (a type of file) from a Certificate Authority (CA). Let’s Encrypt is a CA. In order to get a certificate for your website’s domain from Let’s Encrypt, you have to demonstrate control over the domain. With Let’s Encrypt, you do this using software that uses the ACME protocol which typically runs on your web host.
   
 ---
 ### Install [cert-manager](https://cert-manager.io/docs/installation/)
