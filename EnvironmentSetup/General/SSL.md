@@ -295,6 +295,30 @@ Run `kubectl apply -f <INGRESS_NAME>.yaml` command to update ingress files.
 SSL certificate should be added in couple of minutes.
 
 ---
+## HSTS
+
+The Nginx controller forces the browser to use TLS with [`Strict-Transport-Security`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Strict-Transport-Security) header. 
+
+Disable it to use WAS with HTTP and HTTPS for **ServiceConnect**.
+
+We need to update ingress-nginx-controller config map and restart the ingress-nginx-controller deployment.
+
+`kubectl edit configmap ingress-nginx-controller -n ingress-nginx`
+
+Add **hsts: "False"** in data section.
+```
+apiVersion: v1
+data:
+  client-max-body-size: 1G
+  hsts: "False"
+...
+```
+Restart the **ingress-nginx-controller** deployment.
+
+`kubectl rollout restart deployment ingress-nginx-controller`
+
+
+---
 
 ## Troubleshooting
 
