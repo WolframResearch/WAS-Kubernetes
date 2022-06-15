@@ -295,7 +295,7 @@ Run `kubectl apply -f <INGRESS_NAME>.yaml` command to update ingress files.
 SSL certificate should be added in couple of minutes.
 
 ---
-## HSTS
+## HTTP Strict Transport Security (HSTS)
 
 The Nginx controller forces the browser to use TLS with [`Strict-Transport-Security`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Strict-Transport-Security) header. 
 
