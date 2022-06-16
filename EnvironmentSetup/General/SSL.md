@@ -314,6 +314,31 @@ Run `kubectl apply -f <INGRESS_NAME>.yaml` command to update ingress files.
 SSL certificate should be added in couple of minutes.
 
 ---
+## Update AWES Deployment
+
+You need to update *active-web-elements-server-deployment* deployment file with the new domains.
+
+`kubectl edit deployment active-web-elements-server-deployment -n was`
+
+**spec.template.spec.containers.env**
+```
+        - name: applicationserver.servername
+          value: http://<DOMAIN>/
+        - name: applicationserver.resourcemanager.url
+          value: http://<DOMAIN>/resources/
+        - name: applicationserver.nodefilesmanager.url
+          value: http://<DOMAIN>/nodefiles/
+        - name: applicationserver.endpointmanager.url
+          value: http://<DOMAIN>/endpoints/
+        - name: applicationserver.restart.url
+          value: http://<DOMAIN>/.applicationserver/kernel/restart
+
+```
+It uses `vi` text editor as default.
+
+When you save the files, active-web-elements-server-deployment pods will be restarted.
+
+---
 ## HTTP Strict Transport Security (HSTS)
 
 The Nginx controller forces the browser to use TLS with [`Strict-Transport-Security`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Strict-Transport-Security) header. 
@@ -334,8 +359,7 @@ data:
 ```
 Restart the **ingress-nginx-controller** deployment.
 
-`kubectl rollout restart deployment ingress-nginx-controller`
-
+`kubectl rollout restart deployment ingress-nginx-controller -n ingress-nginx`
 
 ---
 
@@ -351,5 +375,6 @@ Restart the **ingress-nginx-controller** deployment.
 * Check for `was-tls-secret` secret with `kubectl get secrets -n was`
 * Check for `was-certificate` certificate with `kubectl describe certificate was-certificate -n was`
 * Check for  `letsencrypt-cluster-issuer` clusterissuer with `kubectl describe clusterissuer letsencrypt-cluster-issuer`
+* Check for nginx-controller logs. To find nginx-controller pod, run `kubectl get pods -n ingress-nginx` and run `kubectl logs <POD_NAME>`. The pods naming convention might be **ingress-nginx-controller-HASH**
 
 ---
