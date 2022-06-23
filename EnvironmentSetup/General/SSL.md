@@ -1,48 +1,52 @@
-## HTTP over SSL Configuration Guide for WAS
-### Introduction
-There are different ways to add Secure Sockets Layer(SSL) certificate for your application. This document describes how to add SSL support for Wolfram Application Server(WAS) using Kubernetes cert-manager. 
+# HTTP over SSL Configuration Guide for WAS
 
-**Note:** This  is not a mandatory setup guide. This is only a reference guide to configure SSL certificate for WAS.
-### Pre-Requisite
+## Introduction
+This document describes how to add SSL support to Wolfram Application Server (WAS) using cert-manager within your Kubernetes cluster.
 
-* A valid domain address for SSL
-  * SSL certificate has 64character limit, so we can't use default cluster domain(it has more than ~70 characters)
+**Note:** This  is not a mandatory setup guide, but rather a reference guide for configuring SSL certificates for WAS if desired.
+
+## Prerequisites
+
+* A valid domain address for SSL (SSL certificates impose a 64 character limit on the common name which the default cluster domain name excceeds for some environments)
 * A running WAS Cluster
 * Admin Role access to the WAS Cluster
-* The Kubernetes command-line tool, [kubect](https://kubernetes.io/docs/tasks/tools/)
 
+## Tools needed for SSL Certificate management
+The following tools are required to create SSL certifcate for our WAS Cluster.
 
-### Tools needed for SSL Certificate
-We need the following tools to create SSL certifcate for our WAS Cluster.
-- [cert-manager](https://cert-manager.io/docs/installation/)
-  - Cert-Manager automates the provisioning of certificates within Kubernetes clusters. It provides a set of custom resources to issue certificates and attach them to services.
-- [Let's Encrypt](https://letsencrypt.org/)
-  - To enable HTTPS on your website, you need to get a certificate (a type of file) from a Certificate Authority (CA). Let’s Encrypt is a CA. In order to get a certificate for your website’s domain from Let’s Encrypt, you have to demonstrate control over the domain. With Let’s Encrypt, you do this using software that uses the ACME protocol which typically runs on your web host.
-  
----
+* [**kubectl**](https://kubernetes.io/docs/tasks/tools/install-kubectl/)
+
+    **kubectl** controls the Kubernetes cluster manager.
+
+* [**cert-manager**](https://cert-manager.io/docs/installation/)
+
+    The **cert-manager** automates the provisioning of certificates within Kubernetes clusters. It provides a set of custom resources to issue certificates and attach them to services.
+
+## Installation of a certificate
+
+### Obtain a certificate
+
+To enable HTTPS on your website, you need to obtain a certificate from a Certificate Authority (CA). [*Let's Encrypt*](https://letsencrypt.org/) is a free, automated, and open certificate authority (CA) provided by the [Internet Security Research Group (ISRG)](https://www.abetterinternet.org/). In this document it will be assumed that you will obtain your domiain's certificate from *Let's Encrypt*. That being the case you must demonstrate control over the domain using software that supports the ACME protocol which typically runs on your web host.
+ 
 ### Install [cert-manager](https://cert-manager.io/docs/installation/)
+
+To install **cert-manager** run
 
 ```bash
 kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.8.0/cert-manager.yaml
 ```
-It's quite straightforward. The version may change over time.
-
----
-
 
 ### Deploy ClusterIssuer
 
-   Edit spec.acme.email field with the email address in cluster-issuer.yaml file and deploy it to k8s with
+Edit the **spec.acme.email** field with the email address in the cluster-issuer.yaml file and deploy it to the cluster with
 
    ```bash
    kubectl apply -f cluster-issuer.yaml
    ```
 
----
+### Deploy the Certificate
 
-### Deploy Certificate
-
-In certificate.yaml file, update **spec.dnsNames** field as 
+In the certificate.yaml file, update the **spec.dnsNames** field to 
 
 ```
 spec:
@@ -50,16 +54,15 @@ spec:
     - <DOMAIN_WITHOUT_WWW>
 ```
 
-and deploy it to k8s with
+and deploy it to the cluster with
+
 ```bash
 kubectl apply -f certificate.yaml
 ```
 
----
-
 ### Configure Ingress
 
-There are 5 ingress objects as 
+Within WAS there are five ingress objects which will require configuring:
 
 * was-ingress-awes
 * was-ingress-endpoints
@@ -67,17 +70,17 @@ There are 5 ingress objects as
 * was-ingress-resources
 * was-ingress-endpoints-restart-rollout
 
-You can list the ingress objects with `kubectl get ingress`
+You can list these ingress objects with `kubectl get ingress`.
 
-You need to get the current ingress objects configuration with
+To get the current configuration state for each object run
 
-`kubectl get ingress <INGRESS_NAME> -o yaml > <INGRESS_NAME>.yaml`
+```bash
+kubectl get ingress <INGRESS_NAME> -o yaml > <INGRESS_NAME>.yaml
+```
 
-It will export the current ingress file from the cluster.
+which will export the current ingress file from the cluster. For each object, edit the following entries.
 
-So you can edit them as below and use `kubectl apply -f <INGRESS_NAME>.yaml` for apply changes.
-
-Add **force-ssl-redirect** and **ssl-redirect** annotations as "*false"* under **metadata.annotations**
+Add the **force-ssl-redirect** and **ssl-redirect** annotations set to "*false"* under **metadata.annotations**
 
 ```
 ...
@@ -86,7 +89,7 @@ nginx.ingress.kubernetes.io/ssl-redirect: "false"
 ...
 ```
 
-Add **host** under **spec.rules** as
+Add a **host** entry under **spec.rules** as
 
 ```
 spec:
@@ -99,7 +102,7 @@ spec:
 ...
 ```
 
-In ingress files, add **tls** under **spec** as
+Finally, add a **tls** entry under **spec** as
 
 ```
 spec:
@@ -111,15 +114,24 @@ spec:
       secretName: was-tls-secret
 ```
 
-**ps: Indentation is very important when updating YAML files. You can check the YAML file errors with**
+**warning:** Syntax errors in a configuration file may disable an object or cause erratic behavior. You can check your configuration file for mistakes by running
 
-**`kubectl apply -f <INGRESS_NAME>.yaml --dry-run=server`**
+```bash
+kubectl apply -f <INGRESS_NAME>.yaml --dry-run=server
+```
 
-**This command doesn't make change on the cluster, only checks for errors.**
+This command will not make any changes on the cluster.
 
----
+When the ingress object's configuration is satisfactorily updated, modify it on the cluster by running
 
-These are the sample ingress files
+```bash
+kubectl apply -f <INGRESS_NAME>.yaml
+```
+
+The SSL certificate should be added in couple of minutes.
+
+
+#### Sample ingress files
 
 **was-ingress-awes.yaml**
 
@@ -308,19 +320,16 @@ spec:
         secretName: was-tls-secret
 ```
 
-Run `kubectl apply -f <INGRESS_NAME>.yaml` command to update ingress files.
+### Update AWES Deployment
 
+If you have created a new domain as part of the certification installation process, you will need to update *active-web-elements-server-deployment* deployment file with the new domain. To do so run
 
-SSL certificate should be added in couple of minutes.
+```bash
+kubectl edit deployment active-web-elements-server-deployment -n was
+```
 
----
-## Update AWES Deployment
+And add the domains to **spec.template.spec.containers.env** as
 
-You need to update *active-web-elements-server-deployment* deployment file with the new domains.
-
-`kubectl edit deployment active-web-elements-server-deployment -n was`
-
-**spec.template.spec.containers.env**
 ```
         - name: applicationserver.servername
           value: http://<DOMAIN>/
@@ -334,22 +343,23 @@ You need to update *active-web-elements-server-deployment* deployment file with 
           value: http://<DOMAIN>/.applicationserver/kernel/restart
 
 ```
-It uses `vi` text editor as default.
 
-When you save the files, active-web-elements-server-deployment pods will be restarted.
+The **edit** command uses the **vi** text editor as its default, but this is [configurable](https://docs.vmware.com/en/VMware-vSphere/7.0/vmware-vsphere-with-tanzu/GUID-DC2BB6E0-A327-4DB8-9A87-5F3376E70033.html#:~:text=To%20use%20the%20kubectl%20edit%20command%2C%20create%20a,knows%20when%20you%20have%20committed%20%28saved%29%20your%20changes.).
 
----
-## HTTP Strict Transport Security (HSTS)
+When you save the files, the *active-web-elements-server-deployment* pods will be restarted.
 
-The Nginx controller forces the browser to use TLS with [`Strict-Transport-Security`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Strict-Transport-Security) header. 
+### HTTP Strict Transport Security (HSTS)
 
-Disable it to use WAS with HTTP and HTTPS for **ServiceConnect**.
+By default the Nginx ingress controller forces the browser to use TLS with the [`Strict-Transport-Security`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Strict-Transport-Security) header. You may wish to disable it to support the use of both HTTP and HTTPS with **ServiceConnect** Wolfram Languate client or other clients.
 
-We need to update ingress-nginx-controller config map and restart the ingress-nginx-controller deployment.
+You will need to update then *ingress-nginx-controller* config map. Run
 
-`kubectl edit configmap ingress-nginx-controller -n ingress-nginx`
+```bash
+kubectl edit configmap ingress-nginx-controller -n ingress-nginx
+```
 
-Add **hsts: "False"** in data section.
+and add **hsts: "False"** in the data section as
+
 ```
 apiVersion: v1
 data:
@@ -357,24 +367,63 @@ data:
   hsts: "False"
 ...
 ```
-Restart the **ingress-nginx-controller** deployment.
 
-`kubectl rollout restart deployment ingress-nginx-controller -n ingress-nginx`
+Now restart the **ingress-nginx-controller** deployment by running
 
----
+```bash
+kubectl rollout restart deployment ingress-nginx-controller -n ingress-nginx
+```
+
+The changes will take effect when the rolling restart has completed.
 
 ## Troubleshooting
 
-   * Check cert-manager's pod logs which is in cert-manager namespaces.
+* To check the **cert-manager**'s pod logs which are in the *cert-manager* namespace run
 
+    ```bash
+    kubectl logs cert-manager-<HASH> -n cert-manager
+    ```
 
-   	kubectl logs cert-manager-<HASH> -n cert-manager
+* To check the current challanges which the **cert-manager** working on run
 
-* Run `kubectl describe challanges` to check current challanges which is cert-manager working on.
-* Check ingress objects events with `kubectl describe ingress <INGRESS>`
-* Check for `was-tls-secret` secret with `kubectl get secrets -n was`
-* Check for `was-certificate` certificate with `kubectl describe certificate was-certificate -n was`
-* Check for  `letsencrypt-cluster-issuer` clusterissuer with `kubectl describe clusterissuer letsencrypt-cluster-issuer`
-* Check for nginx-controller logs. To find nginx-controller pod, run `kubectl get pods -n ingress-nginx` and run `kubectl logs <POD_NAME>`. The pods naming convention might be **ingress-nginx-controller-HASH**
+    ```bash
+    kubectl describe challenges
+    ```
 
----
+* To check the ingress objects events run
+
+    ```bash
+    kubectl describe ingress <INGRESS>
+    ```
+
+* To check for the presesence of a **was-tls-secret** run
+
+    ```bash
+    kubectl get secrets -n was
+    ```
+
+* To check for the preseseence of a **was-certificate** run
+
+    ```bash
+    kubectl describe certificate was-certificate -n was
+    ```
+    
+* To check for a **letsencrypt-cluster-issuer** clusterissuer run
+
+    ```bash
+    kubectl describe clusterissuer letsencrypt-cluster-issuer
+    ```
+
+* To check the **nginx-controller** logs first find the **nginx-controller** pod by running
+
+    ```bash
+    kubectl get pods -n ingress-nginx
+    ```
+    
+	The pod's naming typically follows the convention **ingress-nginx-controller-HASH**. Then run
+
+	```bash
+	kubectl logs <POD_NAME>
+	```
+
+	to read the log.
