@@ -5,7 +5,7 @@
 This document describes the setup of Amazon Kubernetes (EKS) and Wolfram Application Server (WAS).
 
 
-## Pre-Requisite Tools
+## Prerequisite Tools
 
 The following CLI tools are required to be installed on your local machine to complete the setup and installation:
 
