@@ -26,7 +26,7 @@ The following tools are required to create SSL certifcate for our WAS Cluster.
 
 ### Obtain a certificate
 
-To enable HTTPS on your website, you need to obtain a certificate from a Certificate Authority (CA). [*Let's Encrypt*](https://letsencrypt.org/) is a free, automated, and open certificate authority (CA) provided by the [Internet Security Research Group (ISRG)](https://www.abetterinternet.org/). In this document it will be assumed that you will obtain your domiain's certificate from *Let's Encrypt*. That being the case you must demonstrate control over the domain using software that supports the ACME protocol which typically runs on your web host.
+To enable HTTPS on your website, you need to obtain a certificate from a Certificate Authority (CA). [*Let's Encrypt*](https://letsencrypt.org/) is a free, automated, and open certificate authority (CA) provided by the [Internet Security Research Group (ISRG)](https://www.abetterinternet.org/). In this document it will be assumed that you will obtain your domain's certificate from *Let's Encrypt*. That being the case you must demonstrate control over the domain using software that supports the ACME protocol which typically runs on your web host.
  
 ### Install [cert-manager](https://cert-manager.io/docs/installation/)
 
