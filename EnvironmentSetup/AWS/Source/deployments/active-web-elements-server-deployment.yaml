@@ -74,7 +74,7 @@ spec:
             path: /.applicationserver/info
             port: 8080
           initialDelaySeconds: 15
-          periodSeconds: 200
+          periodSeconds: 20
           failureThreshold: 10
         readinessProbe:
           httpGet:
