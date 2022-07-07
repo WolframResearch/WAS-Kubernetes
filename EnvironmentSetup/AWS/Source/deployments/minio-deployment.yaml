@@ -24,9 +24,9 @@ spec:
       containers:
       - env:
         - name: MINIO_ACCESS_KEY
-          value: <your-access-key>
+          value: AKIAWOFL5WGMKX7FH752
         - name: MINIO_SECRET_KEY
-          value: <your-secret-key>
+          value: O0WfMWLXjxz+k/RfKZqzGmkm5v/1dpNwI+dz7BDt
         - name: SERVER_ENDPOINT
           value: http://minio:9000
         image: wolframapplicationserver/minio:1.0.0

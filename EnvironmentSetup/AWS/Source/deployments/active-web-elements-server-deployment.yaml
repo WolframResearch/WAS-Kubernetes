@@ -48,15 +48,15 @@ spec:
         - name: poolconfiguration_kernelpool_1__JLinkEnabled
           value: "false"
         - name: applicationserver.servername
-          value: "http://domain.com/"
+          value: "http://aa9acfdf1861b43e2ac3c24af033d4c9-6254c5ee9cb499d1.elb.us-east-1.amazonaws.com/"
         - name: applicationserver.resourcemanager.url
-          value: "http://domain.com/resources/"
+          value: "http://aa9acfdf1861b43e2ac3c24af033d4c9-6254c5ee9cb499d1.elb.us-east-1.amazonaws.com/resources/"
         - name: applicationserver.nodefilesmanager.url
-          value: "http://domain.com/nodefiles/"
+          value: "http://aa9acfdf1861b43e2ac3c24af033d4c9-6254c5ee9cb499d1.elb.us-east-1.amazonaws.com/nodefiles/"
         - name: applicationserver.endpointmanager.url
-          value: "http://domain.com/endpoints/"
+          value: "http://aa9acfdf1861b43e2ac3c24af033d4c9-6254c5ee9cb499d1.elb.us-east-1.amazonaws.com/endpoints/"
         - name: applicationserver.restart.url
-          value: "http://domain.com/.applicationserver/kernel/restart"
+          value: "http://aa9acfdf1861b43e2ac3c24af033d4c9-6254c5ee9cb499d1.elb.us-east-1.amazonaws.com/.applicationserver/kernel/restart"
         image: wolframapplicationserver/active-web-elements-server:2.0.4
         name: active-web-elements-server
         ports:
