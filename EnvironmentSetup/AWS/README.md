@@ -9,9 +9,9 @@ This document describes the setup of Amazon Kubernetes (EKS) and Wolfram Applica
 
 The following CLI tools are required to be installed on your local machine to complete the setup and installation:
 
-* **AWS CLI** - https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-install.html
+* **AWS CLIv2** - https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html#getting-started-install-instructions
 
-* **Kubectl** - https://kubernetes.io/docs/tasks/tools/install-kubectl/
+* **Kubectl >= 1.22** - https://kubernetes.io/docs/tasks/tools/install-kubectl/
 
 * **Docker v20.10 or newer** - https://docs.docker.com/get-docker/
 
@@ -26,7 +26,7 @@ The automated configuration tool will use the following default values when buil
 * AMI Instance Type: c5.2xlarge
 * Disk Size: 30GB
 * Node Group scaling configuration: [Minimum size: 2, Maximum size: 10, Desired size: 2]
-* Kubernetes Version: 1.19
+* Kubernetes Version: 1.22
 
 To change any of the above defaults open `Source/terraform/variables.tf`, modify accordingly and save file.
 
