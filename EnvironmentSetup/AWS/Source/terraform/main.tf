@@ -6,11 +6,11 @@ terraform {
     dynamodb_table = "terraform-state-locking-was"
     encrypt        = true
   }
-  required_version = "~> 0.14"
+  required_version = "~> 1.2.4"
   required_providers {
     aws = {
       source  = "hashicorp/aws"
-      version = "~> 3.0"
+      version = "~> 3.75.2"
     }
   }
 }
@@ -38,7 +38,7 @@ data "aws_availability_zones" "available" {
 
 module "vpc" {
   source                 = "terraform-aws-modules/vpc/aws"
-  version                = "2.66.0"
+  version                = "3.14.2"
   name                   = "${var.cluster-name}-vpc"
   cidr                   = "10.168.0.0/16"
   azs                    = data.aws_availability_zones.available.names
@@ -67,7 +67,7 @@ module "vpc" {
 
 module "eks" {
   source                    = "terraform-aws-modules/eks/aws"
-  version                   = "13.2.1"
+  version                   = "16.1.0"
   cluster_name              = var.cluster-name
   cluster_version           = var.cluster-version
   subnets                   = module.vpc.private_subnets
@@ -85,7 +85,7 @@ module "eks" {
       max_capacity     = var.max-worker-node
       min_capacity     = var.min-worker-node
       disk_size        = var.disk-size
-      instance_type    = var.instance_type
+      instance_types    = [var.instance_type]
     }
   }
 
