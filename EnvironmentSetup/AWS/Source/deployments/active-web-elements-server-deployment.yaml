@@ -33,6 +33,10 @@ spec:
           value: kafka-persistent-kafka-bootstrap.kafka.svc.cluster.local:9092
         - name: applicationserver.nodefiles.cachedirectory
           value: /opt/.wolframcache/nodefiles/
+        - name: applicationserver.version
+          value: "3.0"
+        - name: applicationserver.wolframEngineVersion
+          value: "13.0.0"
         - name: applicationserver.kernelinitializationfile.name
           value: init.m
         - name: poolconfiguration_kernelpool_0__KernelNumber
