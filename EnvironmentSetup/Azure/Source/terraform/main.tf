@@ -8,10 +8,10 @@ terraform {
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
-	  version = "~> 2.0"
+	  version = "~> 3.13"
     }
   }
-  required_version = "~> 0.14"
+  required_version = "~> 1.2.4"
 }
 
 provider "azurerm" {
@@ -39,8 +39,8 @@ resource "azurerm_kubernetes_cluster" "default" {
     node_count          = var.desired-worker-node
     vm_size             = var.instance_type
     os_disk_size_gb     = var.disk-size
-	max_pods            = var.max_pods
-	enable_auto_scaling = true
+	  max_pods            = var.max_pods
+	  enable_auto_scaling = true
     min_count           = var.min-worker-node
     max_count           = var.max-worker-node
   }
@@ -48,10 +48,6 @@ resource "azurerm_kubernetes_cluster" "default" {
   service_principal {
     client_id     = var.appId
     client_secret = var.password
-  }
-
-  role_based_access_control {
-    enabled = true
   }
   
   tags = {

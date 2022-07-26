@@ -493,11 +493,7 @@ SetupFunction()
 		appid=$(echo $spoutput | grep -oP '(?<="appId": ")[^"]*')
 		apppassword=$(echo $spoutput | grep -oP '(?<="password": ")[^"]*')
 		echo $apppassword >> $LOG_PATH
-		if [[ $apppassword =~ "~" ]]; then
-			spoutput=$(az ad app credential reset --id $appid --append 2> /dev/null)
-			apppassword=$(echo $spoutput | grep -oP '(?<="password": ")[^"]*')
-			echo $apppassword >> $LOG_PATH
-		elif [[ $apppassword =~ "/" ]]; then
+		if [[ $apppassword =~ "/" ]]; then
 			spoutput=$(az ad app credential reset --id $appid --append 2> /dev/null)
 			apppassword=$(echo $spoutput | grep -oP '(?<="password": ")[^"]*')
 			echo $apppassword >> $LOG_PATH
@@ -505,16 +501,20 @@ SetupFunction()
 			spoutput=$(az ad app credential reset --id $appid --append 2> /dev/null)
 			apppassword=$(echo $spoutput | grep -oP '(?<="password": ")[^"]*')
 			echo $apppassword >> $LOG_PATH
+    elif [[ $spoutput == "" || $appid == "" || $apppassword == "" ]]; then
+      spoutput=$(az ad app credential reset --id $appid --append 2> /dev/null)
+			apppassword=$(echo $spoutput | grep -oP '(?<="password": ")[^"]*')
+			echo $apppassword >> $LOG_PATH
 		else
 			echo "password no syntax issues" >> $LOG_PATH
 			break;
 		fi
 	done
-	
-	
+  
+    apppassword=$(echo $apppassword | sed "s/[!@#$%^&*()-~]/\\\&/g")
 	# find and replace appid and password
-    sed -i -e "s~XXXXXX~$appid~g" variables.tf
-	sed -i -e "s~YYYYYY~$apppassword~g" variables.tf
+    sed -i -e "s/XXXXXX/$appid/g" variables.tf
+	  sed -i -e "s/YYYYYY/$apppassword/g" variables.tf
 	
 	spuser=$(echo $spuser | tr '[:upper:]' '[:lower:]')
     spuser=$(echo $spuser | tr -d '\r')
