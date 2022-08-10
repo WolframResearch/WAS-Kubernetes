@@ -34,9 +34,9 @@ spec:
         - name: applicationserver.nodefiles.cachedirectory
           value: /opt/.wolframcache/nodefiles/
         - name: applicationserver.version
-          value: "3.0"
+          value: "3.1"
         - name: applicationserver.wolframEngineVersion
-          value: "13.0.0"
+          value: "13.1.0"
         - name: applicationserver.kernelinitializationfile.name
           value: init.m
         - name: poolconfiguration_kernelpool_0__KernelNumber
@@ -51,10 +51,6 @@ spec:
           value: Public
         - name: poolconfiguration_kernelpool_1__JLinkEnabled
           value: "false"
-        - name: applicationserver.version
-          value: "3.0.0"
-        - name: applicationserver.wolframEngineVersion
-          value: "13.0.0"
         - name: applicationserver.servername
           value: "http://domain.com/"
         - name: applicationserver.resourcemanager.url
@@ -65,7 +61,7 @@ spec:
           value: "http://domain.com/endpoints/"
         - name: applicationserver.restart.url
           value: "http://domain.com/.applicationserver/kernel/restart"
-        image: wolframapplicationserver/active-web-elements-server:2.0.4
+        image: wolframapplicationserver/active-web-elements-server:3.1.0
         name: active-web-elements-server
         ports:
         - containerPort: 8080
