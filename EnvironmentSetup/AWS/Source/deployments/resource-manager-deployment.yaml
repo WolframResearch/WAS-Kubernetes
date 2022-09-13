@@ -23,6 +23,9 @@ spec:
       restartPolicy: Always
       containers:
       - env:
+
+        - name: JAVA_OPTS
+          value: "-Xms1024m -Xmx2048m"
         - name: SPRING_PROFILES_ACTIVE
           value: docker
         - name: LOG_LOCATION
@@ -30,17 +33,17 @@ spec:
         - name: KAFKA.BOOTSTRAP-SERVERS
           value: kafka-persistent-kafka-bootstrap.kafka.svc.cluster.local:9092
         - name: MINIOACCESSKEY
-          value: <your-access-key>
+          value: AKIAWOFL5WGMNPZ3MFHB
         - name: MINIOSECRETKEY
-          value: <your-secret-key>
+          value: vchreurDpvY/72X61oq/cR3GuVJGxET1BtaKZz4e
         - name: RESOURCEINFO.BUCKET
-          value: <your-resourceinfo-bucketname>
+          value: was-resources-442742190488
         - name: NODEFILES.BUCKET
-          value: <your-nodefiles-bucketname>
+          value: was-nodefiles-442742190488
         - name: RESOURCE.BUCKET.REGION
-          value: <your-resource-bucket-region>
+          value: us-east-1
         - name: NODEFILES.BUCKET.REGION
-          value: <your-nodefiles-bucket-region>
+          value: us-east-1
         image: wolframapplicationserver/resource-manager:1.2.0
         name: resource-manager
         ports:
@@ -48,10 +51,10 @@ spec:
         resources:
           limits:
             cpu: "1000m"
-            memory: 1Gi
+            memory: 4Gi
           requests:
             cpu: "500m"
-            memory: 500Mi
+            memory: 2000Mi
         readinessProbe:
           tcpSocket:
             port: 9090
