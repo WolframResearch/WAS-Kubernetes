@@ -8,6 +8,7 @@ metadata:
     app.kubernetes.io/part-of: ingress-nginx
   annotations:
     nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: 1g
     nginx.ingress.kubernetes.io/rewrite-target: /nodefiles/$1
 spec:
   ingressClassName: nginx
