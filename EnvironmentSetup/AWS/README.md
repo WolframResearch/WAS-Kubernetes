@@ -11,7 +11,7 @@ The following CLI tools are required to be installed on your local machine to co
 
 * **AWS CLIv2** - https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html#getting-started-install-instructions
 
-* **Kubectl >= 1.22** - https://kubernetes.io/docs/tasks/tools/install-kubectl/
+* **Kubectl >= 1.24** - https://kubernetes.io/docs/tasks/tools/install-kubectl/
 
 * **Docker v20.10 or newer** - https://docs.docker.com/get-docker/
 
