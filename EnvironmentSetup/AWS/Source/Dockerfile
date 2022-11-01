@@ -1,11 +1,11 @@
 FROM ubuntu:focal
-ENV KUBECTL_VERSION='v1.23.0'
+ENV KUBECTL_VERSION='v1.24.0'
 ENV DEBIAN_FRONTEND=noninteractive 
 ENV TERM xterm-256color
 ENV COLORTERM truecolor
 ENV LANG='en_US.UTF-8' LANGUAGE='en_US:en' LC_ALL='en_US.UTF-8'
 ENV TF_DATA_DIR=/terraform-state
-RUN apt-get update && apt-get install software-properties-common apt-transport-https locales curl tar unzip git procps libncurses-dev -y && \
+RUN apt-get update && apt-get install software-properties-common apt-transport-https locales curl tar unzip git procps libncurses-dev vim -y && \
 	locale-gen en_US.utf8 && locale -a  && \
 	update-locale LANG=en_US.UTF-8 LANG=en_US.UTF8 LC_CTYPE=en_US.UTF8 LC_COLLATE=en_US.UTF8 && \
 	curl -LO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl" && \
