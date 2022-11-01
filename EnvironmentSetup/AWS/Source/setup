@@ -422,16 +422,41 @@ EOF
 install_msg
 export AWS_DEFAULT_OUTPUT="json"
 
-SetupFunction()
+saveCredsFunction()
 {
-	banner=true
-    cd Source/terraform
-    GET_CLUSTER_NAME=$(grep -A1 -i cluster-name variables.tf | grep -i default | awk '{print $3}' | sed -e 's/"//g' | tr -d '\n')
-    GET_CLUSTER_NAME=$(echo $GET_CLUSTER_NAME | tr -d '\r')
-    GET_REGION=$(grep -A1 -i aws_region variables.tf | grep -i default | awk '{print $3}' | sed -e 's/"//g' | tr -d '\n')
-    GET_REGION=$(echo $GET_REGION | tr -d '\r')
+  echo "GET_CLUSTER_NAME:$GET_CLUSTER_NAME" >> creds
+  echo "GET_REGION:$GET_REGION" >> creds
+  echo "TERRAFORM_BUCKET:$terraform_bucket_name" >> creds
+  echo "MINIO_ACCESS_KEY:$MINIO_ACCESS_KEY" >> creds
+  echo "MINIO_SECRET_KEY:$MINIO_SECRET_KEY" >> creds
+  echo "DYNAMODB_TABLE:$dynamodb_table" >> creds
+  echo "EFS_FS_ID:$filesystem_id" >> creds
+  echo "RESOURCE_INFO_BUCKET:$resources_bucket_name" >> creds
+  echo "NODE_FILES_BUCKET:$nodefiles_bucket_name" >> creds
+  echo "BASE_URL:http://$BASE_URL/" >> creds
+  echo "RESOURCE_MANAGER_URL:http://$BASE_URL/resources/" >> creds
+  echo "NODEFILES_MANAGER_URL:http://$BASE_URL/nodefiles/" >> creds
+  echo "ENDPOINT_MANAGER_URL:http://$BASE_URL/endpoints/" >> creds
+  echo "ENDPOINT_INFO_URL:http://$BASE_URL/.applicationserver/info"
+  echo "RESTART_URL:http://$BASE_URL/.applicationserver/kernel/restart" >> creds
 
-	CFILE=~/.aws/credentials
+  creds_bucket_suffix="was-creds-"
+  creds_bucket_name="$creds_bucket_suffix$account_id"
+
+  created_bucket=$(aws s3api create-bucket --bucket $creds_bucket_name --region $GET_REGION)
+
+  aws s3api put-bucket-encryption --bucket $creds_bucket_name --server-side-encryption-configuration '{"Rules": [{"ApplyServerSideEncryptionByDefault": {"SSEAlgorithm": "AES256"}}]}'
+  aws s3api put-bucket-versioning --bucket $creds_bucket_name --versioning-configuration Status=Enabled
+  aws s3api put-public-access-block --bucket $creds_bucket_name --public-access-block-configuration "BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true"
+  
+  pushed_creds=$(aws s3api put-object --bucket $creds_bucket_name --key creds --body creds)
+
+  rm creds
+}
+
+awsKeysFunction()
+{
+  CFILE=~/.aws/credentials
 	if [ -f "$CFILE" ]; then
 		MINIO_ACCESS_KEY=$(cat ~/.aws/credentials | grep aws_access_key_id | awk '{print $3}')
 		MINIO_SECRET_KEY=$(cat ~/.aws/credentials | grep aws_secret_access_key | awk '{print $3}')
@@ -441,11 +466,23 @@ SetupFunction()
         echo
         exit 1
 	fi
+}
+
+SetupFunction()
+{
+	banner=true
+    cd Source/terraform
+
+    GET_CLUSTER_NAME=$(grep -A1 -i cluster-name variables.tf | grep -i default | awk '{print $3}' | sed -e 's/"//g' | tr -d '\n')
+    GET_CLUSTER_NAME=$(echo $GET_CLUSTER_NAME | tr -d '\r')
+    GET_REGION=$(grep -A1 -i aws_region variables.tf | grep -i default | awk '{print $3}' | sed -e 's/"//g' | tr -d '\n')
+    GET_REGION=$(echo $GET_REGION | tr -d '\r')
 
     cd ..
 	echo
 	log_debug "Phase 1 of 5: Prequisites Checks"   
 	printf "${YELLOW}☑${CYAN}□□□□${NORMAL} Phase ${YELLOW}1${NORMAL} of ${GREEN}5${NORMAL}: Prequisites Checks\\n"
+    run_ok "awsKeysFunction" "Checking AWS credentials"
     run_ok "kubectlFunction" "Checking Kubectl Installed"
     run_ok "terraformFunction" "Checking Terraform Installed"
     run_ok "helmFunction" "Checking Helm Installed"
@@ -480,8 +517,7 @@ SetupFunction()
     lower_cluster_name=$(echo $lower_cluster_name | tr -d '\r')
     get_user_info=$(aws sts get-caller-identity)
     account_id=$(echo $get_user_info | grep -oP '(?<="Account": ")[^"]*')
-    echo "variable \"terraform-s3-bucket-name\" { default = \"$suffix-$lower_cluster_name-$account_id\" } " >> variables.tf
-    terraform_bucket_name=$(grep -i terraform-s3-bucket-name variables.tf |  cut -d '"' -f 4)
+    terraform_bucket_name=$suffix-$lower_cluster_name-$account_id
     CURRENT_BUCKET_VAL=$(grep -i "bucket         =" main.tf | awk '{print $3}' | head -n 1)
     sed -i -e 's/'"$CURRENT_BUCKET_VAL"'/"'"$terraform_bucket_name"'"/g' main.tf
 
@@ -548,7 +584,6 @@ SetupFunction()
     for eachval in $subnets
     do
         output=$(aws efs create-mount-target --file-system-id $filesystem_id --subnet-id $eachval --security-group $group_id 2> /dev/null)
-        echo $output >> mountIDs.txt
         sleep 10
     done
     install_chart_stable=$(helm repo add stable https://charts.helm.sh/stable  >> $LOG_PATH)
@@ -699,7 +734,7 @@ EOF
 	log_debug "Phase 4 of 5: Wolfram Application Server Deployment"
 	printf "${GREEN}☑☑☑${YELLOW}☑${CYAN}□${NORMAL} Phase ${YELLOW}4${NORMAL} of ${GREEN}5${NORMAL}: Wolfram Application Server Deployment\\n"
 	run_ok "kubectl apply -f namespace/ && kubectl config set-context --current --namespace=kafka" "Creating Namespace"
-	run_ok "kubectl create -f strimzi-kafka-deployment/ && sleep 15 && kubectl wait --for=condition=ready --timeout=30m pod -l name=strimzi-cluster-operator && kubectl create -f kafka && sleep 15 && kubectl wait --for=condition=ready --timeout=30m pod -l statefulset.kubernetes.io/pod-name=kafka-persistent-zookeeper-0 && sleep 15 && kubectl wait --for=condition=ready --timeout=30m pod -l statefulset.kubernetes.io/pod-name=kafka-persistent-kafka-0 &&  sleep 15 && kubectl wait --for=condition=ready --timeout=30m pod -l app.kubernetes.io/name=entity-operator && kubectl create -f kafkabridge && sleep 15 && kubectl wait --for=condition=ready --timeout=30m pod -l app.kubernetes.io/name=kafka-bridge" "Deploying Kafka Cluster (can take upto 10 minutes)"	
+	run_ok "kubectl create -f strimzi-kafka-deployment/ && sleep 15 && kubectl wait --for=condition=ready --timeout=60m pod -l name=strimzi-cluster-operator && kubectl create -f kafka && sleep 15 && kubectl wait --for=condition=ready --timeout=60m pod -l statefulset.kubernetes.io/pod-name=kafka-persistent-zookeeper-0 && sleep 15 && kubectl wait --for=condition=ready --timeout=60m pod -l statefulset.kubernetes.io/pod-name=kafka-persistent-kafka-0 && sleep 15 && kubectl wait --for=condition=ready --timeout=60m pod -l app.kubernetes.io/name=entity-operator && kubectl create -f kafkabridge && sleep 15 && kubectl wait --for=condition=ready --timeout=60m pod -l app.kubernetes.io/name=kafka-bridge" "Deploying Kafka Cluster (can take upto 10 minutes)"	
 	run_ok "kafkaoperatorCheck" "Setting Up Kafka"
 	
 	run_ok "kubectl config set-context --current --namespace=was" "Set WAS Namespace as default"
@@ -728,18 +763,18 @@ EOF
     sed -i -e 's~'"$CURRENT_MINIO_SECRET_KEY"'~'"$MINIO_SECRET_KEY"'~g' deployments/minio-deployment.yaml
 
 	
-	# Resource Manger deployment setup
+	  # Resource Manger deployment setup
     CURRENT_MINIOACCESSKEY=$(grep -A1 -i MINIOACCESSKEY deployments/resource-manager-deployment.yaml | grep -i value: |  awk '{print $2}')
     sed -i -e 's~'"$CURRENT_MINIOACCESSKEY"'~'"$MINIO_ACCESS_KEY"'~g' deployments/resource-manager-deployment.yaml
     CURRENT_MINIOSECRETKEY=$(grep -A1 -i MINIOSECRETKEY deployments/resource-manager-deployment.yaml | grep -i value: |  awk '{print $2}')
     sed -i -e 's~'"$CURRENT_MINIOSECRETKEY"'~'"$MINIO_SECRET_KEY"'~g' deployments/resource-manager-deployment.yaml
-    resources_bucket_name="was-resources-$account_id"
-    nodefiles_bucket_name="was-nodefiles-$account_id"
+    resources_bucket_name="$GET_CLUSTER_NAME-resources-$account_id"
+    nodefiles_bucket_name="$GET_CLUSTER_NAME-nodefiles-$account_id"
     CURRENT_RESOURCEINFOBUCKET=$(grep -A1 -i RESOURCEINFO.BUCKET deployments/resource-manager-deployment.yaml | grep -i value: |  awk '{print $2}')
     sed -i -e 's~'"$CURRENT_RESOURCEINFOBUCKET"'~'"$resources_bucket_name"'~g' deployments/resource-manager-deployment.yaml
     CURRENT_NODEFILESBUCKET=$(grep -A1 -i NODEFILES.BUCKET deployments/resource-manager-deployment.yaml | grep -i value: |  awk '{print $2}' |  cut -d ' ' -f 1)
     CURRENT_NODEFILESBUCKET=$(echo $CURRENT_NODEFILESBUCKET | awk '{print $1}')
-	sed -i -e 's~'"$CURRENT_NODEFILESBUCKET"'~'"$nodefiles_bucket_name"'~g' deployments/resource-manager-deployment.yaml
+	  sed -i -e 's~'"$CURRENT_NODEFILESBUCKET"'~'"$nodefiles_bucket_name"'~g' deployments/resource-manager-deployment.yaml
     CURRENT_RESOURCE_BUCKET_REGION=$(grep -A1 -i RESOURCE.BUCKET.REGION deployments/resource-manager-deployment.yaml | grep -i value: |  awk '{print $2}')
     sed -i -e 's~'"$CURRENT_RESOURCE_BUCKET_REGION"'~'"$GET_REGION"'~g' deployments/resource-manager-deployment.yaml
     CURRENT_NODEFILES_BUCKET_REGION=$(grep -A1 -i NODEFILES.BUCKET.REGION deployments/resource-manager-deployment.yaml | grep -i value: |  awk '{print $2}')
@@ -770,13 +805,14 @@ EOF
     printf "${GREEN}Nodefiles:${NORMAL} http://$BASE_URL/nodefiles/\n\n"
     printf "${GREEN}Endpoints Info:${NORMAL} http://$BASE_URL/.applicationserver/info\n\n"
     printf "${GREEN}Restart AWES:${NORMAL} http://$BASE_URL/.applicationserver/kernel/restart\n\n"
-    
+  
+  run_ok "saveCredsFunction" "Saving values"
+
 	echo
     echo "EKS Cluster build complete and Wolfram Application Server Deployed. Our warmest appreciation to you for running Wolfram Application Server on Amazon environment. Enjoy!"
 	echo
 
 }
-
 
 custommetricsSetup()
 {
@@ -976,15 +1012,44 @@ kafkaShutdown()
 
 }
 
+parseCredsFunction()
+{
+  GET_CLUSTER_NAME=$(cat creds | cut -d$';' -f1 | grep GET_CLUSTER_NAME | cut -d$':' -f2)
+  GET_REGION=$(cat creds | cut -d$';' -f1 | grep GET_REGION | cut -d$':' -f2)
+  TERRAFORM_BUCKET=$(cat creds | cut -d$';' -f1 | grep TERRAFORM_BUCKET | cut -d$':' -f2)
+  MINIO_ACCESS_KEY=$(cat creds | cut -d$';' -f1 | grep MINIO_ACCESS_KEY | cut -d$':' -f2)
+  MINIO_SECRET_KEY=$(cat creds | cut -d$';' -f1 | grep MINIO_SECRET_KEY | cut -d$':' -f2)
+  DYNAMODB_TABLE=$(cat creds | cut -d$';' -f1 | grep DYNAMODB_TABLE | cut -d$':' -f2)
+  EFS_FS_ID=$(cat creds | cut -d$';' -f1 | grep EFS_FS_ID | cut -d$':' -f2)
+  RESOURCE_INFO_BUCKET=$(cat creds | cut -d$';' -f1 | grep RESOURCE_INFO_BUCKET | cut -d$':' -f2)
+  NODE_FILES_BUCKET=$(cat creds | cut -d$';' -f1 | grep NODE_FILES_BUCKET | cut -d$':' -f2)
+  BASE_URL=$(cat creds | cut -d$';' -f1 | grep BASE_URL | cut -d$':' -f2)
+  RESOURCE_MANAGER_URL=$(cat creds | cut -d$';' -f1 | grep RESOURCE_MANAGER_URL | cut -d$':' -f2)
+  NODEFILES_MANAGER_URL=$(cat creds | cut -d$';' -f1 | grep NODEFILES_MANAGER_URL | cut -d$':' -f2)
+  ENDPOINT_MANAGER_URL=$(cat creds | cut -d$';' -f1 | grep ENDPOINT_MANAGER_URL | cut -d$':' -f2)
+  ENDPOINT_INFO_URL=$(cat creds | cut -d$';' -f1 | grep ENDPOINT_INFO_URL | cut -d$':' -f2)
+  RESTART_URL=$(cat creds | cut -d$';' -f1 | grep RESTART_URL | cut -d$':' -f2)
+  rm creds
+}
 DeleteFunction()
 {
 	banner=true
-	cd Source/terraform
-    GET_CLUSTER_NAME=$(grep -A1 -i cluster-name variables.tf | grep -i default | awk '{print $3}' | sed -e 's/"//g' | tr -d '\n')
-    GET_CLUSTER_NAME=$(echo $GET_CLUSTER_NAME | tr -d '\r')
-	GET_REGION=$(grep -A1 -i aws_region variables.tf | grep -i default | awk '{print $3}' | sed -e 's/"//g' | tr -d '\n')
-    GET_REGION=$(echo $GET_REGION | tr -d '\r')
-	cd ..
+
+  get_user_info=$(aws sts get-caller-identity)
+  account_id=$(echo $get_user_info | grep -oP '(?<="Account": ")[^"]*')
+  creds_bucket_suffix="was-creds-"
+  creds_bucket_name=$creds_bucket_suffix$account_id
+
+  fetched_creds=$(aws s3api get-object --bucket $creds_bucket_name --key creds creds | grep VersionId | awk '{print $2}' | sed -e 's/"//g')
+
+  if [ -z $fetched_creds ]; then
+      echo
+      log_error "There is no creds file in S3 bucket. Is the owner account different than the current?"
+      echo
+      exit 1
+  fi
+
+  parseCredsFunction
 	
 	echo
 	log_debug "Phase 1 of 5: Prequisites Checks"   
@@ -992,6 +1057,7 @@ DeleteFunction()
     run_ok "kubectlFunction" "Checking Kubectl Installed"
     run_ok "terraformFunction" "Checking Terraform Installed"
     run_ok "helmFunction" "Checking Helm Installed"
+    run_ok "awsKeysFunction" "Checking AWS credentials"
     run_ok "CURRENTEKSCHECK" "Checking EKS Status"
 	
     val="no"
@@ -1005,35 +1071,28 @@ DeleteFunction()
 	echo
 	log_debug "Phase 2 of 5: Delete Wolfram Application Server Deployments"
 	printf "${GREEN}☑${YELLOW}☑${CYAN}□□□${NORMAL} Phase ${YELLOW}2${NORMAL} of ${GREEN}5${NORMAL}: Delete Wolfram Application Server Deployments\\n"
-    
-    BASE_URL=$(kubectl get svc -n ingress-nginx | awk '{print $4}' | sed -n '2p')
+
+  cd Source
+  run_ok "kubectl config use-context arn:aws:eks:$GET_REGION:$account_id:cluster/$GET_CLUSTER_NAME " "Switching Context"
+  BASE_URL=$(kubectl get svc -n ingress-nginx | awk '{print $4}' | sed -n '2p')
 	sed -i -e "s/$BASE_URL/domain.com/g" deployments/active-web-elements-server-deployment.yaml
 	
 	run_ok "kubectl delete --ignore-not-found=true -f deployments/" "Deleting Deployments"
     # Minio deployment setup
-    CURRENT_MINIO_ACCESS_KEY=$(grep -A1 -i MINIO_ACCESS_KEY deployments/minio-deployment.yaml | grep -i value: |  awk '{print $2}')
-    sed -i -e 's~'"$CURRENT_MINIO_ACCESS_KEY"'~<your-access-key>~g' deployments/minio-deployment.yaml
-    CURRENT_MINIO_SECRET_KEY=$(grep -A1 -i MINIO_SECRET_KEY deployments/minio-deployment.yaml | grep -i value: |  awk '{print $2}')
-    sed -i -e 's~'"$CURRENT_MINIO_SECRET_KEY"'~<your-secret-key>~g' deployments/minio-deployment.yaml
+    sed -i -e 's~'"$MINIO_ACCESS_KEY"'~<your-access-key>~g' deployments/minio-deployment.yaml
+    sed -i -e 's~'"$MINIO_SECRET_KEY"'~<your-secret-key>~g' deployments/minio-deployment.yaml
     # Resource Manger deployment setup
-    CURRENT_MINIOACCESSKEY=$(grep -A1 -i MINIOACCESSKEY deployments/resource-manager-deployment.yaml | grep -i value: |  awk '{print $2}')
-    sed -i -e 's~'"$CURRENT_MINIOACCESSKEY"'~<your-access-key>~g' deployments/resource-manager-deployment.yaml
-    CURRENT_MINIOSECRETKEY=$(grep -A1 -i MINIOSECRETKEY deployments/resource-manager-deployment.yaml | grep -i value: |  awk '{print $2}')
-    sed -i -e 's~'"$CURRENT_MINIOSECRETKEY"'~<your-secret-key>~g' deployments/resource-manager-deployment.yaml
-    CURRENT_RESOURCEINFOBUCKET=$(grep -A1 -i RESOURCEINFO.BUCKET deployments/resource-manager-deployment.yaml | grep -i value: |  awk '{print $2}')
-    sed -i -e 's~'"$CURRENT_RESOURCEINFOBUCKET"'~<your-resourceinfo-bucketname>~g' deployments/resource-manager-deployment.yaml
-    CURRENT_NODEFILESBUCKET=$(grep -A1 -i NODEFILES.BUCKET deployments/resource-manager-deployment.yaml | grep -i value: |  awk '{print $2}')
-    CURRENT_NODEFILESBUCKET=$(echo $CURRENT_NODEFILESBUCKET | awk '{print $1}')
-	sed -i -e 's~'"$CURRENT_NODEFILESBUCKET"'~<your-nodefiles-bucketname>~g' deployments/resource-manager-deployment.yaml
-    CURRENT_RESOURCE_BUCKET_REGION=$(grep -A1 -i RESOURCE.BUCKET.REGION deployments/resource-manager-deployment.yaml | grep -i value: |  awk '{print $2}')
-    sed -i -e 's~'"$CURRENT_RESOURCE_BUCKET_REGION"'~<your-resource-bucket-region>~g' deployments/resource-manager-deployment.yaml
-    CURRENT_NODEFILES_BUCKET_REGION=$(grep -A1 -i NODEFILES.BUCKET.REGION deployments/resource-manager-deployment.yaml | grep -i value: |  awk '{print $2}')
-    sed -i -e 's~'"$CURRENT_NODEFILES_BUCKET_REGION"'~<your-nodefiles-bucket-region>~g' deployments/resource-manager-deployment.yaml
+    sed -i -e 's~'"$MINIO_ACCESS_KEY"'~<your-access-key>~g' deployments/resource-manager-deployment.yaml
+    sed -i -e 's~'"$MINIO_SECRET_KEY"'~<your-secret-key>~g' deployments/resource-manager-deployment.yaml
+    sed -i -e 's~'"$RESOURCE_INFO_BUCKET"'~<your-resourceinfo-bucketname>~g' deployments/resource-manager-deployment.yaml
+	  sed -i -e 's~'"$NODE_FILES_BUCKET"'~<your-nodefiles-bucketname>~g' deployments/resource-manager-deployment.yaml
+    sed -i -e 's~'"$GET_REGION"'~<your-resource-bucket-region>~g' deployments/resource-manager-deployment.yaml
+    sed -i -e 's~'"$GET_REGION"'~<your-nodefiles-bucket-region>~g' deployments/resource-manager-deployment.yaml
 
 	
     run_ok "kafkaShutdown" "Deleting Kafka Cluster"
     run_ok "kubectl delete secret generic basic-auth --ignore-not-found=true" "Deleting NGINX Auth"
-    
+ 
 	run_ok "kubectl delete --ignore-not-found=true -f ingress/" "Deleting Ingress"
 	run_ok "kubectl delete --ignore-not-found=true -f hpa/" "Deleting Horizontal Pod Autoscaler"
     run_ok "kubectl delete --ignore-not-found=true -f services/" "Deleting Services"
@@ -1053,8 +1112,8 @@ DeleteFunction()
     set -e
     kubectl patch storageclass gp2 -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}' >> $LOG_PATH
     run_ok "kubectl delete --ignore-not-found=true daemonsets,replicasets,deployments,pods,statefulsets,rc,svc,sc,pv,pvc,ingress,hpa --all --all-namespaces" "Deleting all namespace resources"
-	efs_id=$(cat values.yaml | grep "efsFileSystemId:" | cut -d ' ' -f 4)
-	efs_mounts=$(aws efs describe-mount-targets --file-system-id $efs_id --profile default --region $GET_REGION | grep "MountTargetId" | cut -d '"' -f 4)
+
+	efs_mounts=$(aws efs describe-mount-targets --file-system-id $EFS_FS_ID --profile default --region $GET_REGION | grep "MountTargetId" | cut -d '"' -f 4)
 
     for eachval in $efs_mounts
     do
@@ -1062,7 +1121,7 @@ DeleteFunction()
 		sleep 5
     done
 
-    run_ok "sleep 15 && aws efs delete-file-system --file-system-id $efs_id" "Deleting EFS Storage System"
+    run_ok "sleep 15 && aws efs delete-file-system --file-system-id $EFS_FS_ID" "Deleting EFS Storage System"
     rm -rf values*
     kubectl delete --ignore-not-found=true -f namespace.yaml >> $LOG_PATH
 	suffix_efs_sc="efs-mount-eks-"
@@ -1074,21 +1133,25 @@ DeleteFunction()
 	log_debug "Phase 4 of 5: Delete Amazon Kubernetes Cluster (EKS)"
 	printf "${GREEN}☑☑☑${YELLOW}☑${CYAN}□${NORMAL} Phase ${YELLOW}4${NORMAL} of ${GREEN}5${NORMAL}: Delete Amazon Kubernetes Cluster (EKS)\\n"
     cd terraform
+    sed -i -e 's~'"terraform-tfstate-"'$'"{var.cluster-name}"~$TERRAFORM_BUCKET~g main.tf
+    sed -i -e 's~'"$"'{var.aws-region}'~$GET_REGION~g main.tf
 	run_ok "sleep 5 && terraform init && terraform refresh && terraform destroy -auto-approve || true" "Deleting EKS"
 	set +e
-	terraform_bucket_name=$(grep -i terraform-s3-bucket-name variables.tf |  cut -d '"' -f 4)
 
 	echo
 	log_debug "Phase 5 of 5: Cleanup"
 	printf "${GREEN}☑☑☑☑${YELLOW}☑${NORMAL} Phase ${YELLOW}5${NORMAL} of ${GREEN}5${NORMAL}: Cleanup\\n"
     run_ok "deleteAWSBucket" "Deleting Terraform S3 Bucket"
-    run_ok "aws dynamodb delete-table --table-name terraform-state-locking-was" "Deleting Dynamodb Terraform Table"
-	awk '!/terraform-s3-bucket-name/' variables.tf  > tmpfile && mv tmpfile variables.tf >> $LOG_PATH
+    run_ok "aws dynamodb delete-table --table-name $DYNAMODB_TABLE" "Deleting Dynamodb Terraform Table"
+	awk '!/$TERRAFORM_BUCKET/' variables.tf  > tmpfile && mv tmpfile variables.tf >> $LOG_PATH
 	rm -rf .terraform
 	cd ../..
 	run_ok "cleanconfiguration" "Cleaning Configuration - Resetting Back To Default"
 
-
+  aws s3api delete-objects --bucket $creds_bucket_name --delete "$(aws s3api list-object-versions --bucket $creds_bucket_name --query='{Objects: Versions[].{Key:Key,VersionId:VersionId}}')"
+  aws s3api delete-objects --bucket $creds_bucket_name --delete "$(aws s3api list-object-versions --bucket $creds_bucket_name --query='{Objects: DeleteMarkers[].{Key:Key,VersionId:VersionId}}')"
+  aws s3 rb s3://$creds_bucket_name --force
+  
 	echo
     echo "Deleted EKS Cluster and Wolfram Application Server. Our warmest appreciation to you for running Wolfram Application Server on Amazon environment. Thank You!"
 	echo
@@ -1103,11 +1166,8 @@ cleanconfiguration()
 	echo
 	log_debug "Phase 1 of 1: Clean Configuration"
 	
-    CURRENT_REGION_VAL=$(grep -A1 -i "region         =" main.tf | head -n 1 | awk '{print $3}')
-    sed -i -e 's/'"$CURRENT_REGION_VAL"'/"${var.cluster-name}"/g' main.tf
-	CURRENT_BUCKET_VAL=$(grep -i "bucket         =" main.tf | awk '{print $3}' | head -n 1)
-    sed -i -e 's/'"$CURRENT_BUCKET_VAL"'/"terraform-tfstate-${var.cluster-name}"/g' main.tf
-	GET_REGION=$(grep -A1 -i aws_region variables.tf | grep -i default | awk '{print $3}' | sed -e 's/"//g' | tr -d '\n')
+    sed -i -e 's/'"$GET_CLUSTER_NAME"'/${var.cluster-name}/g' main.tf
+    sed -i -e 's/'"$TERRAFORM_BUCKET"'/terraform-tfstate-${var.cluster-name}/g' main.tf
     GET_REGION=$(echo $GET_REGION | tr -d '\r')
     sed -i -e 's/'"$GET_REGION"'/us-east-1/g' variables.tf
 	awk '!/terraform-s3-bucket-name/' variables.tf  > tmpfile && mv tmpfile variables.tf >> $LOG_PATH
@@ -1122,27 +1182,18 @@ cleanconfiguration()
 	
 	
 	# clean deployments
-	currentDomain=$(grep -Eo '(http|https)://[^/"]+' deployments/active-web-elements-server-deployment.yaml | head -n 1)
-	sed -i -e "s~$currentDomain~http:\/\/domain.com~g" deployments/active-web-elements-server-deployment.yaml
-    # Minio deployment setup
-    CURRENT_MINIO_ACCESS_KEY=$(grep -A1 -i MINIO_ACCESS_KEY deployments/minio-deployment.yaml | grep -i value: |  awk '{print $2}')
-    sed -i -e 's~'"$CURRENT_MINIO_ACCESS_KEY"'~<your-access-key>~g' deployments/minio-deployment.yaml
-    CURRENT_MINIO_SECRET_KEY=$(grep -A1 -i MINIO_SECRET_KEY deployments/minio-deployment.yaml | grep -i value: |  awk '{print $2}')
-    sed -i -e 's~'"$CURRENT_MINIO_SECRET_KEY"'~<your-secret-key>~g' deployments/minio-deployment.yaml
-    # Resource Manger deployment setup
-    CURRENT_MINIOACCESSKEY=$(grep -A1 -i MINIOACCESSKEY deployments/resource-manager-deployment.yaml | grep -i value: |  awk '{print $2}')
-    sed -i -e 's~'"$CURRENT_MINIOACCESSKEY"'~<your-access-key>~g' deployments/resource-manager-deployment.yaml
-    CURRENT_MINIOSECRETKEY=$(grep -A1 -i MINIOSECRETKEY deployments/resource-manager-deployment.yaml | grep -i value: |  awk '{print $2}')
-    sed -i -e 's~'"$CURRENT_MINIOSECRETKEY"'~<your-secret-key>~g' deployments/resource-manager-deployment.yaml
-    CURRENT_RESOURCEINFOBUCKET=$(grep -A1 -i RESOURCEINFO.BUCKET deployments/resource-manager-deployment.yaml | grep -i value: |  awk '{print $2}')
-    sed -i -e 's~'"$CURRENT_RESOURCEINFOBUCKET"'~<your-resourceinfo-bucketname>~g' deployments/resource-manager-deployment.yaml
-    CURRENT_NODEFILESBUCKET=$(grep -A1 -i NODEFILES.BUCKET deployments/resource-manager-deployment.yaml | grep -i value: |  awk '{print $2}')
-    CURRENT_NODEFILESBUCKET=$(echo $CURRENT_NODEFILESBUCKET | awk '{print $1}')
-	sed -i -e 's~'"$CURRENT_NODEFILESBUCKET"'~<your-nodefiles-bucketname>~g' deployments/resource-manager-deployment.yaml
-    CURRENT_RESOURCE_BUCKET_REGION=$(grep -A1 -i RESOURCE.BUCKET.REGION deployments/resource-manager-deployment.yaml | grep -i value: |  awk '{print $2}')
-    sed -i -e 's~'"$CURRENT_RESOURCE_BUCKET_REGION"'~<your-resource-bucket-region>~g' deployments/resource-manager-deployment.yaml
-    CURRENT_NODEFILES_BUCKET_REGION=$(grep -A1 -i NODEFILES.BUCKET.REGION deployments/resource-manager-deployment.yaml | grep -i value: |  awk '{print $2}')
-    sed -i -e 's~'"$CURRENT_NODEFILES_BUCKET_REGION"'~<your-nodefiles-bucket-region>~g' deployments/resource-manager-deployment.yaml
+  
+	sed -i -e "s~$BASE_URL~http:\/\/domain.com~g" deployments/active-web-elements-server-deployment.yaml
+  # Minio deployment setup
+  sed -i -e 's~'"$MINIO_ACCESS_KEY"'~<your-access-key>~g' deployments/minio-deployment.yaml
+  sed -i -e 's~'"$MINIO_SECRET_KEY"'~<your-secret-key>~g' deployments/minio-deployment.yaml
+  # Resource Manger deployment setup
+  sed -i -e 's~'"$MINIOACCESSKEY"'~<your-access-key>~g' deployments/resource-manager-deployment.yaml
+  sed -i -e 's~'"$MINIOSECRETKEY"'~<your-secret-key>~g' deployments/resource-manager-deployment.yaml
+  sed -i -e 's~'"$RESOURCE_INFO_BUCKET"'~<your-resourceinfo-bucketname>~g' deployments/resource-manager-deployment.yaml
+	sed -i -e 's~'"$NODE_FILES_BUCKET"'~<your-nodefiles-bucketname>~g' deployments/resource-manager-deployment.yaml
+  sed -i -e 's~'"$GET_REGION"'~<your-resource-bucket-region>~g' deployments/resource-manager-deployment.yaml
+  sed -i -e 's~'"$GET_REGION"'~<your-nodefiles-bucket-region>~g' deployments/resource-manager-deployment.yaml
 
 	cd ..
 	
@@ -1153,9 +1204,9 @@ cleanconfiguration()
 
 deleteAWSBucket()
 {
-aws s3api delete-objects --bucket $terraform_bucket_name --delete "$(aws s3api list-object-versions --bucket $terraform_bucket_name --query='{Objects: Versions[].{Key:Key,VersionId:VersionId}}')"
-aws s3api delete-objects --bucket $terraform_bucket_name --delete "$(aws s3api list-object-versions --bucket $terraform_bucket_name --query='{Objects: DeleteMarkers[].{Key:Key,VersionId:VersionId}}')"
-aws s3 rb s3://$terraform_bucket_name --force
+aws s3api delete-objects --bucket $TERRAFORM_BUCKET --delete "$(aws s3api list-object-versions --bucket $TERRAFORM_BUCKET --query='{Objects: Versions[].{Key:Key,VersionId:VersionId}}')"
+aws s3api delete-objects --bucket $TERRAFORM_BUCKET --delete "$(aws s3api list-object-versions --bucket $TERRAFORM_BUCKET --query='{Objects: DeleteMarkers[].{Key:Key,VersionId:VersionId}}')"
+aws s3 rb s3://$TERRAFORM_BUCKET --force
 }
 
 NEWEKSCHECK()
@@ -1172,8 +1223,6 @@ NEWEKSCHECK()
 
 CURRENTEKSCHECK()
 {
-    cd terraform
-    GET_CLUSTER_NAME=$(grep -A1 -i cluster-name variables.tf | grep -i default | awk '{print $3}' | sed -e 's/"//g' | tr -d '\n')
     GET_CLUSTER_NAME=$(echo $GET_CLUSTER_NAME | tr -d '\r')
     clusterExists=$(aws eks describe-cluster --name $GET_CLUSTER_NAME 2>/dev/null 2>&1 )
 	if [[ $clusterExists =~ "ACTIVE" ]]; then
@@ -1183,12 +1232,11 @@ CURRENTEKSCHECK()
 	    printf "no cluster found" 2>/dev/null 2>&1
 		eks_Exists="no"
 	fi
-    cd ..
 }
 
 URLFunction()
 {
-    banner=true
+  banner=true
 	echo
 	log_debug "Phase 1 of 1: Application URL Details"
 	printf "${GREEN}${YELLOW}☑${CYAN}${NORMAL} Phase ${YELLOW}1${NORMAL} of ${GREEN}1${NORMAL}: Application URL Details\\n\n"
@@ -1211,11 +1259,34 @@ helpFunction()
   printf "  ${YELLOW}--create${NORMAL} \t\t- Setup EKS and Deploy Wolfram Application Server on AWS\\n"
   printf "  ${YELLOW}--delete${NORMAL} \t\t- Delete EKS and Wolfram Application Server from AWS\\n"
   printf "  ${YELLOW}--endpoint-info${NORMAL} \t- Get Your Application URL Endpoints Information\\n"
-  printf "  ${YELLOW}--clean-configuration${NORMAL} \t- Clean any custom configuration for buckets and regions\\n"
+  printf "  ${YELLOW}--clean-configuration${NORMAL} - Clean any custom configuration for buckets and regions\\n"
+  printf "  ${YELLOW}--get-creds${NORMAL} \t\t- Show stored values on S3 bucket\\n"
   printf "  ${YELLOW}--help${NORMAL} \t\t- Help\\n"
   echo
 }
 
+getCredsFunction() {
+  banner=true
+  get_user_info=$(aws sts get-caller-identity)
+  account_id=$(echo $get_user_info | grep -oP '(?<="Account": ")[^"]*')
+  creds_bucket_suffix="was-creds-"
+  creds_bucket_name=$creds_bucket_suffix$account_id
+
+  fetched_creds=$(aws s3api get-object --bucket $creds_bucket_name --key creds creds | grep VersionId | awk '{print $2}' | sed -e 's/"//g')
+
+  if [ -z $fetched_creds ]; then
+      echo
+      log_error "There is no creds file in S3 bucket. Is the owner account different than the current?"
+      echo
+      exit 1
+  fi
+
+  echo "Stored values are"
+  echo
+  echo
+  cat creds
+  rm creds
+}
 
 invalidoptionsFunction()
 {
@@ -1235,6 +1306,8 @@ do
         --endpoint-info) URLFunction
             ;;
         --clean-configuration) cleanconfiguration
+            ;;
+        --get-creds) getCredsFunction
             ;;
         --help) helpFunction
             ;;
