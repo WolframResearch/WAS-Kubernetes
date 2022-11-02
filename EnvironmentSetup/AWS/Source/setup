@@ -1073,6 +1073,7 @@ DeleteFunction()
 	printf "${GREEN}☑${YELLOW}☑${CYAN}□□□${NORMAL} Phase ${YELLOW}2${NORMAL} of ${GREEN}5${NORMAL}: Delete Wolfram Application Server Deployments\\n"
 
   cd Source
+  run_ok "aws eks update-kubeconfig --region $GET_REGION --name $GET_CLUSTER_NAME" "Updating kubeconfig"
   run_ok "kubectl config use-context arn:aws:eks:$GET_REGION:$account_id:cluster/$GET_CLUSTER_NAME " "Switching Context"
   BASE_URL=$(kubectl get svc -n ingress-nginx | awk '{print $4}' | sed -n '2p')
 	sed -i -e "s/$BASE_URL/domain.com/g" deployments/active-web-elements-server-deployment.yaml
