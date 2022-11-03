@@ -1270,7 +1270,7 @@ getCredsFunction() {
   creds_bucket_suffix="was-creds-"
   creds_bucket_name=$creds_bucket_suffix$account_id
 
-  fetched_creds=$(aws s3api get-object --bucket $creds_bucket_name --key creds creds | grep VersionId | awk '{print $2}' | sed -e 's/"//g')
+  fetched_creds=$(aws s3api get-object --bucket $creds_bucket_name --key creds creds | grep ContentLength | awk '{print $2}' | sed -e 's/"//g')
 
   if [ -z $fetched_creds ]; then
       echo
