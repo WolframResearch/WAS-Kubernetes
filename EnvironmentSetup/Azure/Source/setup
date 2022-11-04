@@ -1029,7 +1029,7 @@ DeleteFunction()
   # GET_SAN=$(grep -A0 -i storage_account_name variables.tf | grep -i default | awk '{print $6}' | sed -e 's/"//g' | tr -d '\n')
 	# GET_SAN=$(echo $GET_SAN | tr -d '\r')
 	PARSED_TENANTID=$(az account list --query [].tenantId --output tsv | cut -d '-' -f 5)
-	PARSED_TENANTID=$(echo $TENANTID | tr -d '\r')
+	PARSED_TENANTID=$(echo $PARSED_TENANTID | tr -d '\r')
 	lower_cluster_name=$(echo $GET_CLUSTER_NAME | tr '[:upper:]' '[:lower:]')
   lower_cluster_name=$(echo $lower_cluster_name | tr -d '\r')
 	spsuffix="AzureWAS"
