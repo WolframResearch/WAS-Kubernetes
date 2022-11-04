@@ -421,16 +421,58 @@ EOF
 }
 install_msg
 
-SetupFunction()
+saveCredsFunction()
 {
-	banner=true
-    cd Source/terraform
-    GET_CLUSTER_NAME=$(grep -A1 -i cluster-name variables.tf | grep -i default | awk '{print $3}' | sed -e 's/"//g' | tr -d '\n')
-    GET_CLUSTER_NAME=$(echo $GET_CLUSTER_NAME | tr -d '\r')
-    GET_REGION=$(grep -A1 -i aks_region variables.tf | grep -i default | awk '{print $3}' | sed -e 's/"//g' | tr -d '\n')
-    GET_REGION=$(echo $GET_REGION | tr -d '\r')
 
-	CFILE=~/.azure/azureProfile.json
+  WAS="was"
+
+  PARSED_TENANT=$(az account list | grep tenantId | cut -d$':' -f2 | cut -d'"' -f 2 | cut -d$"-" -f1)
+  CREDS_RG_NAME="$WAS-creds-rg-$PARSED_TENANT"
+  CREDS_STORAGE_ACCOUNT_NAME="${WAS}sa${PARSED_TENANT}"
+  CREDS_STORAGE_CONTAINER_NAME="$WAS$PARSED_TENANT"
+
+  echo "GET_CLUSTER_NAME:$GET_CLUSTER_NAME" >> creds
+  echo "GET_REGION:$GET_REGION" >> creds
+  echo "GET_SAN:$GET_SAN" >> creds
+  echo "ACCOUNT_KEY:$ACCOUNT_KEY" >> creds
+  echo "MINIO_ACCESS_KEY:$GET_SAN" >> creds
+  echo "MINIO_SECRET_KEY:$ACCOUNT_KEY" >> creds
+  echo "TENANT_ID:$TENANT_ID" >> creds
+  echo "RESOURCE_GROUP_NAME:$RESOURCE_GROUP_NAME" >> creds
+  echo "TF_RESOURCE_GROUP_NAME:$TF_RESOURCE_GROUP_NAME" >> creds
+  echo "AD_APP_ID:$AD_APP_ID" >> creds
+  echo "AD_APP_PASSWORD:$AD_APP_PASSWORD" >> creds
+  echo "AZURE_DOMAIN:$AZURE_DOMAIN" >> creds
+  echo "STORAGE_CONTAINER_NAME:$STORAGE_CONTAINER_NAME" >> creds
+  echo "RESOURCE_INFO_BUCKET:$resources_bucket_name" >> creds
+  echo "NODE_FILES_BUCKET:$nodefiles_bucket_name" >> creds
+  echo "CREDS_RG_NAME:$CREDS_RG_NAME" >> creds
+  echo "CREDS_STORAGE_ACCOUNT_NAME:$CREDS_STORAGE_ACCOUNT_NAME" >> creds
+  echo "CREDS_STORAGE_CONTAINER_NAME:$CREDS_STORAGE_CONTAINER_NAME" >> creds
+
+  echo "BASE_URL:http://$BASE_URL/" >> creds
+  echo "RESOURCE_MANAGER_URL:http://$BASE_URL/resources/" >> creds
+  echo "ENDPOINT_MANAGER_URL:http://$BASE_URL/endpoints/" >> creds
+  echo "NODEFILES_URL:http://$BASE_URL/nodefiles" >> creds
+  echo "ENDPOINTS_INFO_URL:http://$BASE_URL/.applicationserver/info" >> creds
+  echo "RESTART_URL:http://$BASE_URL/.applicationserver/kernel/restart" >> creds
+
+  create_rg=$(az group create --name $CREDS_RG_NAME --location $GET_REGION)
+  create_sa=$(az storage account create --name $CREDS_STORAGE_ACCOUNT_NAME --resource-group $CREDS_RG_NAME --location $GET_REGION --encryption-services file --allow-blob-public-access false --allow-cross-tenant-replication false)
+  create_container=$(az storage container create --account-name $CREDS_STORAGE_ACCOUNT_NAME --name $CREDS_STORAGE_CONTAINER_NAME --auth-mode login)
+  upload_creds=$(az storage blob upload --account-name $CREDS_STORAGE_ACCOUNT_NAME --container-name $CREDS_STORAGE_CONTAINER_NAME --name creds --file creds --auth-mode login)
+  
+  rm creds
+}
+
+deleteCredsFunction()
+{
+  delete_creds=$(az group delete --name $CREDS_RG_NAME --no-wait --yes)
+}
+
+azureKeysFunction()
+{
+  	CFILE=~/.azure/azureProfile.json
 	if [ -f "$CFILE" ]; then
 		TFILE=tenant-id.config
 		if [ -f "$TFILE" ]; then
@@ -448,6 +490,16 @@ SetupFunction()
         echo
         exit 1
 	fi
+}
+
+SetupFunction()
+{
+	banner=true
+    cd Source/terraform
+    GET_CLUSTER_NAME=$(grep -A1 -i cluster-name variables.tf | grep -i default | awk '{print $3}' | sed -e 's/"//g' | tr -d '\n')
+    GET_CLUSTER_NAME=$(echo $GET_CLUSTER_NAME | tr -d '\r')
+    GET_REGION=$(grep -A1 -i aks_region variables.tf | grep -i default | awk '{print $3}' | sed -e 's/"//g' | tr -d '\n')
+    GET_REGION=$(echo $GET_REGION | tr -d '\r')
 
 	echo
 	log_debug "Phase 1 of 5: Prequisites Checks"   
@@ -455,6 +507,7 @@ SetupFunction()
     run_ok "kubectlFunction" "Checking Kubectl Installed"
     run_ok "terraformFunction" "Checking Terraform Installed"
     run_ok "helmFunction" "Checking Helm Installed"
+    run_ok "azureKeysFunction" "Checking Azure credentials"
     run_ok "NEWAKSCHECK" "Checking AKS Status"
     val="yes"
 	if [ X"$aks_Exists" = X"$val" ]; then
@@ -480,10 +533,12 @@ SetupFunction()
 	
     lower_cluster_name=$(echo $GET_CLUSTER_NAME | tr '[:upper:]' '[:lower:]')
     lower_cluster_name=$(echo $lower_cluster_name | tr -d '\r')
-	RESOURCE_GROUP_NAME="$lower_cluster_name-rg-$TENANTID"
-    sed -i -e "s~XXXXXX~$RESOURCE_GROUP_NAME~g" main.tf
+    RESOURCE_GROUP_NAME="WAS-rg"
+    TENANT_ID=$(az account list | grep tenantId | cut -d$':' -f2 | cut -d'"' -f 2)
+	  TF_RESOURCE_GROUP_NAME="$lower_cluster_name-rg-$TENANTID"
+    sed -i -e "s~XXXXXX~$TF_RESOURCE_GROUP_NAME~g" main.tf
 	
-	run_ok "az group create --name $RESOURCE_GROUP_NAME --location $GET_REGION" "Creating Resource Group"
+	run_ok "az group create --name $TF_RESOURCE_GROUP_NAME --location $GET_REGION" "Creating Resource Group"
 	spsuffix="AzureWAS"
 	spuser="$spsuffix$TENANTID"
 
@@ -512,21 +567,25 @@ SetupFunction()
 	done
   
     apppassword=$(echo $apppassword | sed "s/[!@#$%^&*()-~]/\\\&/g")
-	# find and replace appid and password
+
+    AD_APP_ID=$appid
+    AD_APP_PASSWORD=$apppassword
+
+	  # find and replace appid and password
     sed -i -e "s/XXXXXX/$appid/g" variables.tf
 	  sed -i -e "s/YYYYYY/$apppassword/g" variables.tf
 	
-	spuser=$(echo $spuser | tr '[:upper:]' '[:lower:]')
+	  spuser=$(echo $spuser | tr '[:upper:]' '[:lower:]')
     spuser=$(echo $spuser | tr -d '\r')
-	
-    echo "variable \"storage_account_name\" { default = \"$spuser\" } " >> variables.tf
+  
+    # echo "variable \"storage_account_name\" { default = \"$spuser\" } " >> variables.tf
     
-    GET_SAN=$(grep -A0 -i storage_account_name variables.tf | grep -i default | awk '{print $6}' | sed -e 's/"//g' | tr -d '\n')
+  GET_SAN=$spuser
 	GET_SAN=$(echo $GET_SAN | tr -d '\r')
-	CONTAINER_NAME="tfstate"
-
-	run_ok "createStorageAccount" "Creating Storage Account"
-	run_ok "az storage container create --name $CONTAINER_NAME --account-name $GET_SAN --account-key $ACCOUNT_KEY 2> /dev/null" "Creating Terraform Blob Container"
+	STORAGE_CONTAINER_NAME="tfstate"
+  
+  run_ok "createStorageAccount" "Creating Storage Account"
+	run_ok "az storage container create --name $STORAGE_CONTAINER_NAME --account-name $GET_SAN --account-key $ACCOUNT_KEY 2> /dev/null" "Creating Terraform Blob Container"
     sed -i -e "s~YYYYYY~$GET_SAN~g" main.tf
 
     run_ok "terraform init && terraform refresh && terraform plan && terraform apply -auto-approve" "Building AKS - (can take upto 15 minutes)"
@@ -539,7 +598,7 @@ SetupFunction()
 	domainsuffix="was"
 	azuredomain="$domainsuffix-$TENANTID"
     sed -i -e "s~^    service.beta.kubernetes.io\/azure-dns-label-name: .*~    service.beta.kubernetes.io\/azure-dns-label-name: \"$azuredomain\"~g" ingress-controller/deploy.yml
-	run_ok "kubectl apply -f ingress-controller/ & sleep 120" "Setup Ingress Controller"
+	run_ok "kubectl apply -f ingress-controller/deploy.yml & sleep 180" "Setup Ingress Controller"
 	run_ok "kubectl apply -f metrics-server/ & sleep 30" "Setup Metrics Server"
 
 	echo
@@ -571,27 +630,28 @@ SetupFunction()
 	run_ok "kubectl apply -f ingress/" "Setup Ingress"
     
 	
-    # Minio deployment setup
-    CURRENT_MINIO_ACCESS_KEY=$(grep -A1 -i MINIO_ACCESS_KEY deployments/minio-deployment.yaml | grep -i value: |  awk '{print $2}')
-    sed -i -e 's~'"$CURRENT_MINIO_ACCESS_KEY"'~'"$GET_SAN"'~g' deployments/minio-deployment.yaml
-    CURRENT_MINIO_SECRET_KEY=$(grep -A1 -i MINIO_SECRET_KEY deployments/minio-deployment.yaml | grep -i value: |  awk '{print $2}')
-    sed -i -e 's~'"$CURRENT_MINIO_SECRET_KEY"'~'"$ACCOUNT_KEY"'~g' deployments/minio-deployment.yaml
+  # Minio deployment setup
+  CURRENT_MINIO_ACCESS_KEY=$(grep -A1 -i MINIO_ACCESS_KEY deployments/minio-deployment.yaml | grep -i value: |  awk '{print $2}')
+  sed -i -e 's~'"$CURRENT_MINIO_ACCESS_KEY"'~'"$GET_SAN"'~g' deployments/minio-deployment.yaml
+  CURRENT_MINIO_SECRET_KEY=$(grep -A1 -i MINIO_SECRET_KEY deployments/minio-deployment.yaml | grep -i value: |  awk '{print $2}')
+  sed -i -e 's~'"$CURRENT_MINIO_SECRET_KEY"'~'"$ACCOUNT_KEY"'~g' deployments/minio-deployment.yaml
     
 	# Resource Manger deployment setup
-    CURRENT_MINIOACCESSKEY=$(grep -A1 -i MINIOACCESSKEY deployments/resource-manager-deployment.yaml | grep -i value: |  awk '{print $2}')
-    sed -i -e 's~'"$CURRENT_MINIOACCESSKEY"'~'"$GET_SAN"'~g' deployments/resource-manager-deployment.yaml
-    CURRENT_MINIOSECRETKEY=$(grep -A1 -i MINIOSECRETKEY deployments/resource-manager-deployment.yaml | grep -i value: |  awk '{print $2}')
+  CURRENT_MINIOACCESSKEY=$(grep -A1 -i MINIOACCESSKEY deployments/resource-manager-deployment.yaml | grep -i value: |  awk '{print $2}')
+  sed -i -e 's~'"$CURRENT_MINIOACCESSKEY"'~'"$GET_SAN"'~g' deployments/resource-manager-deployment.yaml
+  CURRENT_MINIOSECRETKEY=$(grep -A1 -i MINIOSECRETKEY deployments/resource-manager-deployment.yaml | grep -i value: |  awk '{print $2}')
 	sed -i -e 's~'"$CURRENT_MINIOSECRETKEY"'~'"$ACCOUNT_KEY"'~g' deployments/resource-manager-deployment.yaml
-    resources_bucket_name="was-resources-$TENANTID"
-    nodefiles_bucket_name="was-nodefiles-$TENANTID"
-    CURRENT_RESOURCEINFOBUCKET=$(grep -A1 -i RESOURCEINFO.BUCKET deployments/resource-manager-deployment.yaml | grep -i value: |  awk '{print $2}')
-    sed -i -e 's~'"$CURRENT_RESOURCEINFOBUCKET"'~'"$resources_bucket_name"'~g' deployments/resource-manager-deployment.yaml
-    CURRENT_NODEFILESBUCKET=$(grep -A1 -i NODEFILES.BUCKET deployments/resource-manager-deployment.yaml | grep -i value: |  awk '{print $2}')
-    sed -i -e 's~'"$CURRENT_NODEFILESBUCKET"'~'"$nodefiles_bucket_name"'~g' deployments/resource-manager-deployment.yaml
+  resources_bucket_name="was-resources-$TENANTID"
+  nodefiles_bucket_name="was-nodefiles-$TENANTID"
+  CURRENT_RESOURCEINFOBUCKET=$(grep -A1 -i RESOURCEINFO.BUCKET deployments/resource-manager-deployment.yaml | grep -i value: |  awk '{print $2}')
+  sed -i -e 's~'"$CURRENT_RESOURCEINFOBUCKET"'~'"$resources_bucket_name"'~g' deployments/resource-manager-deployment.yaml
+  CURRENT_NODEFILESBUCKET=$(grep -A1 -i NODEFILES.BUCKET deployments/resource-manager-deployment.yaml | grep -i value: |  awk '{print $2}')
+  sed -i -e 's~'"$CURRENT_NODEFILESBUCKET"'~'"$nodefiles_bucket_name"'~g' deployments/resource-manager-deployment.yaml
     
 	# AWES deployment setup
 	domainsuf="cloudapp.azure.com"
 	fullazuredomain="$azuredomain.$GET_REGION.$domainsuf"
+  AZURE_DOMAIN=$fullazuredomain
 	rm -rf ingress-controller/domain.config
 	echo $fullazuredomain >> ingress-controller/domain.config
 	sed -i -e "s/domain.com/$fullazuredomain/g" deployments/active-web-elements-server-deployment.yaml
@@ -617,6 +677,7 @@ SetupFunction()
     printf "${GREEN}Endpoints Info:${NORMAL} http://$BASE_URL/.applicationserver/info\n\n"
     printf "${GREEN}Restart AWES:${NORMAL} http://$BASE_URL/.applicationserver/kernel/restart\n\n"
     
+    saveCredsFunction
 	echo
     echo "AKS Cluster build complete and Wolfram Application Server Deployed. Our warmest appreciation to you for running Wolfram Application Server on Azure environment. Enjoy!"
 	echo
@@ -625,8 +686,8 @@ SetupFunction()
 
 createStorageAccount()
 {
-	san=$(az storage account create --resource-group $RESOURCE_GROUP_NAME --name $GET_SAN --sku Standard_LRS --encryption-services blob 2> /dev/null)
-	ACCOUNT_KEY=$(az storage account keys list --resource-group $RESOURCE_GROUP_NAME --account-name $GET_SAN --query '[0].value' -o tsv  2> /dev/null)
+	san=$(az storage account create --resource-group $TF_RESOURCE_GROUP_NAME --name $GET_SAN --sku Standard_LRS --encryption-services blob 2> /dev/null)
+	ACCOUNT_KEY=$(az storage account keys list --resource-group $TF_RESOURCE_GROUP_NAME --account-name $GET_SAN --query '[0].value' -o tsv  2> /dev/null)
 }
 
 custommetricsSetup()
@@ -818,15 +879,95 @@ deleteSP()
 	id=$(az ad sp list --output table --all | grep $spuser | awk '{print $3}') && az ad sp delete --id $id
 }
 
+parseCredsFunction()
+{
+  GET_CLUSTER_NAME=$(cat creds | cut -d$';' -f1 | grep GET_CLUSTER_NAME | cut -d$':' -f2 | tr -d '\r')
+  GET_REGION=$(cat creds | cut -d$';' -f1 | grep GET_REGION | cut -d$':' -f2 | tr -d '\r')
+  GET_SAN=$(cat creds | cut -d$';' -f1 | grep GET_SAN | cut -d$':' -f2 | tr -d '\r')
+  ACCOUNT_KEY=$(cat creds | cut -d$';' -f1 | grep ACCOUNT_KEY | cut -d$':' -f2 | tr -d '\r')
+  MINIO_ACCESS_KEY=$(cat creds | cut -d$';' -f1 | grep MINIO_ACCESS_KEY | cut -d$':' -f2 | tr -d '\r')
+  MINIO_SECRET_KEY=$(cat creds | cut -d$';' -f1 | grep MINIO_SECRET_KEY | cut -d$':' -f2 | tr -d '\r')
+  TENANT_ID=$(cat creds | cut -d$';' -f1 | grep TENANT_ID | cut -d$':' -f2 | tr -d '\r')
+  TF_RESOURCE_GROUP_NAME=$(cat creds | cut -d$';' -f1 | grep TF_RESOURCE_GROUP_NAME | cut -d$':' -f2 | tr -d '\r')
+  RESOURCE_GROUP_NAME=$(cat creds | cut -d$';' -f1 | grep -w "RESOURCE_GROUP_NAME" | cut -d$':' -f2 | tr -d '\r')
+  AD_APP_ID=$(cat creds | cut -d$';' -f1 | grep AD_APP_ID | cut -d$':' -f2 | tr -d '\r')
+  AD_APP_PASSWORD=$(cat creds | cut -d$';' -f1 | grep AD_APP_PASSWORD | cut -d$':' -f2 | tr -d '\r')
+  AZURE_DOMAIN=$(cat creds | cut -d$';' -f1 | grep AZURE_DOMAIN | cut -d$':' -f2 | tr -d '\r')
+  STORAGE_CONTAINER_NAME=$(cat creds | cut -d$';' -f1 | grep -w "STORAGE_CONTAINER_NAME" | cut -d$':' -f2 | tr -d '\r')
+  RESOURCE_INFO_BUCKET=$(cat creds | cut -d$';' -f1 | grep RESOURCE_INFO_BUCKET | cut -d$':' -f2 | tr -d '\r')
+  NODE_FILES_BUCKET=$(cat creds | cut -d$';' -f1 | grep NODE_FILES_BUCKET | cut -d$':' -f2 | tr -d '\r')
+  CREDS_RG_NAME=$(cat creds | cut -d$';' -f1 | grep CREDS_RG_NAME | cut -d$':' -f2 | tr -d '\r')
+  CREDS_STORAGE_ACCOUNT_NAME=$(cat creds | cut -d$';' -f1 | grep CREDS_STORAGE_ACCOUNT_NAME | cut -d$':' -f2 | tr -d '\r')
+  CREDS_STORAGE_CONTAINER_NAME=$(cat creds | cut -d$';' -f1 | grep CREDS_STORAGE_CONTAINER_NAME | cut -d$':' -f2 | tr -d '\r')
+  BASE_URL=$(cat creds | cut -d$';' -f1 | grep BASE_URL | cut -d ":" -f 2- | tr -d '\r')
+  RESOURCE_MANAGER_URL=$(cat creds | cut -d$';' -f1 | grep RESOURCE_MANAGER_URL | cut -d ":" -f 2- | tr -d '\r')
+  ENDPOINT_MANAGER_URL=$(cat creds | cut -d$';' -f1 | grep ENDPOINT_MANAGER_URL | cut -d ":" -f 2- | tr -d '\r')
+  NODEFILES_URL=$(cat creds | cut -d$';' -f1 | grep NODEFILES_URL | cut -d ":" -f 2- | tr -d '\r')
+  ENDPOINTS_INFO_URL=$(cat creds | cut -d$';' -f1 | grep ENDPOINTS_INFO_URL | cut -d ":" -f 2- | tr -d '\r')
+  RESTART_URL=$(cat creds | cut -d$';' -f1 | grep RESTART_URL | cut -d ":" -f 2- | tr -d '\r')
+
+}
+
 DeleteFunction()
 {
 	banner=true
-	cd Source/terraform
-    GET_CLUSTER_NAME=$(grep -A1 -i cluster-name variables.tf | grep -i default | awk '{print $3}' | sed -e 's/"//g' | tr -d '\n')
-    GET_CLUSTER_NAME=$(echo $GET_CLUSTER_NAME | tr -d '\r')
-    GET_REGION=$(grep -A1 -i aks_region variables.tf | grep -i default | awk '{print $3}' | sed -e 's/"//g' | tr -d '\n')
-    GET_REGION=$(echo $GET_REGION | tr -d '\r')
-	cd ..
+	# cd Source/terraform
+  #   GET_CLUSTER_NAME=$(grep -A1 -i cluster-name variables.tf | grep -i default | awk '{print $3}' | sed -e 's/"//g' | tr -d '\n')
+  #   GET_CLUSTER_NAME=$(echo $GET_CLUSTER_NAME | tr -d '\r')
+  #   GET_REGION=$(grep -A1 -i aks_region variables.tf | grep -i default | awk '{print $3}' | sed -e 's/"//g' | tr -d '\n')
+  #   GET_REGION=$(echo $GET_REGION | tr -d '\r')
+	# cd ..
+
+  PARSED_TENANT=$(az account list | grep tenantId | cut -d$':' -f2 | cut -d'"' -f 2 | cut -d$"-" -f1)
+  WAS="was"
+  CREDS_STORAGE_ACCOUNT_NAME="${WAS}sa${PARSED_TENANT}"
+  CREDS_STORAGE_CONTAINER_NAME="$WAS$PARSED_TENANT"
+  
+  fetched_creds=$(az storage blob download --account-name "$CREDS_STORAGE_ACCOUNT_NAME" --container-name $CREDS_STORAGE_CONTAINER_NAME --name creds --file creds --no-progress --only-show-errors | grep container | cut -d$":" -f2 | cut -d$'"' -f2 | sed 's/ *$//g')
+  
+  if [[ $fetched_creds != $CREDS_STORAGE_CONTAINER_NAME ]]; then
+    echo
+    echo "There is no creds file in Azure Storage Blob. Is the owner account different than the current?"
+    echo
+    exit 1
+  fi
+
+  parseCredsFunction
+
+  echo "GET_CLUSTER_NAME:$GET_CLUSTER_NAME"
+  echo "GET_REGION:$GET_REGION"
+  echo "GET_SAN:$GET_SAN"
+  echo "ACCOUNT_KEY:$ACCOUNT_KEY"
+  echo "MINIO_ACCESS_KEY:$MINIO_ACCESS_KEY"
+  echo "MINIO_SECRET_KEY:$MINIO_SECRET_KEY"
+  echo "TENANT_ID:$TENANT_ID"
+  echo "TF_RESOURCE_GROUP_NAME:$TF_RESOURCE_GROUP_NAME"
+  echo "RESOURCE_GROUP_NAME:$RESOURCE_GROUP_NAME"
+  echo "AD_APP_ID:$AD_APP_ID"
+  echo "AD_APP_PASSWORD:$AD_APP_PASSWORD"
+  echo "AZURE_DOMAIN:$AZURE_DOMAIN"
+  echo "STORAGE_CONTAINER_NAME:$STORAGE_CONTAINER_NAME"
+  echo "RESOURCE_INFO_BUCKET:$RESOURCE_INFO_BUCKET"
+  echo "NODE_FILES_BUCKET:$NODE_FILES_BUCKET"
+  echo "CREDS_RG_NAME:$CREDS_RG_NAME"
+  echo "CREDS_STORAGE_ACCOUNT_NAME:$CREDS_STORAGE_ACCOUNT_NAME"
+  echo "CREDS_STORAGE_CONTAINER_NAME:$CREDS_STORAGE_CONTAINER_NAME"
+  echo "BASE_URL:$BASE_URL"
+  echo "RESOURCE_MANAGER_URL:$RESOURCE_MANAGER_URL"
+  echo "ENDPOINT_MANAGER_URL:$ENDPOINT_MANAGER_URL"
+  echo "NODEFILES_URL:$NODEFILES_URL"
+  echo "ENDPOINTS_INFO_URL:$ENDPOINTS_INFO_URL"
+  echo "RESTART_URL:$RESTART_URL"
+
+  cd Source
+
+  
+  sed -i -e 's~'"WAS"'~'"$GET_CLUSTER_NAME"'~g' terraform/variables.tf
+  sed -i -e 's~'"eastus"'~'"$GET_REGION"'~g' terraform/variables.tf
+  sed -i -e "s/XXXXXX/$AD_APP_ID/g" terraform/variables.tf
+  sed -i -e "s/YYYYYY/$AD_APP_PASSWORD/g" terraform/variables.tf
+  sed -i -e "s~XXXXXX~$TF_RESOURCE_GROUP_NAME~g" terraform/main.tf
+  sed -i -e "s~YYYYYY~$GET_SAN~g" terraform/main.tf
 	
 	echo
 	log_debug "Phase 1 of 5: Prequisites Checks"   
@@ -847,17 +988,33 @@ DeleteFunction()
 	echo
 	log_debug "Phase 2 of 5: Delete Wolfram Application Server Deployments"
 	printf "${GREEN}☑${YELLOW}☑${CYAN}□□□${NORMAL} Phase ${YELLOW}2${NORMAL} of ${GREEN}5${NORMAL}: Delete Wolfram Application Server Deployments\\n"
-	run_ok "kubectl delete --ignore-not-found=true -f deployments/" "Deleting Deployments"
+	
+  kubernetes_cluster_name=$GET_CLUSTER_NAME-aks
+  
+  CFILE=~/.kube/config
+	if [ -f "$CFILE" ]; then
+		log_debug "Already has kubeconfig"
+		chmod 700 ~/.kube/config
+	else
+		mkdir -p ~/.kube
+		touch ~/.kube/config
+		chmod 700 ~/.kube/config
+	fi
+
+  az aks get-credentials --name $kubernetes_cluster_name --resource-group $RESOURCE_GROUP_NAME --overwrite --only-show-errors
+  run_ok "kubectl config use-context $kubernetes_cluster_name " "Switching Context"
+  
+  run_ok "kubectl delete --ignore-not-found=true -f deployments/" "Deleting Deployments"
     run_ok "kafkaShutdown" "Deleting Kafka Cluster"
     run_ok "kubectl delete secret generic basic-auth --ignore-not-found=true" "Deleting NGINX Auth"
     
 	run_ok "kubectl delete --ignore-not-found=true -f ingress/" "Deleting Ingress"
 	run_ok "kubectl delete --ignore-not-found=true -f hpa/" "Deleting Horizontal Pod Autoscaler"
-    run_ok "kubectl delete --ignore-not-found=true -f services/" "Deleting Services"
+  run_ok "kubectl delete --ignore-not-found=true -f services/" "Deleting Services"
 	run_ok "kubectl delete --ignore-not-found=true -f pvc/" "Deleting Persistent Volume Claims"
 
 	run_ok "kubectl delete --ignore-not-found=true -f strimzi-kafka-deployment/020-RoleBinding-strimzi-cluster-operator.yaml -n kafkacluster && kubectl delete --ignore-not-found=true -f strimzi-kafka-deployment/032-RoleBinding-strimzi-cluster-operator-topic-operator-delegation.yaml -n kafkacluster && kubectl delete --ignore-not-found=true -f strimzi-kafka-deployment/031-RoleBinding-strimzi-cluster-operator-entity-operator-delegation.yaml -n kafkacluster && kubectl delete --ignore-not-found=true -f strimzi-kafka-deployment/ -n kafka && kubectl delete --ignore-not-found=true -f kafka && kubectl delete --ignore-not-found=true -f kafkabridge" "Deleting Kafka Cluster Operator"
-    run_ok "kubectl delete --ignore-not-found=true apiservice v1beta1.custom.metrics.k8s.io && kubectl delete --ignore-not-found=true -f namespace/" "Deleting WAS Namespace"
+  run_ok "kubectl delete --ignore-not-found=true apiservice v1beta1.custom.metrics.k8s.io && kubectl delete --ignore-not-found=true -f namespace/" "Deleting WAS Namespace"
 	run_ok "kubectl config set-context --current --namespace=default" "Reset Namespace"
     
 	echo
@@ -901,52 +1058,53 @@ DeleteFunction()
     
 	# delete storage account
 	cd terraform
-    GET_SAN=$(grep -A0 -i storage_account_name variables.tf | grep -i default | awk '{print $6}' | sed -e 's/"//g' | tr -d '\n')
-	GET_SAN=$(echo $GET_SAN | tr -d '\r')
-	TENANTID=$(az account list --query [].tenantId --output tsv | cut -d '-' -f 5)
-	TENANTID=$(echo $TENANTID | tr -d '\r')
+  # GET_SAN=$(grep -A0 -i storage_account_name variables.tf | grep -i default | awk '{print $6}' | sed -e 's/"//g' | tr -d '\n')
+	# GET_SAN=$(echo $GET_SAN | tr -d '\r')
+	PARSED_TENANTID=$(az account list --query [].tenantId --output tsv | cut -d '-' -f 5)
+	PARSED_TENANTID=$(echo $TENANTID | tr -d '\r')
 	lower_cluster_name=$(echo $GET_CLUSTER_NAME | tr '[:upper:]' '[:lower:]')
-    lower_cluster_name=$(echo $lower_cluster_name | tr -d '\r')
+  lower_cluster_name=$(echo $lower_cluster_name | tr -d '\r')
 	spsuffix="AzureWAS"
-	spuser="$spsuffix$TENANTID"
-	RESOURCE_GROUP_NAME="$lower_cluster_name-rg-$TENANTID"
-	run_ok "az storage account delete --name $GET_SAN --resource-group $RESOURCE_GROUP_NAME --yes" "Deleting Storage Account"
+	spuser="$spsuffix$PARSED_TENANTID"
+	TF_RESOURCE_GROUP_NAME="$lower_cluster_name-rg-$PARSED_TENANTID"
+	run_ok "az storage account delete --name $GET_SAN --resource-group $TF_RESOURCE_GROUP_NAME --yes" "Deleting Storage Account"
 	
 	# delete service prinipal account
 	run_ok "deleteSP" "Deleting Service Principal Account"
 	
 	set -e
 	# delete resource groups
-	run_ok "az group delete --name $RESOURCE_GROUP_NAME --no-wait --yes && az group delete --name NetworkWatcherRG --no-wait --yes" "Deleting Resource Group"
-	run_ok "az group delete --name WAS-rg --no-wait --yes || true" "Deleting WAS Resource Group"
+	run_ok "az group delete --name $TF_RESOURCE_GROUP_NAME --no-wait --yes && az group delete --name NetworkWatcherRG --no-wait --yes" "Deleting Resource Group"
+	run_ok "az group delete --name "${GET_CLUSTER_NAME}-rg" --no-wait --yes || true" "Deleting WAS Resource Group"
 	set +e
 	# Cleanup
 	rm -rf tmpfile
 	awk '!/storage_account_name/' variables.tf  > tmpfile && mv tmpfile variables.tf >> $LOG_PATH
 	# Reset main.tf values to default
-	sed -i -e 's/'"$RESOURCE_GROUP_NAME"'/XXXXXX/g' main.tf
+	sed -i -e 's/'"$TF_RESOURCE_GROUP_NAME"'/XXXXXX/g' main.tf
 	sed -i -e 's/'"$GET_SAN"'/YYYYYY/g' main.tf
 
 	# variables
 	# find and replace appid and password
-	GET_APP_ID=$(grep -A2 -i appId variables.tf | grep -i default | awk '{print $3}' | sed -e 's/"//g' | tr -d '\n')
-	GET_APP_ID=$(echo $GET_APP_ID | tr -d '\r')
+	# GET_APP_ID=$(grep -A2 -i appId variables.tf | grep -i default | awk '{print $3}' | sed -e 's/"//g' | tr -d '\n')
+	# GET_APP_ID=$(echo $GET_APP_ID | tr -d '\r')
     sed -i -e 's~'"$GET_APP_ID"'~XXXXXX~g' variables.tf
 	
-	GET_APP_PASSWORD=$(grep -A2 -i password variables.tf | grep -i default | awk '{print $3}' | sed -e 's/"//g' | tr -d '\n')
-	GET_APP_PASSWORD=$(echo $GET_APP_PASSWORD | tr -d '\r')
+	# GET_APP_PASSWORD=$(grep -A2 -i password variables.tf | grep -i default | awk '{print $3}' | sed -e 's/"//g' | tr -d '\n')
+	# GET_APP_PASSWORD=$(echo $GET_APP_PASSWORD | tr -d '\r')
 	sed -i -e 's~'"$GET_APP_PASSWORD"'~YYYYYY~g' variables.tf
 	rm -rf tenant-id.config
 	rm -rf .terraform*
 	rm -rf stopspinning*
 	cd ..
 	rm -rf stopspinning
-    rm -rf efs/mountIDs.txt
-    rm -rf efs/stopspinning
+    # rm -rf efs/mountIDs.txt
+    # rm -rf efs/stopspinning
     rm -rf custom-metrics/stopspinning
 	rm -rf tmpfile	
 	cd ..
 	
+  deleteCredsFunction
 	echo
     echo "Deleted AKS Cluster and Wolfram Application Server. Our warmest appreciation to you for running Wolfram Application Server on Azure environment. Thank You!"
 	echo
@@ -983,6 +1141,12 @@ CURRENTAKSCHECK()
 		aks_Exists="no"
 	fi
     cd ..
+}
+
+getCredsFunction()
+{
+    banner=true
+
 }
 
 URLFunction()
@@ -1032,6 +1196,8 @@ do
         --delete) DeleteFunction
             ;;
         --endpoint-info) URLFunction
+            ;;
+        --get-creds) getCredsFunction
             ;;
         --help) helpFunction
             ;;
