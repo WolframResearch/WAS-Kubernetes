@@ -538,10 +538,13 @@ SetupFunction()
 	  TF_RESOURCE_GROUP_NAME="$lower_cluster_name-rg-$TENANTID"
     sed -i -e "s~XXXXXX~$TF_RESOURCE_GROUP_NAME~g" main.tf
 	
+  # Create terraform resource group
+
 	run_ok "az group create --name $TF_RESOURCE_GROUP_NAME --location $GET_REGION" "Creating Resource Group"
 	spsuffix="AzureWAS"
 	spuser="$spsuffix$TENANTID"
 
+  # Create app credentials
 	while true;
 	do
 		spoutput=$(az ad sp create-for-rbac --skip-assignment --name=$spuser 2> /dev/null)
@@ -571,19 +574,20 @@ SetupFunction()
     AD_APP_ID=$appid
     AD_APP_PASSWORD=$apppassword
 
-	  # find and replace appid and password
+	  # Find and replace appid and password
+
     sed -i -e "s/XXXXXX/$appid/g" variables.tf
 	  sed -i -e "s/YYYYYY/$apppassword/g" variables.tf
 	
 	  spuser=$(echo $spuser | tr '[:upper:]' '[:lower:]')
     spuser=$(echo $spuser | tr -d '\r')
-  
-    # echo "variable \"storage_account_name\" { default = \"$spuser\" } " >> variables.tf
     
   GET_SAN=$spuser
 	GET_SAN=$(echo $GET_SAN | tr -d '\r')
 	STORAGE_CONTAINER_NAME="tfstate"
   
+  # Create storage account
+
   run_ok "createStorageAccount" "Creating Storage Account"
 	run_ok "az storage container create --name $STORAGE_CONTAINER_NAME --account-name $GET_SAN --account-key $ACCOUNT_KEY 2> /dev/null" "Creating Terraform Blob Container"
     sed -i -e "s~YYYYYY~$GET_SAN~g" main.tf
@@ -595,6 +599,9 @@ SetupFunction()
 	echo
 	log_debug "Phase 3 of 5: Deploy Dependencies"
 	printf "${GREEN}☑☑${YELLOW}☑${CYAN}□□${NORMAL} Phase ${YELLOW}3${NORMAL} of ${GREEN}5${NORMAL}: Deploy Dependencies\\n"
+  
+  # Determine domain address
+
 	domainsuffix="was"
 	azuredomain="$domainsuffix-$TENANTID"
     sed -i -e "s~^    service.beta.kubernetes.io\/azure-dns-label-name: .*~    service.beta.kubernetes.io\/azure-dns-label-name: \"$azuredomain\"~g" ingress-controller/deploy.yml
@@ -604,17 +611,22 @@ SetupFunction()
 	echo
 	log_debug "Phase 4 of 5: Wolfram Application Server Deployment"
 	printf "${GREEN}☑☑☑${YELLOW}☑${CYAN}□${NORMAL} Phase ${YELLOW}4${NORMAL} of ${GREEN}5${NORMAL}: Wolfram Application Server Deployment\\n"
+
 	run_ok "kubectl apply -f namespace/ && kubectl config set-context --current --namespace=kafka" "Creating Namespace"
+
 	kubectl patch storageclass default -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"false"}}}' >> $LOG_PATH
+
 	run_ok "kubectl apply -f sc/" "Setup Storage Class"
 	
 	run_ok "kubectl create -f strimzi-kafka-deployment/ && sleep 15 && kubectl wait --for=condition=ready --timeout=30m pod -l name=strimzi-cluster-operator && kubectl create -f kafka && sleep 60 && kubectl wait --for=condition=ready --timeout=30m pod -l statefulset.kubernetes.io/pod-name=kafka-persistent-zookeeper-0 && sleep 60 && kubectl wait --for=condition=ready --timeout=30m pod -l statefulset.kubernetes.io/pod-name=kafka-persistent-kafka-0 &&  sleep 60 && kubectl wait --for=condition=ready --timeout=30m pod -l app.kubernetes.io/name=entity-operator && kubectl create -f kafkabridge && sleep 60 && kubectl wait --for=condition=ready --timeout=30m pod -l app.kubernetes.io/name=kafka-bridge" "Deploying Kafka Cluster (can take upto 10 minutes)"	
-	run_ok "kafkaoperatorCheck" "Setting Up Kafka"
+	
+  run_ok "kafkaoperatorCheck" "Setting Up Kafka"
 	
 	run_ok "kubectl config set-context --current --namespace=was" "Set WAS Namespace as default"
 		
-    run_ok "kubectl apply -f pvc/" "Setup Persistent Volume Claims"
-	run_ok "kubectl apply -f services/" "Setup Services"
+  run_ok "kubectl apply -f pvc/" "Setup Persistent Volume Claims"
+	
+  run_ok "kubectl apply -f services/" "Setup Services"
     
     while true;
     do
@@ -631,12 +643,14 @@ SetupFunction()
     
 	
   # Minio deployment setup
+
   CURRENT_MINIO_ACCESS_KEY=$(grep -A1 -i MINIO_ACCESS_KEY deployments/minio-deployment.yaml | grep -i value: |  awk '{print $2}')
   sed -i -e 's~'"$CURRENT_MINIO_ACCESS_KEY"'~'"$GET_SAN"'~g' deployments/minio-deployment.yaml
   CURRENT_MINIO_SECRET_KEY=$(grep -A1 -i MINIO_SECRET_KEY deployments/minio-deployment.yaml | grep -i value: |  awk '{print $2}')
   sed -i -e 's~'"$CURRENT_MINIO_SECRET_KEY"'~'"$ACCOUNT_KEY"'~g' deployments/minio-deployment.yaml
     
 	# Resource Manger deployment setup
+
   CURRENT_MINIOACCESSKEY=$(grep -A1 -i MINIOACCESSKEY deployments/resource-manager-deployment.yaml | grep -i value: |  awk '{print $2}')
   sed -i -e 's~'"$CURRENT_MINIOACCESSKEY"'~'"$GET_SAN"'~g' deployments/resource-manager-deployment.yaml
   CURRENT_MINIOSECRETKEY=$(grep -A1 -i MINIOSECRETKEY deployments/resource-manager-deployment.yaml | grep -i value: |  awk '{print $2}')
@@ -649,6 +663,7 @@ SetupFunction()
   sed -i -e 's~'"$CURRENT_NODEFILESBUCKET"'~'"$nodefiles_bucket_name"'~g' deployments/resource-manager-deployment.yaml
     
 	# AWES deployment setup
+
 	domainsuf="cloudapp.azure.com"
 	fullazuredomain="$azuredomain.$GET_REGION.$domainsuf"
   AZURE_DOMAIN=$fullazuredomain
@@ -669,6 +684,9 @@ SetupFunction()
 	echo
 	log_debug "Phase 5 of 5: Application URL Details"
 	printf "${GREEN}☑☑☑☑${YELLOW}☑${NORMAL} Phase ${YELLOW}5${NORMAL} of ${GREEN}5${NORMAL}: Application URL Details\\n\n"
+
+  # Print URLs
+
     BASE_URL="$fullazuredomain"
     printf "${GREEN}Base URL - Active Web Elements Server:${NORMAL} http://$BASE_URL/\n\n"
     printf "${GREEN}Resource Manager:${NORMAL} http://$BASE_URL/resources/\n\n"
@@ -677,6 +695,8 @@ SetupFunction()
     printf "${GREEN}Endpoints Info:${NORMAL} http://$BASE_URL/.applicationserver/info\n\n"
     printf "${GREEN}Restart AWES:${NORMAL} http://$BASE_URL/.applicationserver/kernel/restart\n\n"
     
+  # Save credentials to Azure Blob
+
     saveCredsFunction
 	echo
     echo "AKS Cluster build complete and Wolfram Application Server Deployed. Our warmest appreciation to you for running Wolfram Application Server on Azure environment. Enjoy!"
@@ -918,6 +938,8 @@ DeleteFunction()
   CREDS_STORAGE_ACCOUNT_NAME="${WAS}sa${PARSED_TENANT}"
   CREDS_STORAGE_CONTAINER_NAME="$WAS$PARSED_TENANT"
   
+  # Download and parse creds
+
   fetched_creds=$(az storage blob download --account-name "$CREDS_STORAGE_ACCOUNT_NAME" --container-name $CREDS_STORAGE_CONTAINER_NAME --name creds --file creds --no-progress --only-show-errors | grep container | cut -d$":" -f2 | cut -d$'"' -f2 | sed 's/ *$//g')
   
   if [[ $fetched_creds != $CREDS_STORAGE_CONTAINER_NAME ]]; then
@@ -931,6 +953,8 @@ DeleteFunction()
 
   cd Source
   
+  # Replace variables
+
   sed -i -e 's~'"WAS"'~'"$GET_CLUSTER_NAME"'~g' terraform/variables.tf
   sed -i -e 's~'"eastus"'~'"$GET_REGION"'~g' terraform/variables.tf
   sed -i -e "s/XXXXXX/$AD_APP_ID/g" terraform/variables.tf
@@ -970,7 +994,10 @@ DeleteFunction()
 		chmod 700 ~/.kube/config
 	fi
 
-  az aks get-credentials --name $kubernetes_cluster_name --resource-group $RESOURCE_GROUP_NAME --overwrite --only-show-errors
+  # Update kube config
+  update_kubeconfig=$(az aks get-credentials --name $kubernetes_cluster_name --resource-group $RESOURCE_GROUP_NAME --overwrite --only-show-errors)
+
+  # Switch context
   run_ok "kubectl config use-context $kubernetes_cluster_name " "Switching Context"
   
   run_ok "kubectl delete --ignore-not-found=true -f deployments/" "Deleting Deployments"
@@ -1003,14 +1030,13 @@ DeleteFunction()
 	log_debug "Phase 5 of 5: Cleanup"
 	printf "${GREEN}☑☑☑☑${YELLOW}☑${NORMAL} Phase ${YELLOW}5${NORMAL} of ${GREEN}5${NORMAL}: Cleanup\\n"
 	
-
-	BASE_URL=$(cat ingress-controller/domain.config | tr -d '\n' )
 	sed -i -e "s~$BASE_URL~domain.com~g" deployments/active-web-elements-server-deployment.yaml
 	
 	sed -i -e "s~^    service.beta.kubernetes.io\/azure-dns-label-name: .*~    service.beta.kubernetes.io\/azure-dns-label-name: \"domain\"~g" ingress-controller/deploy.yml
 
 
     # Reset deployment setup
+
     CURRENT_MINIO_ACCESS_KEY=$(grep -A1 -i MINIO_ACCESS_KEY deployments/minio-deployment.yaml | grep -i value: |  awk '{print $2}')
     sed -i -e 's~'"$CURRENT_MINIO_ACCESS_KEY"'~<your-access-key>~g' deployments/minio-deployment.yaml
     CURRENT_MINIO_SECRET_KEY=$(grep -A1 -i MINIO_SECRET_KEY deployments/minio-deployment.yaml | grep -i value: |  awk '{print $2}')
@@ -1024,10 +1050,10 @@ DeleteFunction()
     CURRENT_NODEFILESBUCKET=$(grep -A1 -i NODEFILES.BUCKET deployments/resource-manager-deployment.yaml | grep -i value: |  awk '{print $2}')
     sed -i -e 's~'"$CURRENT_NODEFILESBUCKET"'~<your-nodefiles-bucketname>~g' deployments/resource-manager-deployment.yaml
     
-	# delete storage account
+	# Delete terraform storage account
+
 	cd terraform
-  # GET_SAN=$(grep -A0 -i storage_account_name variables.tf | grep -i default | awk '{print $6}' | sed -e 's/"//g' | tr -d '\n')
-	# GET_SAN=$(echo $GET_SAN | tr -d '\r')
+
 	PARSED_TENANTID=$(az account list --query [].tenantId --output tsv | cut -d '-' -f 5)
 	PARSED_TENANTID=$(echo $PARSED_TENANTID | tr -d '\r')
 	lower_cluster_name=$(echo $GET_CLUSTER_NAME | tr '[:upper:]' '[:lower:]')
@@ -1037,15 +1063,22 @@ DeleteFunction()
 	TF_RESOURCE_GROUP_NAME="$lower_cluster_name-rg-$PARSED_TENANTID"
 	run_ok "az storage account delete --name $GET_SAN --resource-group $TF_RESOURCE_GROUP_NAME --yes" "Deleting Storage Account"
 	
+  # Delete active directory/app registration
+
 	run_ok "deleteAR" "Deleting App Registration"
 	
 	set -e
-	# delete resource groups
+
+	# Delete terraform and was resource groups
+
 	run_ok "az group delete --name $TF_RESOURCE_GROUP_NAME --no-wait --yes && az group delete --name NetworkWatcherRG --no-wait --yes" "Deleting Resource Group"
 	run_ok "az group delete --name "${GET_CLUSTER_NAME}-rg" --no-wait --yes || true" "Deleting WAS Resource Group"
 	set +e
+
 	# Cleanup
+
 	rm -rf tmpfile
+
 	awk '!/storage_account_name/' variables.tf  > tmpfile && mv tmpfile variables.tf >> $LOG_PATH
 
 	sed -i -e 's/'"$TF_RESOURCE_GROUP_NAME"'/XXXXXX/g' main.tf
@@ -1065,6 +1098,8 @@ DeleteFunction()
 	rm -rf tmpfile	
 	cd ..
 	
+  # Delete creds resource group
+
   deleteCredsFunction
 
 	echo
