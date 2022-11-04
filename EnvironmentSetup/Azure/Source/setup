@@ -874,9 +874,10 @@ kafkaShutdown()
 
 }
 
-deleteSP()
+deleteAR()
 {
-	id=$(az ad sp list --output table --all | grep $spuser | awk '{print $3}') && az ad sp delete --id $id
+	app_id=$(az ad app list --all --display-name $spuser | grep appId | cut -d$':' -f2 | cut -d'"' -f 2 | tr -d '\r')
+  delete_app=$(az ad app delete --id $app_id --only-show-errors)
 }
 
 parseCredsFunction()
@@ -1005,7 +1006,6 @@ DeleteFunction()
 
 	BASE_URL=$(cat ingress-controller/domain.config | tr -d '\n' )
 	sed -i -e "s~$BASE_URL~domain.com~g" deployments/active-web-elements-server-deployment.yaml
-	rm -rf ingress-controller/domain.config
 	
 	sed -i -e "s~^    service.beta.kubernetes.io\/azure-dns-label-name: .*~    service.beta.kubernetes.io\/azure-dns-label-name: \"domain\"~g" ingress-controller/deploy.yml
 
@@ -1037,8 +1037,7 @@ DeleteFunction()
 	TF_RESOURCE_GROUP_NAME="$lower_cluster_name-rg-$PARSED_TENANTID"
 	run_ok "az storage account delete --name $GET_SAN --resource-group $TF_RESOURCE_GROUP_NAME --yes" "Deleting Storage Account"
 	
-	# delete service prinipal account
-	run_ok "deleteSP" "Deleting Service Principal Account"
+	run_ok "deleteAR" "Deleting App Registration"
 	
 	set -e
 	# delete resource groups
@@ -1067,6 +1066,7 @@ DeleteFunction()
 	cd ..
 	
   deleteCredsFunction
+
 	echo
     echo "Deleted AKS Cluster and Wolfram Application Server. Our warmest appreciation to you for running Wolfram Application Server on Azure environment. Thank You!"
 	echo
