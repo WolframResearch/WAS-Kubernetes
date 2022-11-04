@@ -4,7 +4,7 @@
 
 trap "exit" INT
 aks_Exists=""
-cleanup () {
+cleanup() {
   # Make super duper sure we reap all the spinners
   if [ ! -z "$allpids" ]; then
     for pid in $allpids; do
@@ -21,7 +21,7 @@ trap cleanup INT QUIT TERM EXIT
 # scolors - Color constants
 
 # do we have tput?
-if which 'tput' > /dev/null; then
+if which 'tput' >/dev/null; then
   # do we have a terminal?
   if [ -t 1 ]; then
     # does the terminal have colors?
@@ -87,37 +87,36 @@ SCRIPT_NAME="${SCRIPT_NAME##/*/}"
 
 # Determines if we print colors or not
 if [ "$(tty -s)" ]; then
-    INTERACTIVE_MODE="off"
+  INTERACTIVE_MODE="off"
 else
-    INTERACTIVE_MODE="on"
+  INTERACTIVE_MODE="on"
 fi
 
 #--------------------------------------------------------------------------------------------------
 # Begin Logging Section
-if [ "${INTERACTIVE_MODE}" = "off" ]
-then
-    # Then we don't care about log colors
-    LOG_DEFAULT_COLOR=""
-    LOG_ERROR_COLOR=""
-    LOG_INFO_COLOR=""
-    LOG_SUCCESS_COLOR=""
-    LOG_WARN_COLOR=""
-    LOG_DEBUG_COLOR=""
+if [ "${INTERACTIVE_MODE}" = "off" ]; then
+  # Then we don't care about log colors
+  LOG_DEFAULT_COLOR=""
+  LOG_ERROR_COLOR=""
+  LOG_INFO_COLOR=""
+  LOG_SUCCESS_COLOR=""
+  LOG_WARN_COLOR=""
+  LOG_DEBUG_COLOR=""
 else
-    LOG_DEFAULT_COLOR=$(tput sgr0)
-    LOG_ERROR_COLOR=$(tput setaf 1)
-    LOG_INFO_COLOR=$(tput setaf 6)
-    LOG_SUCCESS_COLOR=$(tput setaf 2)
-    LOG_WARN_COLOR=$(tput setaf 3)
-    LOG_DEBUG_COLOR=$(tput setaf 4)
+  LOG_DEFAULT_COLOR=$(tput sgr0)
+  LOG_ERROR_COLOR=$(tput setaf 1)
+  LOG_INFO_COLOR=$(tput setaf 6)
+  LOG_SUCCESS_COLOR=$(tput setaf 2)
+  LOG_WARN_COLOR=$(tput setaf 3)
+  LOG_DEBUG_COLOR=$(tput setaf 4)
 fi
 
 # This function scrubs the output of any control characters used in colorized output
 # It's designed to be piped through with text that needs scrubbing.  The scrubbed
 # text will come out the other side!
 prepare_log_for_nonterminal() {
-    # Essentially this strips all the control characters for log colors
-    sed "s/[[:cntrl:]]\\[[0-9;]*m//g"
+  # Essentially this strips all the control characters for log colors
+  sed "s/[[:cntrl:]]\\[[0-9;]*m//g"
 }
 
 log() {
@@ -133,33 +132,33 @@ log() {
   local LOG_LEVEL_ERROR=4
 
   # Default level to "info"
-  [ -z "${log_level}" ] && log_level="INFO";
-  [ -z "${log_color}" ] && log_color="${LOG_INFO_COLOR}";
+  [ -z "${log_level}" ] && log_level="INFO"
+  [ -z "${log_color}" ] && log_color="${LOG_INFO_COLOR}"
 
   # Validate LOG_LEVEL_STDOUT and LOG_LEVEL_LOG since they'll be eval-ed.
   case $LOG_LEVEL_STDOUT in
-    DEBUG|INFO|SUCCESS|WARNING|ERROR)
-      ;;
-    *)
-      LOG_LEVEL_STDOUT=INFO
-      ;;
+  DEBUG | INFO | SUCCESS | WARNING | ERROR) ;;
+
+  *)
+    LOG_LEVEL_STDOUT=INFO
+    ;;
   esac
   case $LOG_LEVEL_LOG in
-    DEBUG|INFO|SUCCESS|WARNING|ERROR)
-      ;;
-    *)
-      LOG_LEVEL_LOG=INFO
-      ;;
+  DEBUG | INFO | SUCCESS | WARNING | ERROR) ;;
+
+  *)
+    LOG_LEVEL_LOG=INFO
+    ;;
   esac
 
   # Check LOG_LEVEL_STDOUT to see if this level of entry goes to STDOUT.
   # XXX This is the horror that happens when your language doesn't have a hash data struct.
-  eval log_level_int="\$LOG_LEVEL_${log_level}";
+  eval log_level_int="\$LOG_LEVEL_${log_level}"
   eval log_level_stdout="\$LOG_LEVEL_${LOG_LEVEL_STDOUT}"
   # shellcheck disable=SC2154
   if [ "$log_level_stdout" -le "$log_level_int" ]; then
     # STDOUT
-    printf "%s[%s]%s %s\\n" "$log_color" "$log_level" "$LOG_DEFAULT_COLOR" "$log_text";
+    printf "%s[%s]%s %s\\n" "$log_color" "$log_level" "$LOG_DEFAULT_COLOR" "$log_text"
   fi
   # This is all very tricky; figures out a numeric value to compare.
   eval log_level_log="\$LOG_LEVEL_${LOG_LEVEL_LOG}"
@@ -169,31 +168,30 @@ log() {
     # LOG_PATH minus fancypants colors
     if [ ! -z "$LOG_PATH" ]; then
       today=$(date +"%Y-%m-%d %H:%M:%S %Z")
-      printf "[%s] [%s] %s\\n" "$today" "$log_level" "$log_text" >> "$LOG_PATH"
+      printf "[%s] [%s] %s\\n" "$today" "$log_level" "$log_text" >>"$LOG_PATH"
     fi
   fi
 
-  return 0;
+  return 0
 }
 
-log_info()      { log "$@"; }
-log_success()   { log "$1" "SUCCESS" "${LOG_SUCCESS_COLOR}"; }
-log_error()     { log "$1" "ERROR" "${LOG_ERROR_COLOR}"; }
-log_warning()   { log "$1" "WARNING" "${LOG_WARN_COLOR}"; }
-log_debug()     { log "$1" "DEBUG" "${LOG_DEBUG_COLOR}"; }
+log_info() { log "$@"; }
+log_success() { log "$1" "SUCCESS" "${LOG_SUCCESS_COLOR}"; }
+log_error() { log "$1" "ERROR" "${LOG_ERROR_COLOR}"; }
+log_warning() { log "$1" "WARNING" "${LOG_WARN_COLOR}"; }
+log_debug() { log "$1" "DEBUG" "${LOG_DEBUG_COLOR}"; }
 
 # End Logging Section
 #--------------------------------------------------------------------------------------------------
 
-
 # Config variables, set these after sourcing to change behavior.
-SPINNER_COLORNUM=2 # What color? Irrelevent if COLORCYCLE=1.
-SPINNER_COLORCYCLE=1 # Does the color cycle?
-SPINNER_DONEFILE="stopspinning" # Path/name of file to exit on.
+SPINNER_COLORNUM=2                # What color? Irrelevent if COLORCYCLE=1.
+SPINNER_COLORCYCLE=1              # Does the color cycle?
+SPINNER_DONEFILE="stopspinning"   # Path/name of file to exit on.
 SPINNER_SYMBOLS="ASCII_PROPELLER" # Name of the variable containing the symbols.
-SPINNER_CLEAR=1 # Blank the line when done.
+SPINNER_CLEAR=1                   # Blank the line when done.
 
-spinner () {
+spinner() {
   # Safest option are one of these. Doesn't need Unicode, at all.
   local ASCII_PROPELLER="/ - \\ |"
 
@@ -216,7 +214,7 @@ spinner () {
         if [ $SPINNER_COLORNUM -eq 7 ]; then
           SPINNER_COLORNUM=1
         else
-          SPINNER_COLORNUM=$((SPINNER_COLORNUM+1))
+          SPINNER_COLORNUM=$((SPINNER_COLORNUM + 1))
         fi
       fi
       local SPINNER_COLOR
@@ -228,8 +226,8 @@ spinner () {
         if [ ${SPINNER_CLEAR} -eq 1 ]; then
           tput el
         fi
-	      rm -f ${SPINNER_DONEFILE}
-	      break 2
+        rm -f ${SPINNER_DONEFILE}
+        break 2
       fi
       # This is questionable. sleep with fractional seconds is not
       # always available, but seems to not break things, when not.
@@ -261,11 +259,11 @@ RUN_LOG="/tmp/run-$timestamp.log"
 # Check for unicode support in the shell
 # This is a weird function, but seems to work. Checks to see if a unicode char can be
 # written to a file and can be read back.
-shell_has_unicode () {
+shell_has_unicode() {
   # Write a unicode character to a file...read it back and see if it's handled right.
-  env printf "\\u2714"> unitest.txt
+  env printf "\\u2714" >unitest.txt
 
-  read -r unitest < unitest.txt
+  read -r unitest <unitest.txt
   rm -f unitest.txt
   if [ ${#unitest} -le 3 ]; then
     return 0
@@ -286,7 +284,7 @@ SPINNER_CLEAR=0 # Don't blank the line, so our check/x can simply overwrite it.
 
 # Perform an action, log it, and print a colorful checkmark or X if failed
 # Returns 0 if successful, $? if failed.
-run_ok () {
+run_ok() {
   # Shell is really clumsy with passing strings around.
   # This passes the unexpanded $1 and $2, so subsequent users get the
   # whole thing.
@@ -298,7 +296,7 @@ run_ok () {
     columns=79
   fi
   # shellcheck disable=SC2004
-  COL=$((${columns}-${#msg}-7 ))
+  COL=$((${columns} - ${#msg} - 7))
 
   printf "%s%${COL}s" "$2"
   # Make sure there some unicode action in the shell; there's no
@@ -310,25 +308,25 @@ run_ok () {
   spinner &
   spinpid=$!
   allpids="$allpids $spinpid"
-  echo "Spin pid is: $spinpid" >> ${RUN_LOG}
-  eval "${cmd}" 1>> ${RUN_LOG} 2>&1
+  echo "Spin pid is: $spinpid" >>${RUN_LOG}
+  eval "${cmd}" 1>>${RUN_LOG} 2>&1
   local res=$?
   touch ${SPINNER_DONEFILE}
   env sleep .2 # It's possible to have a race for stdout and spinner clobbering the next bit
   # Just in case the spinner survived somehow, kill it.
   pidcheck=$(ps ${spinpid} | tail -n +2)
   if [ ! -z "$pidcheck" ]; then
-    echo "Made it here...why?" >> ${RUN_LOG}
+    echo "Made it here...why?" >>${RUN_LOG}
     kill $spinpid 2>/dev/null
     rm -rf ${SPINNER_DONEFILE} 2>/dev/null 2>&1
     tput rc
     tput cnorm
   fi
   # Log what we were supposed to be running
-  printf "${msg}: " >> ${RUN_LOG}
+  printf "${msg}: " >>${RUN_LOG}
   if shell_has_unicode; then
     if [ $res -eq 0 ]; then
-      printf "Success.\\n" >> ${RUN_LOG}
+      printf "Success.\\n" >>${RUN_LOG}
       env printf "${GREENBG}[  ${CHECK}  ]${NORMAL}\\n"
       return 0
     else
@@ -345,11 +343,11 @@ run_ok () {
     fi
   else
     if [ $res -eq 0 ]; then
-      printf "Success.\\n" >> ${RUN_LOG}
+      printf "Success.\\n" >>${RUN_LOG}
       env printf "${GREENBG}[ OK! ]${NORMAL}\\n"
       return 0
     else
-      printf "Failed with error: ${res}\\n" >> ${RUN_LOG}
+      printf "Failed with error: ${res}\\n" >>${RUN_LOG}
       echo
       env printf "${REDBG}[ERROR]${NORMAL}\\n"
       if [ "$RUN_ERRORS_FATAL" ]; then
@@ -396,20 +394,19 @@ log_fatal() {
   log_error "$1"
 }
 
-success () {
+success() {
   log_success "$1 Succeeded."
 }
 
-
 install_msg() {
 
-cat <<EOF
+  cat <<EOF
 
 
   Welcome to the Wolfram Application Server${NORMAL} Azure Setup Manager, version ${CYAN}$version${NORMAL}
 
 EOF
-cat <<EOF
+  cat <<EOF
 
   Should any step ${RED}fail${NORMAL} the script shall halt. Completion of each step will be shown in ${GREEN}green${NORMAL}.
 
@@ -417,12 +414,11 @@ cat <<EOF
 
 EOF
 
-
 }
+
 install_msg
 
-saveCredsFunction()
-{
+saveCredsFunction() {
 
   WAS="was"
 
@@ -431,477 +427,449 @@ saveCredsFunction()
   CREDS_STORAGE_ACCOUNT_NAME="${WAS}sa${PARSED_TENANT}"
   CREDS_STORAGE_CONTAINER_NAME="$WAS$PARSED_TENANT"
 
-  echo "GET_CLUSTER_NAME:$GET_CLUSTER_NAME" >> creds
-  echo "GET_REGION:$GET_REGION" >> creds
-  echo "GET_SAN:$GET_SAN" >> creds
-  echo "ACCOUNT_KEY:$ACCOUNT_KEY" >> creds
-  echo "MINIO_ACCESS_KEY:$GET_SAN" >> creds
-  echo "MINIO_SECRET_KEY:$ACCOUNT_KEY" >> creds
-  echo "TENANT_ID:$TENANT_ID" >> creds
-  echo "RESOURCE_GROUP_NAME:$RESOURCE_GROUP_NAME" >> creds
-  echo "TF_RESOURCE_GROUP_NAME:$TF_RESOURCE_GROUP_NAME" >> creds
-  echo "AD_APP_ID:$AD_APP_ID" >> creds
-  echo "AD_APP_PASSWORD:$AD_APP_PASSWORD" >> creds
-  echo "AZURE_DOMAIN:$AZURE_DOMAIN" >> creds
-  echo "STORAGE_CONTAINER_NAME:$STORAGE_CONTAINER_NAME" >> creds
-  echo "RESOURCE_INFO_BUCKET:$resources_bucket_name" >> creds
-  echo "NODE_FILES_BUCKET:$nodefiles_bucket_name" >> creds
-  echo "CREDS_RG_NAME:$CREDS_RG_NAME" >> creds
-  echo "CREDS_STORAGE_ACCOUNT_NAME:$CREDS_STORAGE_ACCOUNT_NAME" >> creds
-  echo "CREDS_STORAGE_CONTAINER_NAME:$CREDS_STORAGE_CONTAINER_NAME" >> creds
+  echo "GET_CLUSTER_NAME:$GET_CLUSTER_NAME" >>creds
+  echo "GET_REGION:$GET_REGION" >>creds
+  echo "GET_SAN:$GET_SAN" >>creds
+  echo "ACCOUNT_KEY:$ACCOUNT_KEY" >>creds
+  echo "MINIO_ACCESS_KEY:$GET_SAN" >>creds
+  echo "MINIO_SECRET_KEY:$ACCOUNT_KEY" >>creds
+  echo "TENANT_ID:$TENANT_ID" >>creds
+  echo "RESOURCE_GROUP_NAME:$RESOURCE_GROUP_NAME" >>creds
+  echo "TF_RESOURCE_GROUP_NAME:$TF_RESOURCE_GROUP_NAME" >>creds
+  echo "AD_APP_ID:$AD_APP_ID" >>creds
+  echo "AD_APP_PASSWORD:$AD_APP_PASSWORD" >>creds
+  echo "AZURE_DOMAIN:$AZURE_DOMAIN" >>creds
+  echo "STORAGE_CONTAINER_NAME:$STORAGE_CONTAINER_NAME" >>creds
+  echo "RESOURCE_INFO_BUCKET:$resources_bucket_name" >>creds
+  echo "NODE_FILES_BUCKET:$nodefiles_bucket_name" >>creds
+  echo "CREDS_RG_NAME:$CREDS_RG_NAME" >>creds
+  echo "CREDS_STORAGE_ACCOUNT_NAME:$CREDS_STORAGE_ACCOUNT_NAME" >>creds
+  echo "CREDS_STORAGE_CONTAINER_NAME:$CREDS_STORAGE_CONTAINER_NAME" >>creds
 
-  echo "BASE_URL:http://$BASE_URL/" >> creds
-  echo "RESOURCE_MANAGER_URL:http://$BASE_URL/resources/" >> creds
-  echo "ENDPOINT_MANAGER_URL:http://$BASE_URL/endpoints/" >> creds
-  echo "NODEFILES_URL:http://$BASE_URL/nodefiles" >> creds
-  echo "ENDPOINTS_INFO_URL:http://$BASE_URL/.applicationserver/info" >> creds
-  echo "RESTART_URL:http://$BASE_URL/.applicationserver/kernel/restart" >> creds
+  echo "BASE_URL:http://$BASE_URL/" >>creds
+  echo "RESOURCE_MANAGER_URL:http://$BASE_URL/resources/" >>creds
+  echo "ENDPOINT_MANAGER_URL:http://$BASE_URL/endpoints/" >>creds
+  echo "NODEFILES_URL:http://$BASE_URL/nodefiles" >>creds
+  echo "ENDPOINTS_INFO_URL:http://$BASE_URL/.applicationserver/info" >>creds
+  echo "RESTART_URL:http://$BASE_URL/.applicationserver/kernel/restart" >>creds
 
   create_rg=$(az group create --name $CREDS_RG_NAME --location $GET_REGION)
   create_sa=$(az storage account create --name $CREDS_STORAGE_ACCOUNT_NAME --resource-group $CREDS_RG_NAME --location $GET_REGION --encryption-services file --allow-blob-public-access false --allow-cross-tenant-replication false)
   create_container=$(az storage container create --account-name $CREDS_STORAGE_ACCOUNT_NAME --name $CREDS_STORAGE_CONTAINER_NAME --auth-mode login)
   upload_creds=$(az storage blob upload --account-name $CREDS_STORAGE_ACCOUNT_NAME --container-name $CREDS_STORAGE_CONTAINER_NAME --name creds --file creds --auth-mode login)
-  
+
   rm creds
 }
 
-deleteCredsFunction()
-{
+deleteCredsFunction() {
   delete_creds=$(az group delete --name $CREDS_RG_NAME --no-wait --yes)
 }
 
-azureKeysFunction()
-{
-  	CFILE=~/.azure/azureProfile.json
-	if [ -f "$CFILE" ]; then
-		TFILE=tenant-id.config
-		if [ -f "$TFILE" ]; then
-			TENANTID=$(cat tenant-id.config | cut -d '-' -f 5 | head -n1 | cut -d " " -f1)
-			TENANTID=$(echo $TENANTID | tr -d '\r')
-		else
-			echo
-			log_error "Cannot find tenant id. Did you enter tenant id ?"
-			echo
-			exit 1
-		fi
-	else
-		echo
-        log_error "Cannot find azure token. Did you run 'az login' ?"
-        echo
-        exit 1
-	fi
+azureKeysFunction() {
+  CFILE=~/.azure/azureProfile.json
+  if [ -f "$CFILE" ]; then
+    TFILE=tenant-id.config
+    if [ -f "$TFILE" ]; then
+      TENANTID=$(cat tenant-id.config | cut -d '-' -f 5 | head -n1 | cut -d " " -f1)
+      TENANTID=$(echo $TENANTID | tr -d '\r')
+    else
+      echo
+      log_error "Cannot find tenant id. Did you enter tenant id ?"
+      echo
+      exit 1
+    fi
+  else
+    echo
+    log_error "Cannot find azure token. Did you run 'az login' ?"
+    echo
+    exit 1
+  fi
 }
 
-SetupFunction()
-{
-	banner=true
-    cd Source/terraform
-    GET_CLUSTER_NAME=$(grep -A1 -i cluster-name variables.tf | grep -i default | awk '{print $3}' | sed -e 's/"//g' | tr -d '\n')
-    GET_CLUSTER_NAME=$(echo $GET_CLUSTER_NAME | tr -d '\r')
-    GET_REGION=$(grep -A1 -i aks_region variables.tf | grep -i default | awk '{print $3}' | sed -e 's/"//g' | tr -d '\n')
-    GET_REGION=$(echo $GET_REGION | tr -d '\r')
+SetupFunction() {
+  banner=true
+  cd Source/terraform
+  GET_CLUSTER_NAME=$(grep -A1 -i cluster-name variables.tf | grep -i default | awk '{print $3}' | sed -e 's/"//g' | tr -d '\n')
+  GET_CLUSTER_NAME=$(echo $GET_CLUSTER_NAME | tr -d '\r')
+  GET_REGION=$(grep -A1 -i aks_region variables.tf | grep -i default | awk '{print $3}' | sed -e 's/"//g' | tr -d '\n')
+  GET_REGION=$(echo $GET_REGION | tr -d '\r')
 
-	echo
-	log_debug "Phase 1 of 5: Prequisites Checks"   
-	printf "${YELLOW}☑${CYAN}□□□□${NORMAL} Phase ${YELLOW}1${NORMAL} of ${GREEN}5${NORMAL}: Prequisites Checks\\n"
-    run_ok "kubectlFunction" "Checking Kubectl Installed"
-    run_ok "terraformFunction" "Checking Terraform Installed"
-    run_ok "helmFunction" "Checking Helm Installed"
-    run_ok "azureKeysFunction" "Checking Azure credentials"
-    run_ok "NEWAKSCHECK" "Checking AKS Status"
-    val="yes"
-	if [ X"$aks_Exists" = X"$val" ]; then
-        echo
-        log_error "Cluster already exists."
-        echo
-        exit 1
-    fi
+  echo
+  log_debug "Phase 1 of 5: Prequisites Checks"
+  printf "${YELLOW}☑${CYAN}□□□□${NORMAL} Phase ${YELLOW}1${NORMAL} of ${GREEN}5${NORMAL}: Prequisites Checks\\n"
+  run_ok "kubectlFunction" "Checking Kubectl Installed"
+  run_ok "terraformFunction" "Checking Terraform Installed"
+  run_ok "helmFunction" "Checking Helm Installed"
+  run_ok "azureKeysFunction" "Checking Azure credentials"
+  run_ok "NEWAKSCHECK" "Checking AKS Status"
+  val="yes"
+  if [ X"$aks_Exists" = X"$val" ]; then
+    echo
+    log_error "Cluster already exists."
+    echo
+    exit 1
+  fi
 
-	echo
-	log_debug "Phase 2 of 5: Build Azure Kubernetes Cluster (EKS)"
-	printf "${GREEN}☑${YELLOW}☑${CYAN}□□□${NORMAL} Phase ${YELLOW}2${NORMAL} of ${GREEN}5${NORMAL}: Build Azure Kubernetes Cluster (AKS)\\n"
-	
-	CFILE=~/.kube/config
-	if [ -f "$CFILE" ]; then
-		log_debug "Already has kubeconfig"
-		chmod 700 ~/.kube/config
-	else
-		mkdir -p ~/.kube
-		touch ~/.kube/config
-		chmod 700 ~/.kube/config
-	fi
-	
-    lower_cluster_name=$(echo $GET_CLUSTER_NAME | tr '[:upper:]' '[:lower:]')
-    lower_cluster_name=$(echo $lower_cluster_name | tr -d '\r')
-    RESOURCE_GROUP_NAME="WAS-rg"
-    TENANT_ID=$(az account list | grep tenantId | cut -d$':' -f2 | cut -d'"' -f 2)
-	  TF_RESOURCE_GROUP_NAME="$lower_cluster_name-rg-$TENANTID"
-    sed -i -e "s~XXXXXX~$TF_RESOURCE_GROUP_NAME~g" main.tf
-	
+  echo
+  log_debug "Phase 2 of 5: Build Azure Kubernetes Cluster (EKS)"
+  printf "${GREEN}☑${YELLOW}☑${CYAN}□□□${NORMAL} Phase ${YELLOW}2${NORMAL} of ${GREEN}5${NORMAL}: Build Azure Kubernetes Cluster (AKS)\\n"
+
+  CFILE=~/.kube/config
+  if [ -f "$CFILE" ]; then
+    log_debug "Already has kubeconfig"
+    chmod 700 ~/.kube/config
+  else
+    mkdir -p ~/.kube
+    touch ~/.kube/config
+    chmod 700 ~/.kube/config
+  fi
+
+  lower_cluster_name=$(echo $GET_CLUSTER_NAME | tr '[:upper:]' '[:lower:]')
+  lower_cluster_name=$(echo $lower_cluster_name | tr -d '\r')
+  RESOURCE_GROUP_NAME="WAS-rg"
+  TENANT_ID=$(az account list | grep tenantId | cut -d$':' -f2 | cut -d'"' -f 2)
+  TF_RESOURCE_GROUP_NAME="$lower_cluster_name-rg-$TENANTID"
+  sed -i -e "s~XXXXXX~$TF_RESOURCE_GROUP_NAME~g" main.tf
+
   # Create terraform resource group
 
-	run_ok "az group create --name $TF_RESOURCE_GROUP_NAME --location $GET_REGION" "Creating Resource Group"
-	spsuffix="AzureWAS"
-	spuser="$spsuffix$TENANTID"
+  run_ok "az group create --name $TF_RESOURCE_GROUP_NAME --location $GET_REGION" "Creating Resource Group"
+  spsuffix="AzureWAS"
+  spuser="$spsuffix$TENANTID"
 
   # Create app credentials
-	while true;
-	do
-		spoutput=$(az ad sp create-for-rbac --skip-assignment --name=$spuser 2> /dev/null)
-		appid=$(echo $spoutput | grep -oP '(?<="appId": ")[^"]*')
-		apppassword=$(echo $spoutput | grep -oP '(?<="password": ")[^"]*')
-		echo $apppassword >> $LOG_PATH
-		if [[ $apppassword =~ "/" ]]; then
-			spoutput=$(az ad app credential reset --id $appid --append 2> /dev/null)
-			apppassword=$(echo $spoutput | grep -oP '(?<="password": ")[^"]*')
-			echo $apppassword >> $LOG_PATH
-		elif [[ $apppassword =~ "\\" ]]; then
-			spoutput=$(az ad app credential reset --id $appid --append 2> /dev/null)
-			apppassword=$(echo $spoutput | grep -oP '(?<="password": ")[^"]*')
-			echo $apppassword >> $LOG_PATH
+  while true; do
+    spoutput=$(az ad sp create-for-rbac --skip-assignment --name=$spuser 2>/dev/null)
+    appid=$(echo $spoutput | grep -oP '(?<="appId": ")[^"]*')
+    apppassword=$(echo $spoutput | grep -oP '(?<="password": ")[^"]*')
+    echo $apppassword >>$LOG_PATH
+    if [[ $apppassword =~ "/" ]]; then
+      spoutput=$(az ad app credential reset --id $appid --append 2>/dev/null)
+      apppassword=$(echo $spoutput | grep -oP '(?<="password": ")[^"]*')
+      echo $apppassword >>$LOG_PATH
+    elif [[ $apppassword =~ "\\" ]]; then
+      spoutput=$(az ad app credential reset --id $appid --append 2>/dev/null)
+      apppassword=$(echo $spoutput | grep -oP '(?<="password": ")[^"]*')
+      echo $apppassword >>$LOG_PATH
     elif [[ $spoutput == "" || $appid == "" || $apppassword == "" ]]; then
-      spoutput=$(az ad app credential reset --id $appid --append 2> /dev/null)
-			apppassword=$(echo $spoutput | grep -oP '(?<="password": ")[^"]*')
-			echo $apppassword >> $LOG_PATH
-		else
-			echo "password no syntax issues" >> $LOG_PATH
-			break;
-		fi
-	done
-  
-    apppassword=$(echo $apppassword | sed "s/[!@#$%^&*()-~]/\\\&/g")
+      spoutput=$(az ad app credential reset --id $appid --append 2>/dev/null)
+      apppassword=$(echo $spoutput | grep -oP '(?<="password": ")[^"]*')
+      echo $apppassword >>$LOG_PATH
+    else
+      echo "password no syntax issues" >>$LOG_PATH
+      break
+    fi
+  done
 
-    AD_APP_ID=$appid
-    AD_APP_PASSWORD=$apppassword
+  apppassword=$(echo $apppassword | sed "s/[!@#$%^&*()-~]/\\\&/g")
 
-	  # Find and replace appid and password
+  AD_APP_ID=$appid
+  AD_APP_PASSWORD=$apppassword
 
-    sed -i -e "s/XXXXXX/$appid/g" variables.tf
-	  sed -i -e "s/YYYYYY/$apppassword/g" variables.tf
-	
-	  spuser=$(echo $spuser | tr '[:upper:]' '[:lower:]')
-    spuser=$(echo $spuser | tr -d '\r')
-    
+  # Find and replace appid and password
+
+  sed -i -e "s/XXXXXX/$appid/g" variables.tf
+  sed -i -e "s/YYYYYY/$apppassword/g" variables.tf
+
+  spuser=$(echo $spuser | tr '[:upper:]' '[:lower:]')
+  spuser=$(echo $spuser | tr -d '\r')
+
   GET_SAN=$spuser
-	GET_SAN=$(echo $GET_SAN | tr -d '\r')
-	STORAGE_CONTAINER_NAME="tfstate"
-  
+  GET_SAN=$(echo $GET_SAN | tr -d '\r')
+  STORAGE_CONTAINER_NAME="tfstate"
+
   # Create storage account
 
   run_ok "createStorageAccount" "Creating Storage Account"
-	run_ok "az storage container create --name $STORAGE_CONTAINER_NAME --account-name $GET_SAN --account-key $ACCOUNT_KEY 2> /dev/null" "Creating Terraform Blob Container"
-    sed -i -e "s~YYYYYY~$GET_SAN~g" main.tf
+  run_ok "az storage container create --name $STORAGE_CONTAINER_NAME --account-name $GET_SAN --account-key $ACCOUNT_KEY 2> /dev/null" "Creating Terraform Blob Container"
+  sed -i -e "s~YYYYYY~$GET_SAN~g" main.tf
 
-    run_ok "terraform init && terraform refresh && terraform plan && terraform apply -auto-approve" "Building AKS - (can take upto 15 minutes)"
-    run_ok "az aks get-credentials --resource-group $(terraform output resource_group_name | sed -e 's/"//g') --name $(terraform output kubernetes_cluster_name | sed -e 's/"//g') --overwrite-existing" "Generating kubeconfig configuration"
-    cd ..
-	
-	echo
-	log_debug "Phase 3 of 5: Deploy Dependencies"
-	printf "${GREEN}☑☑${YELLOW}☑${CYAN}□□${NORMAL} Phase ${YELLOW}3${NORMAL} of ${GREEN}5${NORMAL}: Deploy Dependencies\\n"
-  
+  run_ok "terraform init && terraform refresh && terraform plan && terraform apply -auto-approve" "Building AKS - (can take upto 15 minutes)"
+  run_ok "az aks get-credentials --resource-group $(terraform output resource_group_name | sed -e 's/"//g') --name $(terraform output kubernetes_cluster_name | sed -e 's/"//g') --overwrite-existing" "Generating kubeconfig configuration"
+  cd ..
+
+  echo
+  log_debug "Phase 3 of 5: Deploy Dependencies"
+  printf "${GREEN}☑☑${YELLOW}☑${CYAN}□□${NORMAL} Phase ${YELLOW}3${NORMAL} of ${GREEN}5${NORMAL}: Deploy Dependencies\\n"
+
   # Determine domain address
 
-	domainsuffix="was"
-	azuredomain="$domainsuffix-$TENANTID"
-    sed -i -e "s~^    service.beta.kubernetes.io\/azure-dns-label-name: .*~    service.beta.kubernetes.io\/azure-dns-label-name: \"$azuredomain\"~g" ingress-controller/deploy.yml
-	run_ok "kubectl apply -f ingress-controller/deploy.yml & sleep 180" "Setup Ingress Controller"
-	run_ok "kubectl apply -f metrics-server/ & sleep 30" "Setup Metrics Server"
+  domainsuffix="was"
+  azuredomain="$domainsuffix-$TENANTID"
+  sed -i -e "s~^    service.beta.kubernetes.io\/azure-dns-label-name: .*~    service.beta.kubernetes.io\/azure-dns-label-name: \"$azuredomain\"~g" ingress-controller/deploy.yml
+  run_ok "kubectl apply -f ingress-controller/deploy.yml & sleep 180" "Setup Ingress Controller"
+  run_ok "kubectl apply -f metrics-server/ & sleep 30" "Setup Metrics Server"
 
-	echo
-	log_debug "Phase 4 of 5: Wolfram Application Server Deployment"
-	printf "${GREEN}☑☑☑${YELLOW}☑${CYAN}□${NORMAL} Phase ${YELLOW}4${NORMAL} of ${GREEN}5${NORMAL}: Wolfram Application Server Deployment\\n"
+  echo
+  log_debug "Phase 4 of 5: Wolfram Application Server Deployment"
+  printf "${GREEN}☑☑☑${YELLOW}☑${CYAN}□${NORMAL} Phase ${YELLOW}4${NORMAL} of ${GREEN}5${NORMAL}: Wolfram Application Server Deployment\\n"
 
-	run_ok "kubectl apply -f namespace/ && kubectl config set-context --current --namespace=kafka" "Creating Namespace"
+  run_ok "kubectl apply -f namespace/ && kubectl config set-context --current --namespace=kafka" "Creating Namespace"
 
-	kubectl patch storageclass default -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"false"}}}' >> $LOG_PATH
+  kubectl patch storageclass default -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"false"}}}' >>$LOG_PATH
 
-	run_ok "kubectl apply -f sc/" "Setup Storage Class"
-	
-	run_ok "kubectl create -f strimzi-kafka-deployment/ && sleep 15 && kubectl wait --for=condition=ready --timeout=30m pod -l name=strimzi-cluster-operator && kubectl create -f kafka && sleep 60 && kubectl wait --for=condition=ready --timeout=30m pod -l statefulset.kubernetes.io/pod-name=kafka-persistent-zookeeper-0 && sleep 60 && kubectl wait --for=condition=ready --timeout=30m pod -l statefulset.kubernetes.io/pod-name=kafka-persistent-kafka-0 &&  sleep 60 && kubectl wait --for=condition=ready --timeout=30m pod -l app.kubernetes.io/name=entity-operator && kubectl create -f kafkabridge && sleep 60 && kubectl wait --for=condition=ready --timeout=30m pod -l app.kubernetes.io/name=kafka-bridge" "Deploying Kafka Cluster (can take upto 10 minutes)"	
-	
+  run_ok "kubectl apply -f sc/" "Setup Storage Class"
+
+  run_ok "kubectl create -f strimzi-kafka-deployment/ && sleep 15 && kubectl wait --for=condition=ready --timeout=30m pod -l name=strimzi-cluster-operator && kubectl create -f kafka && sleep 60 && kubectl wait --for=condition=ready --timeout=30m pod -l statefulset.kubernetes.io/pod-name=kafka-persistent-zookeeper-0 && sleep 60 && kubectl wait --for=condition=ready --timeout=30m pod -l statefulset.kubernetes.io/pod-name=kafka-persistent-kafka-0 &&  sleep 60 && kubectl wait --for=condition=ready --timeout=30m pod -l app.kubernetes.io/name=entity-operator && kubectl create -f kafkabridge && sleep 60 && kubectl wait --for=condition=ready --timeout=30m pod -l app.kubernetes.io/name=kafka-bridge" "Deploying Kafka Cluster (can take upto 10 minutes)"
+
   run_ok "kafkaoperatorCheck" "Setting Up Kafka"
-	
-	run_ok "kubectl config set-context --current --namespace=was" "Set WAS Namespace as default"
-		
+
+  run_ok "kubectl config set-context --current --namespace=was" "Set WAS Namespace as default"
+
   run_ok "kubectl apply -f pvc/" "Setup Persistent Volume Claims"
-	
+
   run_ok "kubectl apply -f services/" "Setup Services"
-    
-    while true;
-    do
-        currentregcred=$(kubectl get secret | grep basic-auth | awk '{print $1}')
-        if [ X"$currentregcred" = X"basic-auth" ]; then
-            log_debug "already basic-auth exists"
-            break;
-        else
-            log_debug "basic-auth doesn't exist"
-                run_ok "cd ingress/ && kubectl create secret generic basic-auth --from-file=auth -n was && cd .." "Setup NGINX Auth"
-        fi
-    done
-	run_ok "kubectl apply -f ingress/" "Setup Ingress"
-    
-	
+
+  while true; do
+    currentregcred=$(kubectl get secret | grep basic-auth | awk '{print $1}')
+    if [ X"$currentregcred" = X"basic-auth" ]; then
+      log_debug "already basic-auth exists"
+      break
+    else
+      log_debug "basic-auth doesn't exist"
+      run_ok "cd ingress/ && kubectl create secret generic basic-auth --from-file=auth -n was && cd .." "Setup NGINX Auth"
+    fi
+  done
+  run_ok "kubectl apply -f ingress/" "Setup Ingress"
+
   # Minio deployment setup
 
-  CURRENT_MINIO_ACCESS_KEY=$(grep -A1 -i MINIO_ACCESS_KEY deployments/minio-deployment.yaml | grep -i value: |  awk '{print $2}')
+  CURRENT_MINIO_ACCESS_KEY=$(grep -A1 -i MINIO_ACCESS_KEY deployments/minio-deployment.yaml | grep -i value: | awk '{print $2}')
   sed -i -e 's~'"$CURRENT_MINIO_ACCESS_KEY"'~'"$GET_SAN"'~g' deployments/minio-deployment.yaml
-  CURRENT_MINIO_SECRET_KEY=$(grep -A1 -i MINIO_SECRET_KEY deployments/minio-deployment.yaml | grep -i value: |  awk '{print $2}')
+  CURRENT_MINIO_SECRET_KEY=$(grep -A1 -i MINIO_SECRET_KEY deployments/minio-deployment.yaml | grep -i value: | awk '{print $2}')
   sed -i -e 's~'"$CURRENT_MINIO_SECRET_KEY"'~'"$ACCOUNT_KEY"'~g' deployments/minio-deployment.yaml
-    
-	# Resource Manger deployment setup
 
-  CURRENT_MINIOACCESSKEY=$(grep -A1 -i MINIOACCESSKEY deployments/resource-manager-deployment.yaml | grep -i value: |  awk '{print $2}')
+  # Resource Manger deployment setup
+
+  CURRENT_MINIOACCESSKEY=$(grep -A1 -i MINIOACCESSKEY deployments/resource-manager-deployment.yaml | grep -i value: | awk '{print $2}')
   sed -i -e 's~'"$CURRENT_MINIOACCESSKEY"'~'"$GET_SAN"'~g' deployments/resource-manager-deployment.yaml
-  CURRENT_MINIOSECRETKEY=$(grep -A1 -i MINIOSECRETKEY deployments/resource-manager-deployment.yaml | grep -i value: |  awk '{print $2}')
-	sed -i -e 's~'"$CURRENT_MINIOSECRETKEY"'~'"$ACCOUNT_KEY"'~g' deployments/resource-manager-deployment.yaml
+  CURRENT_MINIOSECRETKEY=$(grep -A1 -i MINIOSECRETKEY deployments/resource-manager-deployment.yaml | grep -i value: | awk '{print $2}')
+  sed -i -e 's~'"$CURRENT_MINIOSECRETKEY"'~'"$ACCOUNT_KEY"'~g' deployments/resource-manager-deployment.yaml
   resources_bucket_name="was-resources-$TENANTID"
   nodefiles_bucket_name="was-nodefiles-$TENANTID"
-  CURRENT_RESOURCEINFOBUCKET=$(grep -A1 -i RESOURCEINFO.BUCKET deployments/resource-manager-deployment.yaml | grep -i value: |  awk '{print $2}')
+  CURRENT_RESOURCEINFOBUCKET=$(grep -A1 -i RESOURCEINFO.BUCKET deployments/resource-manager-deployment.yaml | grep -i value: | awk '{print $2}')
   sed -i -e 's~'"$CURRENT_RESOURCEINFOBUCKET"'~'"$resources_bucket_name"'~g' deployments/resource-manager-deployment.yaml
-  CURRENT_NODEFILESBUCKET=$(grep -A1 -i NODEFILES.BUCKET deployments/resource-manager-deployment.yaml | grep -i value: |  awk '{print $2}')
+  CURRENT_NODEFILESBUCKET=$(grep -A1 -i NODEFILES.BUCKET deployments/resource-manager-deployment.yaml | grep -i value: | awk '{print $2}')
   sed -i -e 's~'"$CURRENT_NODEFILESBUCKET"'~'"$nodefiles_bucket_name"'~g' deployments/resource-manager-deployment.yaml
-    
-	# AWES deployment setup
 
-	domainsuf="cloudapp.azure.com"
-	fullazuredomain="$azuredomain.$GET_REGION.$domainsuf"
+  # AWES deployment setup
+
+  domainsuf="cloudapp.azure.com"
+  fullazuredomain="$azuredomain.$GET_REGION.$domainsuf"
   AZURE_DOMAIN=$fullazuredomain
-	rm -rf ingress-controller/domain.config
-	echo $fullazuredomain >> ingress-controller/domain.config
-	sed -i -e "s/domain.com/$fullazuredomain/g" deployments/active-web-elements-server-deployment.yaml
-	
-	run_ok "kubectl apply -f deployments/" "Setup Deployments"
-	run_ok "deploymentStatus" "Waiting for Deployments To Be Ready"
-	run_ok "endpointStatus" "Checking Base URL Accessible"
-	
-	cd custom-metrics/
-	run_ok "custommetricsSetup" "Setup Custom Metrics"
-	cd ..
-	run_ok "kubectl config set-context --current --namespace=was && kubectl apply -f hpa/" "Setup Horizontal Pod Autoscaler"
+  rm -rf ingress-controller/domain.config
+  echo $fullazuredomain >>ingress-controller/domain.config
+  sed -i -e "s/domain.com/$fullazuredomain/g" deployments/active-web-elements-server-deployment.yaml
 
-	
-	echo
-	log_debug "Phase 5 of 5: Application URL Details"
-	printf "${GREEN}☑☑☑☑${YELLOW}☑${NORMAL} Phase ${YELLOW}5${NORMAL} of ${GREEN}5${NORMAL}: Application URL Details\\n\n"
+  run_ok "kubectl apply -f deployments/" "Setup Deployments"
+  run_ok "deploymentStatus" "Waiting for Deployments To Be Ready"
+  run_ok "endpointStatus" "Checking Base URL Accessible"
+
+  cd custom-metrics/
+  run_ok "custommetricsSetup" "Setup Custom Metrics"
+  cd ..
+  run_ok "kubectl config set-context --current --namespace=was && kubectl apply -f hpa/" "Setup Horizontal Pod Autoscaler"
+
+  echo
+  log_debug "Phase 5 of 5: Application URL Details"
+  printf "${GREEN}☑☑☑☑${YELLOW}☑${NORMAL} Phase ${YELLOW}5${NORMAL} of ${GREEN}5${NORMAL}: Application URL Details\\n\n"
 
   # Print URLs
 
-    BASE_URL="$fullazuredomain"
-    printf "${GREEN}Base URL - Active Web Elements Server:${NORMAL} http://$BASE_URL/\n\n"
-    printf "${GREEN}Resource Manager:${NORMAL} http://$BASE_URL/resources/\n\n"
-    printf "${GREEN}Endpoints Manager:${NORMAL} http://$BASE_URL/endpoints/\n\n"
-    printf "${GREEN}Nodefiles:${NORMAL} http://$BASE_URL/nodefiles/\n\n"
-    printf "${GREEN}Endpoints Info:${NORMAL} http://$BASE_URL/.applicationserver/info\n\n"
-    printf "${GREEN}Restart AWES:${NORMAL} http://$BASE_URL/.applicationserver/kernel/restart\n\n"
-    
+  BASE_URL="$fullazuredomain"
+  printf "${GREEN}Base URL - Active Web Elements Server:${NORMAL} http://$BASE_URL/\n\n"
+  printf "${GREEN}Resource Manager:${NORMAL} http://$BASE_URL/resources/\n\n"
+  printf "${GREEN}Endpoints Manager:${NORMAL} http://$BASE_URL/endpoints/\n\n"
+  printf "${GREEN}Nodefiles:${NORMAL} http://$BASE_URL/nodefiles/\n\n"
+  printf "${GREEN}Endpoints Info:${NORMAL} http://$BASE_URL/.applicationserver/info\n\n"
+  printf "${GREEN}Restart AWES:${NORMAL} http://$BASE_URL/.applicationserver/kernel/restart\n\n"
+
   # Save credentials to Azure Blob
 
-    saveCredsFunction
-	echo
-    echo "AKS Cluster build complete and Wolfram Application Server Deployed. Our warmest appreciation to you for running Wolfram Application Server on Azure environment. Enjoy!"
-	echo
+  saveCredsFunction
+  echo
+  echo "AKS Cluster build complete and Wolfram Application Server Deployed. Our warmest appreciation to you for running Wolfram Application Server on Azure environment. Enjoy!"
+  echo
 
 }
 
-createStorageAccount()
-{
-	san=$(az storage account create --resource-group $TF_RESOURCE_GROUP_NAME --name $GET_SAN --sku Standard_LRS --encryption-services blob 2> /dev/null)
-	ACCOUNT_KEY=$(az storage account keys list --resource-group $TF_RESOURCE_GROUP_NAME --account-name $GET_SAN --query '[0].value' -o tsv  2> /dev/null)
+createStorageAccount() {
+  san=$(az storage account create --resource-group $TF_RESOURCE_GROUP_NAME --name $GET_SAN --sku Standard_LRS --encryption-services blob 2>/dev/null)
+  ACCOUNT_KEY=$(az storage account keys list --resource-group $TF_RESOURCE_GROUP_NAME --account-name $GET_SAN --query '[0].value' -o tsv 2>/dev/null)
 }
 
-custommetricsSetup()
-{
-	kubectl config set-context --current --namespace=monitoring >> $LOG_PATH
-	kubectl apply -f prometheus.yaml >> $LOG_PATH
-	sleep 15
-	kubectl wait --for=condition=ready --timeout=30m pod -l app=prometheus-server -n monitoring >> $LOG_PATH
-	helm repo add prometheus-community https://prometheus-community.github.io/helm-charts  >> $LOG_PATH
-	helm repo update >> $LOG_PATH
-	helm install was -f values.yaml prometheus-community/prometheus-adapter --namespace monitoring >> $LOG_PATH
-	sleep 15
-	kubectl wait --for=condition=ready --timeout=30m pod -l app.kubernetes.io/name=prometheus-adapter -n monitoring >> $LOG_PATH
+custommetricsSetup() {
+  kubectl config set-context --current --namespace=monitoring >>$LOG_PATH
+  kubectl apply -f prometheus.yaml >>$LOG_PATH
+  sleep 15
+  kubectl wait --for=condition=ready --timeout=30m pod -l app=prometheus-server -n monitoring >>$LOG_PATH
+  helm repo add prometheus-community https://prometheus-community.github.io/helm-charts >>$LOG_PATH
+  helm repo update >>$LOG_PATH
+  helm install was -f values.yaml prometheus-community/prometheus-adapter --namespace monitoring >>$LOG_PATH
+  sleep 15
+  kubectl wait --for=condition=ready --timeout=30m pod -l app.kubernetes.io/name=prometheus-adapter -n monitoring >>$LOG_PATH
 }
 
-
-deploymentStatus()
-{
-    while true;
-    do
-        currentawesStatus=$(kubectl get pods --field-selector=status.phase=Running -n was | grep -i "active-web-elements-server-deployment-" | awk '{print $2}' | head -qn1)
-        if [ X"$currentawesStatus" = X"1/1" ]; then
-            log_debug "awes ready"
-            break;
-        else
-            log_debug "awes not ready"
-            sleep 5;
-        fi
-    done
+deploymentStatus() {
+  while true; do
+    currentawesStatus=$(kubectl get pods --field-selector=status.phase=Running -n was | grep -i "active-web-elements-server-deployment-" | awk '{print $2}' | head -qn1)
+    if [ X"$currentawesStatus" = X"1/1" ]; then
+      log_debug "awes ready"
+      break
+    else
+      log_debug "awes not ready"
+      sleep 5
+    fi
+  done
 
 }
 
-endpointStatus()
-{
-    BASE_URL="$fullazuredomain"
-    while true;
-    do
-        currentendpointStatus=$(curl -s -o /dev/null -I -w "%{http_code}" http://$BASE_URL/)
-        if [ X"$currentendpointStatus" = X"503" ]; then
-            log_debug "endpoint accessible"
-            break;
-        else
-            log_debug "endpoint not accessible yet"
-            sleep 5;
-        fi
-    done
+endpointStatus() {
+  BASE_URL="$fullazuredomain"
+  while true; do
+    currentendpointStatus=$(curl -s -o /dev/null -I -w "%{http_code}" http://$BASE_URL/)
+    if [ X"$currentendpointStatus" = X"503" ]; then
+      log_debug "endpoint accessible"
+      break
+    else
+      log_debug "endpoint not accessible yet"
+      sleep 5
+    fi
+  done
 
 }
 
-kafkaoperatorCheck()
-{
-    while true;
-    do
-        currentKafkaoperatorStatus=$(kubectl get pods --field-selector=status.phase=Running -n kafka | grep -i "kafka-persistent-entity-operator-" | awk '{print $2}')
-        if [ X"$currentKafkaoperatorStatus" = X"3/3" ]; then
-            log_debug "kafka operator ready"
-            break;
-        else
-            log_debug "kafka operator not ready"
-            sleep 5;
-        fi
-    done
+kafkaoperatorCheck() {
+  while true; do
+    currentKafkaoperatorStatus=$(kubectl get pods --field-selector=status.phase=Running -n kafka | grep -i "kafka-persistent-entity-operator-" | awk '{print $2}')
+    if [ X"$currentKafkaoperatorStatus" = X"3/3" ]; then
+      log_debug "kafka operator ready"
+      break
+    else
+      log_debug "kafka operator not ready"
+      sleep 5
+    fi
+  done
 }
 
-terraformFunction()
-{
-    while true; do
-      if [ -x "/usr/local/bin/terraform" ]; then
-        break
-      elif [ -x "/usr/bin/terraform" ]; then
-        break
-      else
-        printf "${RED}Terraform not installed. Cannot continue.${NORMAL}\\n"
-        exit 1
-      fi
-    done
+terraformFunction() {
+  while true; do
+    if [ -x "/usr/local/bin/terraform" ]; then
+      break
+    elif [ -x "/usr/bin/terraform" ]; then
+      break
+    else
+      printf "${RED}Terraform not installed. Cannot continue.${NORMAL}\\n"
+      exit 1
+    fi
+  done
 
 }
 
-helmFunction()
-{
-    while true; do
-      if [ -x "/usr/local/bin/helm" ]; then
-        break
-      elif [ -x "/usr/bin/helm" ]; then
-        break
-      else
-        printf "${RED}Helm not installed. Cannot continue.${NORMAL}\\n"
-        exit 1
-      fi
-    done
+helmFunction() {
+  while true; do
+    if [ -x "/usr/local/bin/helm" ]; then
+      break
+    elif [ -x "/usr/bin/helm" ]; then
+      break
+    else
+      printf "${RED}Helm not installed. Cannot continue.${NORMAL}\\n"
+      exit 1
+    fi
+  done
 
 }
 
-kubectlFunction()
-{
-    while true; do
-      if [ -x "/usr/local/bin/kubectl" ]; then
-        break
-      elif [ -x "/usr/bin/kubectl" ]; then
-        break
-      else
-        printf "${RED}Kubectl not installed. Cannot continue.${NORMAL}\\n"
-        exit 1
-      fi
-    done
+kubectlFunction() {
+  while true; do
+    if [ -x "/usr/local/bin/kubectl" ]; then
+      break
+    elif [ -x "/usr/bin/kubectl" ]; then
+      break
+    else
+      printf "${RED}Kubectl not installed. Cannot continue.${NORMAL}\\n"
+      exit 1
+    fi
+  done
 
 }
 
-kafkaShutdown()
-{
-    kubectl delete --ignore-not-found=true -f kafkabridge/ >> $LOG_PATH
-    kubectl delete --ignore-not-found=true -f kafka/ >> $LOG_PATH
-    sleep 60
-    while true;
-    do
-        current=$(kubectl get pods -n kafka | grep -i "kafka-persistent-kafka-0" | awk '{print $1}' | head -qn1)
-        if [ -z $current ]; then
-            log_debug "kafka 0 not running"
-            break;
-        else
-            log_debug "kafka 0 forcing shutdown"
-            kubectl delete pod kafka-persistent-kafka-0 -n kafka --grace-period=0 --force 2>/dev/null 2>&1
-        fi
-    done
-    while true;
-    do
-        current=$(kubectl get pods -n kafka | grep -i "kafka-persistent-kafka-1" | awk '{print $1}' | head -qn1)
-        if [ -z $current ]; then
-            log_debug "kafka 1 not running"
-            break;
-        else
-            log_debug "kafka 1 forcing shutdown"
-            kubectl delete pod kafka-persistent-kafka-1 -n kafka --grace-period=0 --force 2>/dev/null 2>&1
-        fi
-    done
-    while true;
-    do
-        current=$(kubectl get pods -n kafka | grep -i "kafka-persistent-kafka-2" | awk '{print $1}' | head -qn1)
-        if [ -z $current ]; then
-            log_debug "kafka 2 not running"
-            break;
-        else
-            log_debug "kafka 2 forcing shutdown"
-            kubectl delete pod kafka-persistent-kafka-2 -n kafka --grace-period=0 --force 2>/dev/null 2>&1
-        fi
-    done
-    
-    while true;
-    do
-        current=$(kubectl get pods -n kafka | grep -i "kafka-persistent-zookeeper-0" | awk '{print $1}' | head -qn1)
-        if [ -z $current ]; then
-            log_debug "zookeeper 0 not running"
-            break;
-        else
-            log_debug "zookeeper 0 forcing shutdown"
-            kubectl delete pod kafka-persistent-zookeeper-0 -n kafka --grace-period=0 --force 2>/dev/null 2>&1
-        fi
-    done
+kafkaShutdown() {
+  kubectl delete --ignore-not-found=true -f kafkabridge/ >>$LOG_PATH
+  kubectl delete --ignore-not-found=true -f kafka/ >>$LOG_PATH
+  sleep 60
+  while true; do
+    current=$(kubectl get pods -n kafka | grep -i "kafka-persistent-kafka-0" | awk '{print $1}' | head -qn1)
+    if [ -z $current ]; then
+      log_debug "kafka 0 not running"
+      break
+    else
+      log_debug "kafka 0 forcing shutdown"
+      kubectl delete pod kafka-persistent-kafka-0 -n kafka --grace-period=0 --force 2>/dev/null 2>&1
+    fi
+  done
+  while true; do
+    current=$(kubectl get pods -n kafka | grep -i "kafka-persistent-kafka-1" | awk '{print $1}' | head -qn1)
+    if [ -z $current ]; then
+      log_debug "kafka 1 not running"
+      break
+    else
+      log_debug "kafka 1 forcing shutdown"
+      kubectl delete pod kafka-persistent-kafka-1 -n kafka --grace-period=0 --force 2>/dev/null 2>&1
+    fi
+  done
+  while true; do
+    current=$(kubectl get pods -n kafka | grep -i "kafka-persistent-kafka-2" | awk '{print $1}' | head -qn1)
+    if [ -z $current ]; then
+      log_debug "kafka 2 not running"
+      break
+    else
+      log_debug "kafka 2 forcing shutdown"
+      kubectl delete pod kafka-persistent-kafka-2 -n kafka --grace-period=0 --force 2>/dev/null 2>&1
+    fi
+  done
 
-    while true;
-    do
-        current=$(kubectl get pods -n kafka | grep -i "kafka-persistent-zookeeper-1" | awk '{print $1}' | head -qn1)
-        if [ -z $current ]; then
-            log_debug "zookeeper 1 not running"
-            break;
-        else
-            log_debug "zookeeper 1 forcing shutdown"
-            kubectl delete pod kafka-persistent-zookeeper-1 -n kafka --grace-period=0 --force 2>/dev/null 2>&1
-        fi
-    done
-    
-    while true;
-    do
-        current=$(kubectl get pods -n kafka | grep -i "kafka-persistent-zookeeper-2" | awk '{print $1}' | head -qn1)
-        if [ -z $current ]; then
-            log_debug "zookeeper 2 not running"
-            break;
-        else
-            log_debug "zookeeper 2 forcing shutdown"
-            kubectl delete pod kafka-persistent-zookeeper-2 -n kafka --grace-period=0 --force 2>/dev/null 2>&1
-        fi
-    done
+  while true; do
+    current=$(kubectl get pods -n kafka | grep -i "kafka-persistent-zookeeper-0" | awk '{print $1}' | head -qn1)
+    if [ -z $current ]; then
+      log_debug "zookeeper 0 not running"
+      break
+    else
+      log_debug "zookeeper 0 forcing shutdown"
+      kubectl delete pod kafka-persistent-zookeeper-0 -n kafka --grace-period=0 --force 2>/dev/null 2>&1
+    fi
+  done
+
+  while true; do
+    current=$(kubectl get pods -n kafka | grep -i "kafka-persistent-zookeeper-1" | awk '{print $1}' | head -qn1)
+    if [ -z $current ]; then
+      log_debug "zookeeper 1 not running"
+      break
+    else
+      log_debug "zookeeper 1 forcing shutdown"
+      kubectl delete pod kafka-persistent-zookeeper-1 -n kafka --grace-period=0 --force 2>/dev/null 2>&1
+    fi
+  done
+
+  while true; do
+    current=$(kubectl get pods -n kafka | grep -i "kafka-persistent-zookeeper-2" | awk '{print $1}' | head -qn1)
+    if [ -z $current ]; then
+      log_debug "zookeeper 2 not running"
+      break
+    else
+      log_debug "zookeeper 2 forcing shutdown"
+      kubectl delete pod kafka-persistent-zookeeper-2 -n kafka --grace-period=0 --force 2>/dev/null 2>&1
+    fi
+  done
 
 }
 
-deleteAR()
-{
-	app_id=$(az ad app list --all --display-name $spuser | grep appId | cut -d$':' -f2 | cut -d'"' -f 2 | tr -d '\r')
+deleteAR() {
+  app_id=$(az ad app list --all --display-name $spuser | grep appId | cut -d$':' -f2 | cut -d'"' -f 2 | tr -d '\r')
   delete_app=$(az ad app delete --id $app_id --only-show-errors)
 }
 
-parseCredsFunction()
-{
+parseCredsFunction() {
   GET_CLUSTER_NAME=$(cat creds | cut -d$';' -f1 | grep GET_CLUSTER_NAME | cut -d$':' -f2 | tr -d '\r')
   GET_REGION=$(cat creds | cut -d$';' -f1 | grep GET_REGION | cut -d$':' -f2 | tr -d '\r')
   GET_SAN=$(cat creds | cut -d$';' -f1 | grep GET_SAN | cut -d$':' -f2 | tr -d '\r')
@@ -929,19 +897,18 @@ parseCredsFunction()
 
 }
 
-DeleteFunction()
-{
-	banner=true
+DeleteFunction() {
+  banner=true
 
   PARSED_TENANT=$(az account list | grep tenantId | cut -d$':' -f2 | cut -d'"' -f 2 | cut -d$"-" -f1)
   WAS="was"
   CREDS_STORAGE_ACCOUNT_NAME="${WAS}sa${PARSED_TENANT}"
   CREDS_STORAGE_CONTAINER_NAME="$WAS$PARSED_TENANT"
-  
+
   # Download and parse creds
 
   fetched_creds=$(az storage blob download --account-name "$CREDS_STORAGE_ACCOUNT_NAME" --container-name $CREDS_STORAGE_CONTAINER_NAME --name creds --file creds --no-progress --only-show-errors | grep container | cut -d$":" -f2 | cut -d$'"' -f2 | sed 's/ *$//g')
-  
+
   if [[ $fetched_creds != $CREDS_STORAGE_CONTAINER_NAME ]]; then
     echo
     echo "There is no creds file in Azure Storage Blob. Is the owner account different than the current?"
@@ -952,7 +919,7 @@ DeleteFunction()
   parseCredsFunction
 
   cd Source
-  
+
   # Replace variables
 
   sed -i -e 's~'"WAS"'~'"$GET_CLUSTER_NAME"'~g' terraform/variables.tf
@@ -961,211 +928,204 @@ DeleteFunction()
   sed -i -e "s/YYYYYY/$AD_APP_PASSWORD/g" terraform/variables.tf
   sed -i -e "s~XXXXXX~$TF_RESOURCE_GROUP_NAME~g" terraform/main.tf
   sed -i -e "s~YYYYYY~$GET_SAN~g" terraform/main.tf
-	
-	echo
-	log_debug "Phase 1 of 5: Prequisites Checks"   
-	printf "${YELLOW}☑${CYAN}□□□□${NORMAL} Phase ${YELLOW}1${NORMAL} of ${GREEN}5${NORMAL}: Prequisites Checks\\n"
-    run_ok "kubectlFunction" "Checking Kubectl Installed"
-    run_ok "terraformFunction" "Checking Terraform Installed"
-    run_ok "helmFunction" "Checking Helm Installed"
-    run_ok "CURRENTAKSCHECK" "Checking AKS Status"
-	
-    val="no"
-	if [ X"$aks_Exists" = X"$val" ]; then
-        echo
-        log_error "Trying to delete Cluster when it doesn't exist. What are you trying to do?"
-        echo
-        exit 1
-    fi
-    
-	echo
-	log_debug "Phase 2 of 5: Delete Wolfram Application Server Deployments"
-	printf "${GREEN}☑${YELLOW}☑${CYAN}□□□${NORMAL} Phase ${YELLOW}2${NORMAL} of ${GREEN}5${NORMAL}: Delete Wolfram Application Server Deployments\\n"
-	
+
+  echo
+  log_debug "Phase 1 of 5: Prequisites Checks"
+  printf "${YELLOW}☑${CYAN}□□□□${NORMAL} Phase ${YELLOW}1${NORMAL} of ${GREEN}5${NORMAL}: Prequisites Checks\\n"
+  run_ok "kubectlFunction" "Checking Kubectl Installed"
+  run_ok "terraformFunction" "Checking Terraform Installed"
+  run_ok "helmFunction" "Checking Helm Installed"
+  run_ok "CURRENTAKSCHECK" "Checking AKS Status"
+
+  val="no"
+  if [ X"$aks_Exists" = X"$val" ]; then
+    echo
+    log_error "Trying to delete Cluster when it doesn't exist. What are you trying to do?"
+    echo
+    exit 1
+  fi
+
+  echo
+  log_debug "Phase 2 of 5: Delete Wolfram Application Server Deployments"
+  printf "${GREEN}☑${YELLOW}☑${CYAN}□□□${NORMAL} Phase ${YELLOW}2${NORMAL} of ${GREEN}5${NORMAL}: Delete Wolfram Application Server Deployments\\n"
+
   kubernetes_cluster_name=$GET_CLUSTER_NAME-aks
-  
+
   CFILE=~/.kube/config
-	if [ -f "$CFILE" ]; then
-		log_debug "Already has kubeconfig"
-		chmod 700 ~/.kube/config
-	else
-		mkdir -p ~/.kube
-		touch ~/.kube/config
-		chmod 700 ~/.kube/config
-	fi
+  if [ -f "$CFILE" ]; then
+    log_debug "Already has kubeconfig"
+    chmod 700 ~/.kube/config
+  else
+    mkdir -p ~/.kube
+    touch ~/.kube/config
+    chmod 700 ~/.kube/config
+  fi
 
   # Update kube config
   update_kubeconfig=$(az aks get-credentials --name $kubernetes_cluster_name --resource-group $RESOURCE_GROUP_NAME --overwrite --only-show-errors)
 
   # Switch context
   run_ok "kubectl config use-context $kubernetes_cluster_name " "Switching Context"
-  
+
   run_ok "kubectl delete --ignore-not-found=true -f deployments/" "Deleting Deployments"
-    run_ok "kafkaShutdown" "Deleting Kafka Cluster"
-    run_ok "kubectl delete secret generic basic-auth --ignore-not-found=true" "Deleting NGINX Auth"
-    
-	run_ok "kubectl delete --ignore-not-found=true -f ingress/" "Deleting Ingress"
-	run_ok "kubectl delete --ignore-not-found=true -f hpa/" "Deleting Horizontal Pod Autoscaler"
+  run_ok "kafkaShutdown" "Deleting Kafka Cluster"
+  run_ok "kubectl delete secret generic basic-auth --ignore-not-found=true" "Deleting NGINX Auth"
+
+  run_ok "kubectl delete --ignore-not-found=true -f ingress/" "Deleting Ingress"
+  run_ok "kubectl delete --ignore-not-found=true -f hpa/" "Deleting Horizontal Pod Autoscaler"
   run_ok "kubectl delete --ignore-not-found=true -f services/" "Deleting Services"
-	run_ok "kubectl delete --ignore-not-found=true -f pvc/" "Deleting Persistent Volume Claims"
+  run_ok "kubectl delete --ignore-not-found=true -f pvc/" "Deleting Persistent Volume Claims"
 
-	run_ok "kubectl delete --ignore-not-found=true -f strimzi-kafka-deployment/020-RoleBinding-strimzi-cluster-operator.yaml -n kafkacluster && kubectl delete --ignore-not-found=true -f strimzi-kafka-deployment/032-RoleBinding-strimzi-cluster-operator-topic-operator-delegation.yaml -n kafkacluster && kubectl delete --ignore-not-found=true -f strimzi-kafka-deployment/031-RoleBinding-strimzi-cluster-operator-entity-operator-delegation.yaml -n kafkacluster && kubectl delete --ignore-not-found=true -f strimzi-kafka-deployment/ -n kafka && kubectl delete --ignore-not-found=true -f kafka && kubectl delete --ignore-not-found=true -f kafkabridge" "Deleting Kafka Cluster Operator"
+  run_ok "kubectl delete --ignore-not-found=true -f strimzi-kafka-deployment/020-RoleBinding-strimzi-cluster-operator.yaml -n kafkacluster && kubectl delete --ignore-not-found=true -f strimzi-kafka-deployment/032-RoleBinding-strimzi-cluster-operator-topic-operator-delegation.yaml -n kafkacluster && kubectl delete --ignore-not-found=true -f strimzi-kafka-deployment/031-RoleBinding-strimzi-cluster-operator-entity-operator-delegation.yaml -n kafkacluster && kubectl delete --ignore-not-found=true -f strimzi-kafka-deployment/ -n kafka && kubectl delete --ignore-not-found=true -f kafka && kubectl delete --ignore-not-found=true -f kafkabridge" "Deleting Kafka Cluster Operator"
   run_ok "kubectl delete --ignore-not-found=true apiservice v1beta1.custom.metrics.k8s.io && kubectl delete --ignore-not-found=true -f namespace/" "Deleting WAS Namespace"
-	run_ok "kubectl config set-context --current --namespace=default" "Reset Namespace"
-    
-	echo
-	log_debug "Phase 3 of 5: Delete Dependencies"
-	printf "${GREEN}☑☑${YELLOW}☑${CYAN}□□${NORMAL} Phase ${YELLOW}3${NORMAL} of ${GREEN}5${NORMAL}: Delete Dependencies\\n"
-	run_ok "kubectl delete --ignore-not-found=true -f metrics-server/" "Deleting Metrics Server"
-	run_ok "kubectl delete --ignore-not-found=true -f ingress-controller/" "Deleting Ingress Controller"
+  run_ok "kubectl config set-context --current --namespace=default" "Reset Namespace"
 
-	echo
-	log_debug "Phase 4 of 5: Delete Azure Kubernetes Cluster (AKS)"
-	printf "${GREEN}☑☑☑${YELLOW}☑${CYAN}□${NORMAL} Phase ${YELLOW}4${NORMAL} of ${GREEN}5${NORMAL}: Delete Azure Kubernetes Cluster (AKS)\\n"
-    cd terraform
-	run_ok "sleep 5 && terraform init && terraform refresh && terraform destroy -auto-approve" "Deleting AKS"
-	cd ..
-	
-	echo
-	log_debug "Phase 5 of 5: Cleanup"
-	printf "${GREEN}☑☑☑☑${YELLOW}☑${NORMAL} Phase ${YELLOW}5${NORMAL} of ${GREEN}5${NORMAL}: Cleanup\\n"
-	
-	sed -i -e "s~$BASE_URL~domain.com~g" deployments/active-web-elements-server-deployment.yaml
-	
-	sed -i -e "s~^    service.beta.kubernetes.io\/azure-dns-label-name: .*~    service.beta.kubernetes.io\/azure-dns-label-name: \"domain\"~g" ingress-controller/deploy.yml
+  echo
+  log_debug "Phase 3 of 5: Delete Dependencies"
+  printf "${GREEN}☑☑${YELLOW}☑${CYAN}□□${NORMAL} Phase ${YELLOW}3${NORMAL} of ${GREEN}5${NORMAL}: Delete Dependencies\\n"
+  run_ok "kubectl delete --ignore-not-found=true -f metrics-server/" "Deleting Metrics Server"
+  run_ok "kubectl delete --ignore-not-found=true -f ingress-controller/" "Deleting Ingress Controller"
 
+  echo
+  log_debug "Phase 4 of 5: Delete Azure Kubernetes Cluster (AKS)"
+  printf "${GREEN}☑☑☑${YELLOW}☑${CYAN}□${NORMAL} Phase ${YELLOW}4${NORMAL} of ${GREEN}5${NORMAL}: Delete Azure Kubernetes Cluster (AKS)\\n"
+  cd terraform
+  run_ok "sleep 5 && terraform init && terraform refresh && terraform destroy -auto-approve" "Deleting AKS"
+  cd ..
 
-    # Reset deployment setup
+  echo
+  log_debug "Phase 5 of 5: Cleanup"
+  printf "${GREEN}☑☑☑☑${YELLOW}☑${NORMAL} Phase ${YELLOW}5${NORMAL} of ${GREEN}5${NORMAL}: Cleanup\\n"
 
-    CURRENT_MINIO_ACCESS_KEY=$(grep -A1 -i MINIO_ACCESS_KEY deployments/minio-deployment.yaml | grep -i value: |  awk '{print $2}')
-    sed -i -e 's~'"$CURRENT_MINIO_ACCESS_KEY"'~<your-access-key>~g' deployments/minio-deployment.yaml
-    CURRENT_MINIO_SECRET_KEY=$(grep -A1 -i MINIO_SECRET_KEY deployments/minio-deployment.yaml | grep -i value: |  awk '{print $2}')
-    sed -i -e 's~'"$CURRENT_MINIO_SECRET_KEY"'~<your-secret-key>~g' deployments/minio-deployment.yaml
-    CURRENT_MINIOACCESSKEY=$(grep -A1 -i MINIOACCESSKEY deployments/resource-manager-deployment.yaml | grep -i value: |  awk '{print $2}')
-    sed -i -e 's~'"$CURRENT_MINIOACCESSKEY"'~<your-access-key>~g' deployments/resource-manager-deployment.yaml
-    CURRENT_MINIOSECRETKEY=$(grep -A1 -i MINIOSECRETKEY deployments/resource-manager-deployment.yaml | grep -i value: |  awk '{print $2}')
-    sed -i -e 's~'"$CURRENT_MINIOSECRETKEY"'~<your-secret-key>~g' deployments/resource-manager-deployment.yaml
-    CURRENT_RESOURCEINFOBUCKET=$(grep -A1 -i RESOURCEINFO.BUCKET deployments/resource-manager-deployment.yaml | grep -i value: |  awk '{print $2}')
-    sed -i -e 's~'"$CURRENT_RESOURCEINFOBUCKET"'~<your-resourceinfo-bucketname>~g' deployments/resource-manager-deployment.yaml
-    CURRENT_NODEFILESBUCKET=$(grep -A1 -i NODEFILES.BUCKET deployments/resource-manager-deployment.yaml | grep -i value: |  awk '{print $2}')
-    sed -i -e 's~'"$CURRENT_NODEFILESBUCKET"'~<your-nodefiles-bucketname>~g' deployments/resource-manager-deployment.yaml
-    
-	# Delete terraform storage account
+  sed -i -e "s~$BASE_URL~domain.com~g" deployments/active-web-elements-server-deployment.yaml
 
-	cd terraform
+  sed -i -e "s~^    service.beta.kubernetes.io\/azure-dns-label-name: .*~    service.beta.kubernetes.io\/azure-dns-label-name: \"domain\"~g" ingress-controller/deploy.yml
 
-	PARSED_TENANTID=$(az account list --query [].tenantId --output tsv | cut -d '-' -f 5)
-	PARSED_TENANTID=$(echo $PARSED_TENANTID | tr -d '\r')
-	lower_cluster_name=$(echo $GET_CLUSTER_NAME | tr '[:upper:]' '[:lower:]')
+  # Reset deployment setup
+
+  CURRENT_MINIO_ACCESS_KEY=$(grep -A1 -i MINIO_ACCESS_KEY deployments/minio-deployment.yaml | grep -i value: | awk '{print $2}')
+  sed -i -e 's~'"$CURRENT_MINIO_ACCESS_KEY"'~<your-access-key>~g' deployments/minio-deployment.yaml
+  CURRENT_MINIO_SECRET_KEY=$(grep -A1 -i MINIO_SECRET_KEY deployments/minio-deployment.yaml | grep -i value: | awk '{print $2}')
+  sed -i -e 's~'"$CURRENT_MINIO_SECRET_KEY"'~<your-secret-key>~g' deployments/minio-deployment.yaml
+  CURRENT_MINIOACCESSKEY=$(grep -A1 -i MINIOACCESSKEY deployments/resource-manager-deployment.yaml | grep -i value: | awk '{print $2}')
+  sed -i -e 's~'"$CURRENT_MINIOACCESSKEY"'~<your-access-key>~g' deployments/resource-manager-deployment.yaml
+  CURRENT_MINIOSECRETKEY=$(grep -A1 -i MINIOSECRETKEY deployments/resource-manager-deployment.yaml | grep -i value: | awk '{print $2}')
+  sed -i -e 's~'"$CURRENT_MINIOSECRETKEY"'~<your-secret-key>~g' deployments/resource-manager-deployment.yaml
+  CURRENT_RESOURCEINFOBUCKET=$(grep -A1 -i RESOURCEINFO.BUCKET deployments/resource-manager-deployment.yaml | grep -i value: | awk '{print $2}')
+  sed -i -e 's~'"$CURRENT_RESOURCEINFOBUCKET"'~<your-resourceinfo-bucketname>~g' deployments/resource-manager-deployment.yaml
+  CURRENT_NODEFILESBUCKET=$(grep -A1 -i NODEFILES.BUCKET deployments/resource-manager-deployment.yaml | grep -i value: | awk '{print $2}')
+  sed -i -e 's~'"$CURRENT_NODEFILESBUCKET"'~<your-nodefiles-bucketname>~g' deployments/resource-manager-deployment.yaml
+
+  # Delete terraform storage account
+
+  cd terraform
+
+  PARSED_TENANTID=$(az account list --query [].tenantId --output tsv | cut -d '-' -f 5)
+  PARSED_TENANTID=$(echo $PARSED_TENANTID | tr -d '\r')
+  lower_cluster_name=$(echo $GET_CLUSTER_NAME | tr '[:upper:]' '[:lower:]')
   lower_cluster_name=$(echo $lower_cluster_name | tr -d '\r')
-	spsuffix="AzureWAS"
-	spuser="$spsuffix$PARSED_TENANTID"
-	TF_RESOURCE_GROUP_NAME="$lower_cluster_name-rg-$PARSED_TENANTID"
-	run_ok "az storage account delete --name $GET_SAN --resource-group $TF_RESOURCE_GROUP_NAME --yes" "Deleting Storage Account"
-	
+  spsuffix="AzureWAS"
+  spuser="$spsuffix$PARSED_TENANTID"
+  TF_RESOURCE_GROUP_NAME="$lower_cluster_name-rg-$PARSED_TENANTID"
+  run_ok "az storage account delete --name $GET_SAN --resource-group $TF_RESOURCE_GROUP_NAME --yes" "Deleting Storage Account"
+
   # Delete active directory/app registration
 
-	run_ok "deleteAR" "Deleting App Registration"
-	
-	set -e
+  run_ok "deleteAR" "Deleting App Registration"
 
-	# Delete terraform and was resource groups
+  set -e
 
-	run_ok "az group delete --name $TF_RESOURCE_GROUP_NAME --no-wait --yes && az group delete --name NetworkWatcherRG --no-wait --yes" "Deleting Resource Group"
-	run_ok "az group delete --name "${GET_CLUSTER_NAME}-rg" --no-wait --yes || true" "Deleting WAS Resource Group"
-	set +e
+  # Delete terraform and was resource groups
 
-	# Cleanup
+  run_ok "az group delete --name $TF_RESOURCE_GROUP_NAME --no-wait --yes && az group delete --name NetworkWatcherRG --no-wait --yes" "Deleting Resource Group"
+  run_ok "az group delete --name "${GET_CLUSTER_NAME}-rg" --no-wait --yes || true" "Deleting WAS Resource Group"
+  set +e
 
-	rm -rf tmpfile
+  # Cleanup
 
-	awk '!/storage_account_name/' variables.tf  > tmpfile && mv tmpfile variables.tf >> $LOG_PATH
+  rm -rf tmpfile
 
-	sed -i -e 's/'"$TF_RESOURCE_GROUP_NAME"'/XXXXXX/g' main.tf
+  awk '!/storage_account_name/' variables.tf >tmpfile && mv tmpfile variables.tf >>$LOG_PATH
 
-	sed -i -e 's/'"$GET_SAN"'/YYYYYY/g' main.tf
+  sed -i -e 's/'"$TF_RESOURCE_GROUP_NAME"'/XXXXXX/g' main.tf
+
+  sed -i -e 's/'"$GET_SAN"'/YYYYYY/g' main.tf
 
   sed -i -e 's~'"$AD_APP_ID"'~XXXXXX~g' variables.tf
-	
-	sed -i -e 's~'"$AD_APP_PASSWORD"'~YYYYYY~g' variables.tf
 
-	rm -rf tenant-id.config
-	rm -rf .terraform*
-	rm -rf stopspinning*
-	cd ..
-	rm -rf stopspinning
-    rm -rf custom-metrics/stopspinning
-	rm -rf tmpfile	
-	cd ..
-	
+  sed -i -e 's~'"$AD_APP_PASSWORD"'~YYYYYY~g' variables.tf
+
+  rm -rf tenant-id.config
+  rm -rf .terraform*
+  rm -rf stopspinning*
+  cd ..
+  rm -rf stopspinning
+  rm -rf custom-metrics/stopspinning
+  rm -rf tmpfile
+  cd ..
+
   # Delete creds resource group
 
   deleteCredsFunction
 
-	echo
-    echo "Deleted AKS Cluster and Wolfram Application Server. Our warmest appreciation to you for running Wolfram Application Server on Azure environment. Thank You!"
-	echo
-    
-}
-
-NEWAKSCHECK()
-{
-	suffix="-aks"
-	CLUSTER="$GET_CLUSTER_NAME$suffix"
-    clusterExists=$(az aks list | grep $CLUSTER 2>/dev/null 2>&1 )
-	if [[ $clusterExists =~ $CLUSTER ]]; then
-		printf "cluster found"
-		aks_Exists="yes"
-	else
-	    printf "no cluster found" 2>/dev/null 2>&1
-		aks_Exists="no"
-	fi
-}
-
-CURRENTAKSCHECK()
-{
-    cd terraform
-    GET_CLUSTER_NAME=$(grep -A1 -i cluster-name variables.tf | grep -i default | awk '{print $3}' | sed -e 's/"//g' | tr -d '\n')
-    GET_CLUSTER_NAME=$(echo $GET_CLUSTER_NAME | tr -d '\r')
-	suffix="-aks"
-	CLUSTER="$GET_CLUSTER_NAME$suffix"
-    clusterExists=$(az aks list | grep $CLUSTER 2>/dev/null 2>&1 )
-	if [[ $clusterExists =~ $CLUSTER ]]; then
-		printf "cluster found"
-		aks_Exists="yes"
-	else
-	    printf "no cluster found" 2>/dev/null 2>&1
-		aks_Exists="no"
-	fi
-    cd ..
-}
-
-getCredsFunction()
-{
-    banner=true
+  echo
+  echo "Deleted AKS Cluster and Wolfram Application Server. Our warmest appreciation to you for running Wolfram Application Server on Azure environment. Thank You!"
+  echo
 
 }
 
-URLFunction()
-{
-    banner=true
-	cd /Source
-    BASE_URL=$(cat ingress-controller/domain.config | tr -d '\n' )
-	echo
-	log_debug "Phase 1 of 1: Application URL Details"
-	printf "${GREEN}${YELLOW}☑${CYAN}${NORMAL} Phase ${YELLOW}1${NORMAL} of ${GREEN}1${NORMAL}: Application URL Details\\n\n"
-    printf "${GREEN}Base URL - Active Web Elements Server:${NORMAL} http://$BASE_URL/\n\n"
-    printf "${GREEN}Resource Manager:${NORMAL} http://$BASE_URL/resources/\n\n"
-    printf "${GREEN}Endpoints Manager:${NORMAL} http://$BASE_URL/endpoints/\n\n"
-    printf "${GREEN}Nodefiles:${NORMAL} http://$BASE_URL/nodefiles/\n\n"
-    printf "${GREEN}Endpoints Info:${NORMAL} http://$BASE_URL/.applicationserver/info\n\n"
-    printf "${GREEN}Restart AWES:${NORMAL} http://$BASE_URL/.applicationserver/kernel/restart\n\n"
-	
+NEWAKSCHECK() {
+  suffix="-aks"
+  CLUSTER="$GET_CLUSTER_NAME$suffix"
+  clusterExists=$(az aks list | grep $CLUSTER 2>/dev/null 2>&1)
+  if [[ $clusterExists =~ $CLUSTER ]]; then
+    printf "cluster found"
+    aks_Exists="yes"
+  else
+    printf "no cluster found" 2>/dev/null 2>&1
+    aks_Exists="no"
+  fi
 }
 
+CURRENTAKSCHECK() {
+  cd terraform
+  GET_CLUSTER_NAME=$(grep -A1 -i cluster-name variables.tf | grep -i default | awk '{print $3}' | sed -e 's/"//g' | tr -d '\n')
+  GET_CLUSTER_NAME=$(echo $GET_CLUSTER_NAME | tr -d '\r')
+  suffix="-aks"
+  CLUSTER="$GET_CLUSTER_NAME$suffix"
+  clusterExists=$(az aks list | grep $CLUSTER 2>/dev/null 2>&1)
+  if [[ $clusterExists =~ $CLUSTER ]]; then
+    printf "cluster found"
+    aks_Exists="yes"
+  else
+    printf "no cluster found" 2>/dev/null 2>&1
+    aks_Exists="no"
+  fi
+  cd ..
+}
 
-helpFunction()
-{
+getCredsFunction() {
+  banner=true
+
+}
+
+URLFunction() {
+  banner=true
+  cd /Source
+  BASE_URL=$(cat ingress-controller/domain.config | tr -d '\n')
+  echo
+  log_debug "Phase 1 of 1: Application URL Details"
+  printf "${GREEN}${YELLOW}☑${CYAN}${NORMAL} Phase ${YELLOW}1${NORMAL} of ${GREEN}1${NORMAL}: Application URL Details\\n\n"
+  printf "${GREEN}Base URL - Active Web Elements Server:${NORMAL} http://$BASE_URL/\n\n"
+  printf "${GREEN}Resource Manager:${NORMAL} http://$BASE_URL/resources/\n\n"
+  printf "${GREEN}Endpoints Manager:${NORMAL} http://$BASE_URL/endpoints/\n\n"
+  printf "${GREEN}Nodefiles:${NORMAL} http://$BASE_URL/nodefiles/\n\n"
+  printf "${GREEN}Endpoints Info:${NORMAL} http://$BASE_URL/.applicationserver/info\n\n"
+  printf "${GREEN}Restart AWES:${NORMAL} http://$BASE_URL/.applicationserver/kernel/restart\n\n"
+
+}
+
+helpFunction() {
   banner=true
   printf "Usage: %s %s [options]\\n" "${CYAN}" $(basename "$0")
   echo
@@ -1176,41 +1136,45 @@ helpFunction()
   echo
 }
 
-
-invalidoptionsFunction()
-{
-    log_error "Invalid flags given."
-	echo
-	helpFunction
-    exit 1
+invalidoptionsFunction() {
+  log_error "Invalid flags given."
+  echo
+  helpFunction
+  exit 1
 }
 
-while test $# -gt 0
-do
-    case "$1" in
-        --create) SetupFunction
-            ;;
-        --delete) DeleteFunction
-            ;;
-        --endpoint-info) URLFunction
-            ;;
-        --get-creds) getCredsFunction
-            ;;
-        --help) helpFunction
-            ;;
-        --*) invalidoptionsFunction
-            ;;
-        *) invalidoptionsFunction
-            ;;
-    esac
-    shift
+while test $# -gt 0; do
+  case "$1" in
+  --create)
+    SetupFunction
+    ;;
+  --delete)
+    DeleteFunction
+    ;;
+  --endpoint-info)
+    URLFunction
+    ;;
+  --get-creds)
+    getCredsFunction
+    ;;
+  --help)
+    helpFunction
+    ;;
+  --*)
+    invalidoptionsFunction
+    ;;
+  *)
+    invalidoptionsFunction
+    ;;
+  esac
+  shift
 done
 
-if [ "$banner" = false ] ; then
-    log_error "Missing required flags."
-	echo
-	helpFunction
-    exit 1
+if [ "$banner" = false ]; then
+  log_error "Missing required flags."
+  echo
+  helpFunction
+  exit 1
 fi
 
 exit 0
