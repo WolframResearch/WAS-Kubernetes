@@ -911,12 +911,6 @@ parseCredsFunction()
 DeleteFunction()
 {
 	banner=true
-	# cd Source/terraform
-  #   GET_CLUSTER_NAME=$(grep -A1 -i cluster-name variables.tf | grep -i default | awk '{print $3}' | sed -e 's/"//g' | tr -d '\n')
-  #   GET_CLUSTER_NAME=$(echo $GET_CLUSTER_NAME | tr -d '\r')
-  #   GET_REGION=$(grep -A1 -i aks_region variables.tf | grep -i default | awk '{print $3}' | sed -e 's/"//g' | tr -d '\n')
-  #   GET_REGION=$(echo $GET_REGION | tr -d '\r')
-	# cd ..
 
   PARSED_TENANT=$(az account list | grep tenantId | cut -d$':' -f2 | cut -d'"' -f 2 | cut -d$"-" -f1)
   WAS="was"
@@ -934,33 +928,7 @@ DeleteFunction()
 
   parseCredsFunction
 
-  echo "GET_CLUSTER_NAME:$GET_CLUSTER_NAME"
-  echo "GET_REGION:$GET_REGION"
-  echo "GET_SAN:$GET_SAN"
-  echo "ACCOUNT_KEY:$ACCOUNT_KEY"
-  echo "MINIO_ACCESS_KEY:$MINIO_ACCESS_KEY"
-  echo "MINIO_SECRET_KEY:$MINIO_SECRET_KEY"
-  echo "TENANT_ID:$TENANT_ID"
-  echo "TF_RESOURCE_GROUP_NAME:$TF_RESOURCE_GROUP_NAME"
-  echo "RESOURCE_GROUP_NAME:$RESOURCE_GROUP_NAME"
-  echo "AD_APP_ID:$AD_APP_ID"
-  echo "AD_APP_PASSWORD:$AD_APP_PASSWORD"
-  echo "AZURE_DOMAIN:$AZURE_DOMAIN"
-  echo "STORAGE_CONTAINER_NAME:$STORAGE_CONTAINER_NAME"
-  echo "RESOURCE_INFO_BUCKET:$RESOURCE_INFO_BUCKET"
-  echo "NODE_FILES_BUCKET:$NODE_FILES_BUCKET"
-  echo "CREDS_RG_NAME:$CREDS_RG_NAME"
-  echo "CREDS_STORAGE_ACCOUNT_NAME:$CREDS_STORAGE_ACCOUNT_NAME"
-  echo "CREDS_STORAGE_CONTAINER_NAME:$CREDS_STORAGE_CONTAINER_NAME"
-  echo "BASE_URL:$BASE_URL"
-  echo "RESOURCE_MANAGER_URL:$RESOURCE_MANAGER_URL"
-  echo "ENDPOINT_MANAGER_URL:$ENDPOINT_MANAGER_URL"
-  echo "NODEFILES_URL:$NODEFILES_URL"
-  echo "ENDPOINTS_INFO_URL:$ENDPOINTS_INFO_URL"
-  echo "RESTART_URL:$RESTART_URL"
-
   cd Source
-
   
   sed -i -e 's~'"WAS"'~'"$GET_CLUSTER_NAME"'~g' terraform/variables.tf
   sed -i -e 's~'"eastus"'~'"$GET_REGION"'~g' terraform/variables.tf
@@ -1080,26 +1048,20 @@ DeleteFunction()
 	# Cleanup
 	rm -rf tmpfile
 	awk '!/storage_account_name/' variables.tf  > tmpfile && mv tmpfile variables.tf >> $LOG_PATH
-	# Reset main.tf values to default
+
 	sed -i -e 's/'"$TF_RESOURCE_GROUP_NAME"'/XXXXXX/g' main.tf
+
 	sed -i -e 's/'"$GET_SAN"'/YYYYYY/g' main.tf
 
-	# variables
-	# find and replace appid and password
-	# GET_APP_ID=$(grep -A2 -i appId variables.tf | grep -i default | awk '{print $3}' | sed -e 's/"//g' | tr -d '\n')
-	# GET_APP_ID=$(echo $GET_APP_ID | tr -d '\r')
-    sed -i -e 's~'"$GET_APP_ID"'~XXXXXX~g' variables.tf
+  sed -i -e 's~'"$AD_APP_ID"'~XXXXXX~g' variables.tf
 	
-	# GET_APP_PASSWORD=$(grep -A2 -i password variables.tf | grep -i default | awk '{print $3}' | sed -e 's/"//g' | tr -d '\n')
-	# GET_APP_PASSWORD=$(echo $GET_APP_PASSWORD | tr -d '\r')
-	sed -i -e 's~'"$GET_APP_PASSWORD"'~YYYYYY~g' variables.tf
+	sed -i -e 's~'"$AD_APP_PASSWORD"'~YYYYYY~g' variables.tf
+
 	rm -rf tenant-id.config
 	rm -rf .terraform*
 	rm -rf stopspinning*
 	cd ..
 	rm -rf stopspinning
-    # rm -rf efs/mountIDs.txt
-    # rm -rf efs/stopspinning
     rm -rf custom-metrics/stopspinning
 	rm -rf tmpfile	
 	cd ..
