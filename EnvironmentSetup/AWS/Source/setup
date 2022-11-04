@@ -1111,7 +1111,7 @@ DeleteFunction() {
   cd ../..
   run_ok "cleanconfiguration" "Cleaning Configuration - Resetting Back To Default"
 
-  remove-creds=$(aws s3 rb s3://$creds_bucket_name --force)
+  remove_creds=$(aws s3 rb s3://$creds_bucket_name --force)
 
   echo
   echo "Deleted EKS Cluster and Wolfram Application Server. Our warmest appreciation to you for running Wolfram Application Server on Amazon environment. Thank You!"
