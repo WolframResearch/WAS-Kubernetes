@@ -463,6 +463,7 @@ awsKeysFunction() {
 }
 
 SetupFunction() {
+
   banner=true
   cd Source/terraform
 
@@ -527,6 +528,8 @@ SetupFunction() {
     echo 'region = '"$GET_REGION"'' >>~/.aws/config
   fi
 
+  # Create terraform S3 bucket
+
   if [ -z $bucket_check ]; then
     if [ X"$GET_REGION" = X"us-east-1" ]; then
       run_ok "aws s3api create-bucket --bucket $terraform_bucket_name --endpoint-url https://s3.us-east-1.amazonaws.com && sleep 10" "Creating Bucket for terraform"
@@ -538,6 +541,8 @@ SetupFunction() {
     aws s3api put-public-access-block --bucket $terraform_bucket_name --public-access-block-configuration "BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true"
   fi
 
+  # Create dynamodb table for terraform
+
   dynamodb_check=$(aws dynamodb list-tables --output text | grep "terraform-state-locking-was" | awk '{print $2}')
   if [ -z $dynamodb_check ]; then
     dynamodb_table="terraform-state-locking-was"
@@ -545,6 +550,9 @@ SetupFunction() {
   fi
 
   run_ok "terraform init && terraform refresh && terraform plan && terraform apply -auto-approve" "Building EKS - (can take upto 30 minutes)"
+  
+  # Update kubeconfig
+
   run_ok "aws eks --region $GET_REGION update-kubeconfig --name $GET_CLUSTER_NAME" "Generate kubeconfig configuration"
   cd ..
 
@@ -566,13 +574,19 @@ SetupFunction() {
   region=$GET_REGION
   vpc_id=$(aws eks describe-cluster --name $cluster_name --query "cluster.resourcesVpcConfig.vpcId" --output text)
   cidr_block=$(aws ec2 describe-vpcs --vpc-ids $vpc_id --query "Vpcs[].CidrBlock" --output text)
+  
+  # Create security groups
   temp_group_id=$(aws ec2 create-security-group --description $description --group-name $group_name --vpc-id $vpc_id)
   group_id=$(echo $temp_group_id | awk '{print $3}' | sed 's|["]||g')
   nfs_inbound=$(aws ec2 authorize-security-group-ingress --group-id $group_id --protocol tcp --port 2049 --cidr $cidr_block)
+  
+  # Create EFS file system
   temp_file_systemid=$(aws efs create-file-system --throughput-mode bursting --encrypted --region $region --creation-token $token_name)
   filesystem_id=$(echo $temp_file_systemid | grep -Po '"FileSystemId":.*?[^\\]",' | awk '{print $2}' | sed 's|[",]||g')
   get_subnets=$(aws ec2 describe-subnets --region $region --filters "Name=vpc-id,Values=$vpc_id")
   subnets=$(echo $get_subnets | grep -Po '"SubnetId":.*?[^\\]",' | awk '{print $2}' | sed 's|[",]||g')
+  
+  # Create EFS mount targets
   for eachval in $subnets; do
     output=$(aws efs create-mount-target --file-system-id $filesystem_id --subnet-id $eachval --security-group $group_id 2>/dev/null)
     sleep 10
@@ -750,7 +764,7 @@ EOF
   CURRENT_MINIO_SECRET_KEY=$(grep -A1 -i MINIO_SECRET_KEY deployments/minio-deployment.yaml | grep -i value: | awk '{print $2}')
   sed -i -e 's~'"$CURRENT_MINIO_SECRET_KEY"'~'"$MINIO_SECRET_KEY"'~g' deployments/minio-deployment.yaml
 
-  # Resource Manger deployment setup
+  # Resource Manager deployment setup
   CURRENT_MINIOACCESSKEY=$(grep -A1 -i MINIOACCESSKEY deployments/resource-manager-deployment.yaml | grep -i value: | awk '{print $2}')
   sed -i -e 's~'"$CURRENT_MINIOACCESSKEY"'~'"$MINIO_ACCESS_KEY"'~g' deployments/resource-manager-deployment.yaml
   CURRENT_MINIOSECRETKEY=$(grep -A1 -i MINIOSECRETKEY deployments/resource-manager-deployment.yaml | grep -i value: | awk '{print $2}')
@@ -783,6 +797,9 @@ EOF
   echo
   log_debug "Phase 5 of 5: Application URL Details"
   printf "${GREEN}☑☑☑☑${YELLOW}☑${NORMAL} Phase ${YELLOW}5${NORMAL} of ${GREEN}5${NORMAL}: Application URL Details\\n\n"
+  
+  # Print URLs
+
   BASE_URL=$(kubectl get svc -n ingress-nginx | awk '{print $4}' | sed -n '2p')
   printf "${GREEN}Base URL - Active Web Elements Server:${NORMAL} http://$BASE_URL/\n\n"
   printf "${GREEN}Resource Manager:${NORMAL} http://$BASE_URL/resources/\n\n"
@@ -791,6 +808,7 @@ EOF
   printf "${GREEN}Endpoints Info:${NORMAL} http://$BASE_URL/.applicationserver/info\n\n"
   printf "${GREEN}Restart AWES:${NORMAL} http://$BASE_URL/.applicationserver/kernel/restart\n\n"
 
+  # Save credentials to S3 bucket
   run_ok "saveCredsFunction" "Saving values"
 
   echo
@@ -997,6 +1015,7 @@ parseCredsFunction() {
   rm creds
 }
 DeleteFunction() {
+
   banner=true
 
   get_user_info=$(aws sts get-caller-identity)
@@ -1004,6 +1023,7 @@ DeleteFunction() {
   creds_bucket_suffix="was-creds-"
   creds_bucket_name=$creds_bucket_suffix$account_id
 
+  # Download credentials from S3 bucket
   fetched_creds=$(aws s3api get-object --bucket $creds_bucket_name --key creds creds | grep ContentLength | awk '{print $2}' | sed -e 's/"//g')
 
   if [ -z $fetched_creds ]; then
@@ -1013,6 +1033,7 @@ DeleteFunction() {
     exit 1
   fi
 
+  # Parse downloaded credentials
   parseCredsFunction
 
   echo
@@ -1037,22 +1058,17 @@ DeleteFunction() {
   printf "${GREEN}☑${YELLOW}☑${CYAN}□□□${NORMAL} Phase ${YELLOW}2${NORMAL} of ${GREEN}5${NORMAL}: Delete Wolfram Application Server Deployments\\n"
 
   cd Source
+
+  # Update kubeconfig
   run_ok "aws eks update-kubeconfig --region $GET_REGION --name $GET_CLUSTER_NAME" "Updating kubeconfig"
+  
+  # Switch context
   run_ok "kubectl config use-context arn:aws:eks:$GET_REGION:$account_id:cluster/$GET_CLUSTER_NAME " "Switching Context"
+  
   BASE_URL=$(kubectl get svc -n ingress-nginx | awk '{print $4}' | sed -n '2p')
   sed -i -e "s/$BASE_URL/domain.com/g" deployments/active-web-elements-server-deployment.yaml
 
   run_ok "kubectl delete --ignore-not-found=true -f deployments/" "Deleting Deployments"
-  # Minio deployment setup
-  sed -i -e 's~'"$MINIO_ACCESS_KEY"'~<your-access-key>~g' deployments/minio-deployment.yaml
-  sed -i -e 's~'"$MINIO_SECRET_KEY"'~<your-secret-key>~g' deployments/minio-deployment.yaml
-  # Resource Manger deployment setup
-  sed -i -e 's~'"$MINIO_ACCESS_KEY"'~<your-access-key>~g' deployments/resource-manager-deployment.yaml
-  sed -i -e 's~'"$MINIO_SECRET_KEY"'~<your-secret-key>~g' deployments/resource-manager-deployment.yaml
-  sed -i -e 's~'"$RESOURCE_INFO_BUCKET"'~<your-resourceinfo-bucketname>~g' deployments/resource-manager-deployment.yaml
-  sed -i -e 's~'"$NODE_FILES_BUCKET"'~<your-nodefiles-bucketname>~g' deployments/resource-manager-deployment.yaml
-  sed -i -e 's~'"$GET_REGION"'~<your-resource-bucket-region>~g' deployments/resource-manager-deployment.yaml
-  sed -i -e 's~'"$GET_REGION"'~<your-nodefiles-bucket-region>~g' deployments/resource-manager-deployment.yaml
 
   run_ok "kafkaShutdown" "Deleting Kafka Cluster"
   run_ok "kubectl delete secret generic basic-auth --ignore-not-found=true" "Deleting NGINX Auth"
@@ -1079,6 +1095,7 @@ DeleteFunction() {
 
   efs_mounts=$(aws efs describe-mount-targets --file-system-id $EFS_FS_ID --profile default --region $GET_REGION | grep "MountTargetId" | cut -d '"' -f 4)
 
+  # Delete EFS mount targets
   for eachval in $efs_mounts; do
     aws efs delete-mount-target --mount-target-id $eachval
     sleep 5
@@ -1089,6 +1106,8 @@ DeleteFunction() {
   kubectl delete --ignore-not-found=true -f namespace.yaml >>$LOG_PATH
   suffix_efs_sc="efs-mount-eks-"
   efs_sc_id=$(aws ec2 describe-security-groups --output text | grep $suffix_efs_sc$GET_CLUSTER_NAME | awk '{print $3}')
+  
+  # Delete security groups
   aws ec2 delete-security-group --group-id $efs_sc_id >>$LOG_PATH
   cd ..
 
@@ -1111,6 +1130,7 @@ DeleteFunction() {
   cd ../..
   run_ok "cleanconfiguration" "Cleaning Configuration - Resetting Back To Default"
 
+  # Remove credentials from S3 bucket
   remove_creds=$(aws s3 rb s3://$creds_bucket_name --force)
 
   echo
@@ -1143,12 +1163,14 @@ cleanconfiguration() {
   # clean deployments
 
   sed -i -e "s~$BASE_URL~http:\/\/domain.com~g" deployments/active-web-elements-server-deployment.yaml
-  # Minio deployment setup
+  
+  # Undo minio deployment changes
   sed -i -e 's~'"$MINIO_ACCESS_KEY"'~<your-access-key>~g' deployments/minio-deployment.yaml
   sed -i -e 's~'"$MINIO_SECRET_KEY"'~<your-secret-key>~g' deployments/minio-deployment.yaml
-  # Resource Manger deployment setup
-  sed -i -e 's~'"$MINIOACCESSKEY"'~<your-access-key>~g' deployments/resource-manager-deployment.yaml
-  sed -i -e 's~'"$MINIOSECRETKEY"'~<your-secret-key>~g' deployments/resource-manager-deployment.yaml
+
+  # Undo resource manager deployment changes
+  sed -i -e 's~'"$MINIO_ACCESS_KEY"'~<your-access-key>~g' deployments/resource-manager-deployment.yaml
+  sed -i -e 's~'"$MINIO_SECRET_KEY"'~<your-secret-key>~g' deployments/resource-manager-deployment.yaml
   sed -i -e 's~'"$RESOURCE_INFO_BUCKET"'~<your-resourceinfo-bucketname>~g' deployments/resource-manager-deployment.yaml
   sed -i -e 's~'"$NODE_FILES_BUCKET"'~<your-nodefiles-bucketname>~g' deployments/resource-manager-deployment.yaml
   sed -i -e 's~'"$GET_REGION"'~<your-resource-bucket-region>~g' deployments/resource-manager-deployment.yaml
