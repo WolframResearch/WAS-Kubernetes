@@ -1130,17 +1130,32 @@ getCredsFunction() {
 
 URLFunction() {
   banner=true
-  cd /Source
-  BASE_URL=$(cat ingress-controller/domain.config | tr -d '\n')
+
+  PARSED_TENANT=$(az account list | grep tenantId | cut -d$':' -f2 | cut -d'"' -f 2 | cut -d$"-" -f1)
+  WAS="was"
+  CREDS_STORAGE_ACCOUNT_NAME="${WAS}sa${PARSED_TENANT}"
+  CREDS_STORAGE_CONTAINER_NAME="$WAS$PARSED_TENANT"
+
+  fetched_creds=$(az storage blob download --account-name "$CREDS_STORAGE_ACCOUNT_NAME" --container-name $CREDS_STORAGE_CONTAINER_NAME --name creds --file creds --no-progress --only-show-errors | grep container | cut -d$":" -f2 | cut -d$'"' -f2 | sed 's/ *$//g')
+
+  if [[ $fetched_creds != $CREDS_STORAGE_CONTAINER_NAME ]]; then
+    echo
+    echo "There is no creds file in Azure Storage Blob. Is the owner account different than the current?"
+    echo
+    exit 1
+  fi
+
+  parseCredsFunction
+
   echo
   log_debug "Phase 1 of 1: Application URL Details"
   printf "${GREEN}${YELLOW}☑${CYAN}${NORMAL} Phase ${YELLOW}1${NORMAL} of ${GREEN}1${NORMAL}: Application URL Details\\n\n"
-  printf "${GREEN}Base URL - Active Web Elements Server:${NORMAL} http://$BASE_URL/\n\n"
-  printf "${GREEN}Resource Manager:${NORMAL} http://$BASE_URL/resources/\n\n"
-  printf "${GREEN}Endpoints Manager:${NORMAL} http://$BASE_URL/endpoints/\n\n"
-  printf "${GREEN}Nodefiles:${NORMAL} http://$BASE_URL/nodefiles/\n\n"
-  printf "${GREEN}Endpoints Info:${NORMAL} http://$BASE_URL/.applicationserver/info\n\n"
-  printf "${GREEN}Restart AWES:${NORMAL} http://$BASE_URL/.applicationserver/kernel/restart\n\n"
+  printf "${GREEN}Base URL - Active Web Elements Server:${NORMAL} $BASE_URL\n\n"
+  printf "${GREEN}Resource Manager:${NORMAL} ${BASE_URL}resources/\n\n"
+  printf "${GREEN}Endpoints Manager:${NORMAL} ${BASE_URL}endpoints/\n\n"
+  printf "${GREEN}Nodefiles:${NORMAL} ${BASE_URL}nodefiles/\n\n"
+  printf "${GREEN}Endpoints Info:${NORMAL} ${BASE_URL}.applicationserver/info\n\n"
+  printf "${GREEN}Restart AWES:${NORMAL} ${BASE_URL}.applicationserver/kernel/restart\n\n"
 
 }
 
