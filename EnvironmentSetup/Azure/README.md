@@ -138,3 +138,20 @@ The following completely deletes everything including the kubernetes cluster, Wo
 **Step 2.**  After completion, shutdown the azure-setup-manager by running the following command:
 
 	docker-compose down -v
+
+---
+## Troubleshooting
+
+When you run azure-setup-manager, you may encounter this error.
+
+```
+Creating azure-setup-manager ... 
+
+ERROR: for azure-setup-manager  UnixHTTPConnectionPool(host='localhost', port=None): Read timed out. (read timeout=60)
+```
+
+You need to export these to fix that issue.
+```
+export DOCKER_CLIENT_TIMEOUT=120
+export COMPOSE_HTTP_TIMEOUT=120
+```
