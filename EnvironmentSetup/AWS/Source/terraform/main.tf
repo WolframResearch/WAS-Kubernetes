@@ -2,7 +2,7 @@ terraform {
   backend "s3" {
     bucket         = "terraform-tfstate-${var.cluster-name}"
     key            = "global/s3/terraform.tfstate"
-    region         = "${var.cluster-name}"
+    region         = "${var.aws_region}"
     dynamodb_table = "terraform-state-locking-was"
     encrypt        = true
   }
@@ -60,7 +60,7 @@ module "vpc" {
   
   tags = {
     Terraform = "true"
-    Environment = "WAS"
+    Environment = "${var.cluster-name}"
   }
 
 }
