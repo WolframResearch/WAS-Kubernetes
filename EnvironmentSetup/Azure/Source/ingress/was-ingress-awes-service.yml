@@ -8,9 +8,9 @@ metadata:
     app.kubernetes.io/name: ingress-nginx
     app.kubernetes.io/part-of: ingress-nginx
   annotations:
-    nginx.ingress.kubernetes.io/proxy-connect-timeout: 360
-    nginx.ingress.kubernetes.io/proxy-send-timeout: 360
-    nginx.ingress.kubernetes.io/proxy-read-timeout: 360
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "360"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "360"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "360"
     nginx.ingress.kubernetes.io/load-balance: "ewma"
 spec:
   ingressClassName: nginx
