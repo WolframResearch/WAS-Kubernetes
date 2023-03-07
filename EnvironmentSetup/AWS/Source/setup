@@ -769,8 +769,8 @@ EOF
   sed -i -e 's~'"$CURRENT_MINIOACCESSKEY"'~'"$MINIO_ACCESS_KEY"'~g' deployments/resource-manager-deployment.yaml
   CURRENT_MINIOSECRETKEY=$(grep -A1 -i MINIOSECRETKEY deployments/resource-manager-deployment.yaml | grep -i value: | awk '{print $2}')
   sed -i -e 's~'"$CURRENT_MINIOSECRETKEY"'~'"$MINIO_SECRET_KEY"'~g' deployments/resource-manager-deployment.yaml
-  resources_bucket_name="$GET_CLUSTER_NAME-resources-$account_id"
-  nodefiles_bucket_name="$GET_CLUSTER_NAME-nodefiles-$account_id"
+  resources_bucket_name="$was-resources-$account_id"
+  nodefiles_bucket_name="$was-nodefiles-$account_id"
   CURRENT_RESOURCEINFOBUCKET=$(grep -A1 -i RESOURCEINFO.BUCKET deployments/resource-manager-deployment.yaml | grep -i value: | awk '{print $2}')
   sed -i -e 's~'"$CURRENT_RESOURCEINFOBUCKET"'~'"$resources_bucket_name"'~g' deployments/resource-manager-deployment.yaml
   CURRENT_NODEFILESBUCKET=$(grep -A1 -i NODEFILES.BUCKET deployments/resource-manager-deployment.yaml | grep -i value: | awk '{print $2}' | cut -d ' ' -f 1)
