@@ -769,8 +769,8 @@ EOF
   sed -i -e 's~'"$CURRENT_MINIOACCESSKEY"'~'"$MINIO_ACCESS_KEY"'~g' deployments/resource-manager-deployment.yaml
   CURRENT_MINIOSECRETKEY=$(grep -A1 -i MINIOSECRETKEY deployments/resource-manager-deployment.yaml | grep -i value: | awk '{print $2}')
   sed -i -e 's~'"$CURRENT_MINIOSECRETKEY"'~'"$MINIO_SECRET_KEY"'~g' deployments/resource-manager-deployment.yaml
-  resources_bucket_name="$GET_CLUSTER_NAME-resources-$account_id"
-  nodefiles_bucket_name="$GET_CLUSTER_NAME-nodefiles-$account_id"
+  resources_bucket_name="$lower_cluster_name-resources-$account_id"
+  nodefiles_bucket_name="$lower_cluster_name-nodefiles-$account_id"
   CURRENT_RESOURCEINFOBUCKET=$(grep -A1 -i RESOURCEINFO.BUCKET deployments/resource-manager-deployment.yaml | grep -i value: | awk '{print $2}')
   sed -i -e 's~'"$CURRENT_RESOURCEINFOBUCKET"'~'"$resources_bucket_name"'~g' deployments/resource-manager-deployment.yaml
   CURRENT_NODEFILESBUCKET=$(grep -A1 -i NODEFILES.BUCKET deployments/resource-manager-deployment.yaml | grep -i value: | awk '{print $2}' | cut -d ' ' -f 1)
@@ -1132,6 +1132,10 @@ DeleteFunction() {
 
   # Remove credentials from S3 bucket
   remove_creds=$(aws s3 rb s3://$creds_bucket_name --force)
+  # Remove RESOURCE_INFO_BUCKET
+  remove_resource_info=$(aws s3 rb s3://$RESOURCE_INFO_BUCKET --force)
+  # Remove NODE_FILES_BUCKET
+  remove_node_files=$(aws s3 rb s3://$NODE_FILES_BUCKET --force)
 
   echo
   echo "Deleted EKS Cluster and Wolfram Application Server. Our warmest appreciation to you for running Wolfram Application Server on Amazon environment. Thank You!"
