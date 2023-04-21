@@ -359,7 +359,7 @@ run_ok() {
   fi
 }
 
-version=3.1.4
+version=3.3.0
 # Temporary colors
 RED="$(tput setaf 1)"
 YELLOW="$(tput setaf 3)"
@@ -544,8 +544,8 @@ SetupFunction() {
   # Create dynamodb table for terraform
 
   dynamodb_check=$(aws dynamodb list-tables --output text | grep "terraform-state-locking-was" | awk '{print $2}')
+  dynamodb_table="terraform-state-locking-was"
   if [ -z $dynamodb_check ]; then
-    dynamodb_table="terraform-state-locking-was"
     run_ok "aws dynamodb create-table --region $GET_REGION --table-name $dynamodb_table --attribute-definitions AttributeName=LockID,AttributeType=S --key-schema AttributeName=LockID,KeyType=HASH --provisioned-throughput ReadCapacityUnits=1,WriteCapacityUnits=1" "Creating terraform dynamodb table"
   fi
 
@@ -783,7 +783,7 @@ EOF
 
   # AWES deployment setup
   BASE_URL=$(kubectl get svc -n ingress-nginx | awk '{print $4}' | sed -n '2p')
-  sed -i -e "s/domain.com/$BASE_URL/g" deployments/active-web-elements-server-deployment.yaml
+  sed -i -e "s~$BASE_URL~domain.com~g" deployments/active-web-elements-server-deployment.yaml
 
   run_ok "kubectl apply -f deployments/" "Setup Deployments"
   run_ok "deploymentStatus" "Waiting for Deployments To Be Ready"
@@ -1132,10 +1132,6 @@ DeleteFunction() {
 
   # Remove credentials from S3 bucket
   remove_creds=$(aws s3 rb s3://$creds_bucket_name --force)
-  # Remove RESOURCE_INFO_BUCKET
-  remove_resource_info=$(aws s3 rb s3://$RESOURCE_INFO_BUCKET --force)
-  # Remove NODE_FILES_BUCKET
-  remove_node_files=$(aws s3 rb s3://$NODE_FILES_BUCKET --force)
 
   echo
   echo "Deleted EKS Cluster and Wolfram Application Server. Our warmest appreciation to you for running Wolfram Application Server on Amazon environment. Thank You!"
