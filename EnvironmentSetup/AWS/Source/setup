@@ -1132,10 +1132,6 @@ DeleteFunction() {
 
   # Remove credentials from S3 bucket
   remove_creds=$(aws s3 rb s3://$creds_bucket_name --force)
-  # Remove RESOURCE_INFO_BUCKET
-  remove_resource_info=$(aws s3 rb s3://$RESOURCE_INFO_BUCKET --force)
-  # Remove NODE_FILES_BUCKET
-  remove_node_files=$(aws s3 rb s3://$NODE_FILES_BUCKET --force)
 
   echo
   echo "Deleted EKS Cluster and Wolfram Application Server. Our warmest appreciation to you for running Wolfram Application Server on Amazon environment. Thank You!"
