@@ -997,7 +997,7 @@ DeleteFunction() {
   log_debug "Phase 5 of 5: Cleanup"
   printf "${GREEN}☑☑☑☑${YELLOW}☑${NORMAL} Phase ${YELLOW}5${NORMAL} of ${GREEN}5${NORMAL}: Cleanup\\n"
 
-  sed -i -e "s~$BASE_URL~domain.com~g" deployments/active-web-elements-server-deployment.yaml
+  sed -i -e "s~$BASE_URL~http://domain.com/~g" deployments/active-web-elements-server-deployment.yaml
 
   sed -i -e "s~^    service.beta.kubernetes.io\/azure-dns-label-name: .*~    service.beta.kubernetes.io\/azure-dns-label-name: \"domain\"~g" ingress-controller/deploy.yml
 
