@@ -34,7 +34,7 @@ spec:
         - name: applicationserver.nodefiles.cachedirectory
           value: /opt/.wolframcache/nodefiles/
         - name: applicationserver.version
-          value: "3.3.0"
+          value: "3.3.1"
         - name: applicationserver.wolframEngineVersion
           value: "13.2.0"
         - name: applicationserver.kernelinitializationfile.name
@@ -61,7 +61,7 @@ spec:
           value: "http://domain.com/endpoints/"
         - name: applicationserver.restart.url
           value: "http://domain.com/.applicationserver/kernel/restart"
-        image: wolframapplicationserver/active-web-elements-server:3.2.1
+        image: wolframapplicationserver/active-web-elements-server:3.3.1
         name: active-web-elements-server
         ports:
         - containerPort: 8080
