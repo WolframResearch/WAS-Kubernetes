@@ -3,7 +3,7 @@ terraform {
     bucket         = "terraform-tfstate-${var.cluster-name}"
     key            = "global/s3/terraform.tfstate"
     region         = "${var.aws_region}"
-    dynamodb_table = "terraform-state-locking-was"
+    dynamodb_table = "${var.dynamodb_table}"
     encrypt        = true
   }
   required_version = "~> 1.2.4"
