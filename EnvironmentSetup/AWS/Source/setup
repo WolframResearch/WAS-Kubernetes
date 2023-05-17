@@ -1026,10 +1026,12 @@ DeleteFunction() {
   get_user_info=$(aws sts get-caller-identity)
   account_id=$(echo $get_user_info | grep -oP '(?<="Account": ")[^"]*')
   
+  cd /Source/terraform
+
   GET_CLUSTER_NAME=$(grep -A1 -i cluster-name variables.tf | grep -i default | awk '{print $3}' | sed -e 's/"//g' | tr -d '\n')
   GET_CLUSTER_NAME=$(echo $GET_CLUSTER_NAME | tr -d '\r')
-  region=$(grep -A1 -i aws_region variables.tf | grep -i default | awk '{print $3}' | sed -e 's/"//g' | tr -d '\n')
-  region=$(echo $GET_REGION | tr -d '\r')
+  GET_REGION=$(grep -A1 -i aws_region variables.tf | grep -i default | awk '{print $3}' | sed -e 's/"//g' | tr -d '\n')
+  GET_REGION=$(echo $GET_REGION | tr -d '\r')
   lower_cluster_name=$(echo $GET_CLUSTER_NAME | tr '[:upper:]' '[:lower:]')
   lower_cluster_name=$(echo $lower_cluster_name | tr -d '\r')
 
@@ -1037,7 +1039,7 @@ DeleteFunction() {
   creds_bucket_name=$creds_bucket_suffix$account_id
 
   # Download credentials from S3 bucket
-  fetched_creds=$(aws s3api get-object --bucket $creds_bucket_name --region $region --key creds creds | grep ContentLength | awk '{print $2}' | sed -e 's/"//g')
+  fetched_creds=$(aws s3api get-object --bucket $creds_bucket_name --region $GET_REGION --key creds creds | grep ContentLength | awk '{print $2}' | sed -e 's/"//g')
 
   if [ -z $fetched_creds ]; then
     echo
@@ -1059,6 +1061,8 @@ DeleteFunction() {
     echo '[default]' >>~/.aws/config
     echo 'region = '"$GET_REGION"'' >>~/.aws/config
   fi
+
+  cd ../..
 
   echo
   log_debug "Phase 1 of 5: Prequisites Checks"
@@ -1148,14 +1152,14 @@ DeleteFunction() {
   log_debug "Phase 5 of 5: Cleanup"
   printf "${GREEN}☑☑☑☑${YELLOW}☑${NORMAL} Phase ${YELLOW}5${NORMAL} of ${GREEN}5${NORMAL}: Cleanup\\n"
   run_ok "deleteAWSBucket" "Deleting Terraform S3 Bucket"
-  run_ok "aws dynamodb delete-table --table-name $DYNAMODB_TABLE" --region $GET_REGION "Deleting Dynamodb Terraform Table"
+  run_ok "aws dynamodb delete-table --table-name $DYNAMODB_TABLE" "Deleting Dynamodb Terraform Table"
   awk '!/$TERRAFORM_BUCKET/' variables.tf >tmpfile && mv tmpfile variables.tf >>$LOG_PATH
   rm -rf .terraform
   cd ../..
   run_ok "cleanconfiguration" "Cleaning Configuration - Resetting Back To Default"
 
   # Remove credentials from S3 bucket
-  remove_creds=$(aws s3 rb s3://$creds_bucket_name --region $GET_REGION --force)
+  remove_creds=$(aws s3 rb s3://$creds_bucket_name --force)
 
   echo
   echo "Deleted EKS Cluster and Wolfram Application Server. Our warmest appreciation to you for running Wolfram Application Server on Amazon environment. Thank You!"
