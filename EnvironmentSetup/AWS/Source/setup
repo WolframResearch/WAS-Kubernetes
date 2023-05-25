@@ -426,6 +426,8 @@ saveCredsFunction() {
   echo "MINIO_ACCESS_KEY:$MINIO_ACCESS_KEY" >>creds
   echo "MINIO_SECRET_KEY:$MINIO_SECRET_KEY" >>creds
   echo "DYNAMODB_TABLE:$dynamodb_table" >>creds
+  echo "WORKSPACE:$workspace" >>creds
+  echo "S3_KEY:$s3_key" >>creds
   echo "EFS_FS_ID:$filesystem_id" >>creds
   echo "RESOURCE_INFO_BUCKET:$resources_bucket_name" >>creds
   echo "NODE_FILES_BUCKET:$nodefiles_bucket_name" >>creds
@@ -436,15 +438,15 @@ saveCredsFunction() {
   echo "ENDPOINT_INFO_URL:http://$BASE_URL/.applicationserver/info"
   echo "RESTART_URL:http://$BASE_URL/.applicationserver/kernel/restart" >>creds
 
-  creds_bucket_suffix="was-creds-"
+  creds_bucket_suffix="$lower_cluster_name-creds-"
   creds_bucket_name="$creds_bucket_suffix$account_id"
 
   created_bucket=$(aws s3api create-bucket --bucket $creds_bucket_name --region $GET_REGION)
 
-  aws s3api put-bucket-encryption --bucket $creds_bucket_name --server-side-encryption-configuration '{"Rules": [{"ApplyServerSideEncryptionByDefault": {"SSEAlgorithm": "AES256"}}]}'
-  aws s3api put-public-access-block --bucket $creds_bucket_name --public-access-block-configuration "BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true"
+  aws s3api put-bucket-encryption --bucket $creds_bucket_name --region $GET_REGION --server-side-encryption-configuration '{"Rules": [{"ApplyServerSideEncryptionByDefault": {"SSEAlgorithm": "AES256"}}]}'
+  aws s3api put-public-access-block --bucket $creds_bucket_name --region $GET_REGION --public-access-block-configuration "BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true"
 
-  pushed_creds=$(aws s3api put-object --bucket $creds_bucket_name --key creds --body creds)
+  pushed_creds=$(aws s3api put-object --bucket $creds_bucket_name --region $GET_REGION --key creds --body creds)
 
   rm creds
 }
@@ -514,8 +516,12 @@ SetupFunction() {
   terraform_bucket_name=$suffix-$lower_cluster_name-$account_id
   CURRENT_BUCKET_VAL=$(grep -i "bucket         =" main.tf | awk '{print $3}' | head -n 1)
   sed -i -e 's/'"$CURRENT_BUCKET_VAL"'/"'"$terraform_bucket_name"'"/g' main.tf
-
-  bucket_check=$(aws s3api list-buckets --output text | grep $terraform_bucket_name | awk '{print $3}')
+  CURRENT_DYNAMODB_VAL=$(grep -i "dynamodb_table =" main.tf | awk '{print $3}' | head -n 1)
+  sed -i -e 's/'"$CURRENT_DYNAMODB_VAL"'/"'"terraform-state-locking-$lower_cluster_name"'"/g' main.tf
+  CURRENT_KEY_VAL=$(grep -i "key            =" main.tf | awk '{print $3}' | head -n 1)
+  current_date=$(date +'%Y%m%d%H%M%S')
+  s3_key="global/s3/terraform.tfstate.$current_date"
+  sed -i -e 's|'"$CURRENT_KEY_VAL"'|'"\"$s3_key\""'|g' main.tf
 
   AWSCFILE=~/.aws/config
   if [ -f "$AWSCFILE" ]; then
@@ -527,6 +533,8 @@ SetupFunction() {
     echo '[default]' >>~/.aws/config
     echo 'region = '"$GET_REGION"'' >>~/.aws/config
   fi
+
+  bucket_check=$(aws s3api list-buckets --region $GET_REGION --output text | grep $terraform_bucket_name | awk '{print $3}')
 
   # Create terraform S3 bucket
 
@@ -543,13 +551,16 @@ SetupFunction() {
 
   # Create dynamodb table for terraform
 
-  dynamodb_check=$(aws dynamodb list-tables --output text | grep "terraform-state-locking-was" | awk '{print $2}')
-  dynamodb_table="terraform-state-locking-was"
+  dynamodb_table="terraform-state-locking-$lower_cluster_name"
+  dynamodb_check=$(aws dynamodb list-tables --output text | grep "$dynamodb_table" | awk '{print $2}')
+  
   if [ -z $dynamodb_check ]; then
     run_ok "aws dynamodb create-table --region $GET_REGION --table-name $dynamodb_table --attribute-definitions AttributeName=LockID,AttributeType=S --key-schema AttributeName=LockID,KeyType=HASH --provisioned-throughput ReadCapacityUnits=1,WriteCapacityUnits=1" "Creating terraform dynamodb table"
   fi
 
-  run_ok "terraform init && terraform refresh && terraform plan && terraform apply -auto-approve" "Building EKS - (can take upto 30 minutes)"
+  workspace="$lower_cluster_name-$GET_REGION"
+
+  run_ok "terraform init && terraform workspace new $workspace && terraform workspace select $workspace && terraform refresh && terraform plan && terraform apply -auto-approve" "Building EKS - (can take upto 30 minutes)"
   
   # Update kubeconfig
 
@@ -568,9 +579,9 @@ SetupFunction() {
   kubectl apply -f namespace.yaml >>$LOG_PATH
   kubectl config set-context --current --namespace=efs-sc >>$LOG_PATH
   cluster_name=$GET_CLUSTER_NAME
-  group_name="efs-mount-eks-$GET_CLUSTER_NAME"
-  description="efs-mount-eks-$GET_CLUSTER_NAME"
-  token_name="eks-efs-$GET_CLUSTER_NAME"
+  group_name="efs-mount-eks-$cluster_name"
+  description="efs-mount-eks-$cluster_name"
+  token_name="eks-efs-$cluster_name"
   region=$GET_REGION
   vpc_id=$(aws eks describe-cluster --name $cluster_name --query "cluster.resourcesVpcConfig.vpcId" --output text)
   cidr_block=$(aws ec2 describe-vpcs --vpc-ids $vpc_id --query "Vpcs[].CidrBlock" --output text)
@@ -638,7 +649,7 @@ controller:
   # Add additional tags to access points
   tags:
     environment: prod
-    region: us-east-1
+    region: $region
   # Enable if you want the controller to also delete the
   # path on efs when deleteing an access point
   deleteAccessPointRootDir: false
@@ -783,7 +794,7 @@ EOF
 
   # AWES deployment setup
   BASE_URL=$(kubectl get svc -n ingress-nginx | awk '{print $4}' | sed -n '2p')
-  sed -i -e "s~$BASE_URL~domain.com~g" deployments/active-web-elements-server-deployment.yaml
+  sed -i -e "s~domain.com~$BASE_URL~g" deployments/active-web-elements-server-deployment.yaml
 
   run_ok "kubectl apply -f deployments/" "Setup Deployments"
   run_ok "deploymentStatus" "Waiting for Deployments To Be Ready"
@@ -1003,6 +1014,8 @@ parseCredsFunction() {
   MINIO_ACCESS_KEY=$(cat creds | cut -d$';' -f1 | grep MINIO_ACCESS_KEY | cut -d$':' -f2)
   MINIO_SECRET_KEY=$(cat creds | cut -d$';' -f1 | grep MINIO_SECRET_KEY | cut -d$':' -f2)
   DYNAMODB_TABLE=$(cat creds | cut -d$';' -f1 | grep DYNAMODB_TABLE | cut -d$':' -f2)
+  WORKSPACE=$(cat creds | cut -d$';' -f1 | grep WORKSPACE | cut -d$':' -f2)
+  S3_KEY=$(cat creds | cut -d$';' -f1 | grep S3_KEY | cut -d$':' -f2)
   EFS_FS_ID=$(cat creds | cut -d$';' -f1 | grep EFS_FS_ID | cut -d$':' -f2)
   RESOURCE_INFO_BUCKET=$(cat creds | cut -d$';' -f1 | grep RESOURCE_INFO_BUCKET | cut -d$':' -f2)
   NODE_FILES_BUCKET=$(cat creds | cut -d$';' -f1 | grep NODE_FILES_BUCKET | cut -d$':' -f2)
@@ -1018,9 +1031,19 @@ DeleteFunction() {
 
   banner=true
 
+  cd Source/terraform
+
   get_user_info=$(aws sts get-caller-identity)
   account_id=$(echo $get_user_info | grep -oP '(?<="Account": ")[^"]*')
-  creds_bucket_suffix="was-creds-"
+  
+  GET_CLUSTER_NAME=$(grep -A1 -i cluster-name variables.tf | grep -i default | awk '{print $3}' | sed -e 's/"//g' | tr -d '\n')
+  GET_CLUSTER_NAME=$(echo $GET_CLUSTER_NAME | tr -d '\r')
+  region=$(grep -A1 -i aws_region variables.tf | grep -i default | awk '{print $3}' | sed -e 's/"//g' | tr -d '\n')
+  region=$(echo $GET_REGION | tr -d '\r')
+  lower_cluster_name=$(echo $GET_CLUSTER_NAME | tr '[:upper:]' '[:lower:]')
+  lower_cluster_name=$(echo $lower_cluster_name | tr -d '\r')
+
+  creds_bucket_suffix="$lower_cluster_name-creds-"
   creds_bucket_name=$creds_bucket_suffix$account_id
 
   # Download credentials from S3 bucket
@@ -1028,13 +1051,35 @@ DeleteFunction() {
 
   if [ -z $fetched_creds ]; then
     echo
-    log_error "There is no creds file in S3 bucket. Is the owner account different than the current?"
+    log_error "There is no creds file in S3 bucket. Did you update the cluster name and region in terraform/variables.tf file?"
     echo
     exit 1
   fi
 
   # Parse downloaded credentials
   parseCredsFunction
+
+  CURRENT_REGION_VAL=$(grep -A1 -i "region         =" main.tf | head -n 1 | awk '{print $3}')
+  sed -i -e 's/'"$CURRENT_REGION_VAL"'/"'"$GET_REGION"'"/g' main.tf
+  lower_cluster_name=$(echo $GET_CLUSTER_NAME | tr '[:upper:]' '[:lower:]')
+  lower_cluster_name=$(echo $lower_cluster_name | tr -d '\r')
+  CURRENT_BUCKET_VAL=$(grep -i "bucket         =" main.tf | awk '{print $3}' | head -n 1)
+  sed -i -e 's/'"$CURRENT_BUCKET_VAL"'/"'"$TERRAFORM_BUCKET"'"/g' main.tf
+  CURRENT_DYNAMODB_VAL=$(grep -i "dynamodb_table =" main.tf | awk '{print $3}' | head -n 1)
+  sed -i -e 's/'"$CURRENT_DYNAMODB_VAL"'/"'"$DYNAMODB_TABLE"'"/g' main.tf
+  CURRENT_KEY_VAL=$(grep -i "key            =" main.tf | awk '{print $3}' | head -n 1)
+  sed -i -e 's~'$CURRENT_KEY_VAL'~'\"$S3_KEY\"'~g' main.tf
+  
+  AWSCFILE=~/.aws/config
+  if [ -f "$AWSCFILE" ]; then
+    if grep -q "region" "$AWSCFILE"; then
+      log_debug "Already has region"
+      sed -i -e 's/region = .*/region = '"$GET_REGION"'/g' ~/.aws/config
+    fi
+  else
+    echo '[default]' >>~/.aws/config
+    echo 'region = '"$GET_REGION"'' >>~/.aws/config
+  fi
 
   echo
   log_debug "Phase 1 of 5: Prequisites Checks"
@@ -1052,6 +1097,8 @@ DeleteFunction() {
     echo
     exit 1
   fi
+
+  cd ../..
 
   echo
   log_debug "Phase 2 of 5: Delete Wolfram Application Server Deployments"
@@ -1117,21 +1164,21 @@ DeleteFunction() {
   cd terraform
   sed -i -e 's~'"terraform-tfstate-"'$'"{var.cluster-name}"~$TERRAFORM_BUCKET~g main.tf
   sed -i -e 's~'"$"'{var.aws-region}'~$GET_REGION~g main.tf
-  run_ok "sleep 5 && terraform init && terraform refresh && terraform destroy -auto-approve || true" "Deleting EKS"
+  run_ok "sleep 5 && terraform init && terraform workspace select $WORKSPACE && terraform refresh && terraform destroy -auto-approve || true" "Deleting EKS"
   set +e
 
   echo
   log_debug "Phase 5 of 5: Cleanup"
   printf "${GREEN}☑☑☑☑${YELLOW}☑${NORMAL} Phase ${YELLOW}5${NORMAL} of ${GREEN}5${NORMAL}: Cleanup\\n"
   run_ok "deleteAWSBucket" "Deleting Terraform S3 Bucket"
-  run_ok "aws dynamodb delete-table --table-name $DYNAMODB_TABLE" "Deleting Dynamodb Terraform Table"
+  run_ok "aws dynamodb delete-table --table-name $DYNAMODB_TABLE" --region $GET_REGION "Deleting Dynamodb Terraform Table"
   awk '!/$TERRAFORM_BUCKET/' variables.tf >tmpfile && mv tmpfile variables.tf >>$LOG_PATH
   rm -rf .terraform
   cd ../..
   run_ok "cleanconfiguration" "Cleaning Configuration - Resetting Back To Default"
 
   # Remove credentials from S3 bucket
-  remove_creds=$(aws s3 rb s3://$creds_bucket_name --force)
+  remove_creds=$(aws s3 rb s3://$creds_bucket_name --region $GET_REGION --force)
 
   echo
   echo "Deleted EKS Cluster and Wolfram Application Server. Our warmest appreciation to you for running Wolfram Application Server on Amazon environment. Thank You!"
@@ -1183,13 +1230,13 @@ cleanconfiguration() {
 }
 
 deleteAWSBucket() {
-  aws s3api delete-objects --bucket $TERRAFORM_BUCKET --delete "$(aws s3api list-object-versions --bucket $TERRAFORM_BUCKET --query='{Objects: Versions[].{Key:Key,VersionId:VersionId}}')"
-  aws s3api delete-objects --bucket $TERRAFORM_BUCKET --delete "$(aws s3api list-object-versions --bucket $TERRAFORM_BUCKET --query='{Objects: DeleteMarkers[].{Key:Key,VersionId:VersionId}}')"
-  aws s3 rb s3://$TERRAFORM_BUCKET --force
+  aws s3api delete-objects --bucket $TERRAFORM_BUCKET --delete "$(aws s3api list-object-versions --bucket $TERRAFORM_BUCKET --region $GET_REGION --query='{Objects: Versions[].{Key:Key,VersionId:VersionId}}')"
+  aws s3api delete-objects --bucket $TERRAFORM_BUCKET --delete "$(aws s3api list-object-versions --bucket $TERRAFORM_BUCKET --region $GET_REGION --query='{Objects: DeleteMarkers[].{Key:Key,VersionId:VersionId}}')"
+  aws s3 rb s3://$TERRAFORM_BUCKET --region $GET_REGION --force
 }
 
 NEWEKSCHECK() {
-  clusterExists=$(aws eks describe-cluster --name $GET_CLUSTER_NAME 2>/dev/null 2>&1)
+  clusterExists=$(aws eks describe-cluster --name $GET_CLUSTER_NAME --region $GET_REGION 2>/dev/null 2>&1)
   if [[ $clusterExists =~ "{" ]]; then
     printf "cluster found"
     eks_Exists="yes"
@@ -1201,7 +1248,7 @@ NEWEKSCHECK() {
 
 CURRENTEKSCHECK() {
   GET_CLUSTER_NAME=$(echo $GET_CLUSTER_NAME | tr -d '\r')
-  clusterExists=$(aws eks describe-cluster --name $GET_CLUSTER_NAME 2>/dev/null 2>&1)
+  clusterExists=$(aws eks describe-cluster --name $GET_CLUSTER_NAME --region $GET_REGION 2>/dev/null 2>&1)
   if [[ $clusterExists =~ "ACTIVE" ]]; then
     printf "cluster found"
     eks_Exists="yes"
@@ -1243,14 +1290,23 @@ getCredsFunction() {
   banner=true
   get_user_info=$(aws sts get-caller-identity)
   account_id=$(echo $get_user_info | grep -oP '(?<="Account": ")[^"]*')
-  creds_bucket_suffix="was-creds-"
+
+  cd /Source/terraform
+
+  GET_CLUSTER_NAME=$(grep -A1 -i cluster-name variables.tf | grep -i default | awk '{print $3}' | sed -e 's/"//g' | tr -d '\n')
+  GET_CLUSTER_NAME=$(echo $GET_CLUSTER_NAME | tr -d '\r')
+  region=$(grep -A1 -i aws_region variables.tf | grep -i default | awk '{print $3}' | sed -e 's/"//g' | tr -d '\n')
+  region=$(echo $GET_REGION | tr -d '\r')
+  lower_cluster_name=$(echo $GET_CLUSTER_NAME | tr '[:upper:]' '[:lower:]')
+  lower_cluster_name=$(echo $lower_cluster_name | tr -d '\r')
+  creds_bucket_suffix="$lower_cluster_name-creds-"
   creds_bucket_name=$creds_bucket_suffix$account_id
 
   fetched_creds=$(aws s3api get-object --bucket $creds_bucket_name --key creds creds | grep ContentLength | awk '{print $2}' | sed -e 's/"//g')
 
   if [ -z $fetched_creds ]; then
     echo
-    log_error "There is no creds file in S3 bucket. Is the owner account different than the current?"
+    log_error "There is no creds file in S3 bucket. Did you update the cluster name and region in terraform/variables.tf file?"
     echo
     exit 1
   fi
