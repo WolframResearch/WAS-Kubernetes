@@ -28,7 +28,7 @@ spec:
         - name: SPRING_PROFILES_ACTIVE
           value: docker
         - name: LOG_LOCATION
-          value: /opt/app/logs
+          value: /opt/app/${HOSTNAME}/logs
         - name: KAFKA.BOOTSTRAP-SERVERS
           value: kafka-persistent-kafka-bootstrap.kafka.svc.cluster.local:9092
         - name: MINIOACCESSKEY

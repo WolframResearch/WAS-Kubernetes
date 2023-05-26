@@ -26,7 +26,7 @@ spec:
         - name: SPRING_PROFILES_ACTIVE
           value: docker
         - name: LOG_LOCATION
-          value: /opt/app/logs
+          value: /opt/app/${HOSTNAME}/logs
         - name: APPLICATIONSERVER_CACHEDIRECTORY
           value: /tmp/.wolframcache
         - name: KAFKA.BOOTSTRAP-SERVERS
