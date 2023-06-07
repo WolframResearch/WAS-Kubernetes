@@ -92,8 +92,8 @@ The output of this command will follow this pattern:
 **Step 7.** This file needs to be deployed to WAS as a node file in the conventional location `.Wolfram/Licensing/mathpass`. From a Wolfram Language client, this may be achieved using the following code: 
 
     was = ServiceConnect["WolframApplicationServer", "http://<your-base-url>"];
-	ServiceExecute[was, "DeployNodeFile",
-	{"Contents"-> File["/path/to/mathpass"], "NodeFile" -> ".Wolfram/Licensing/mathpass"}]
+    ServiceExecute[was, "DeployNodeFile",
+    {"Contents"-> File["/path/to/mathpass"], "NodeFile" -> ".Wolfram/Licensing/mathpass"}]
 
 
 Alternatively you may use the [node files REST API](../../Documentation/API/NodeFilesManager.md) to install the license file.
@@ -125,7 +125,9 @@ Your setup is now complete.
 
 The following completely deletes everything including the kubernetes cluster, Wolfram Application Server and all resources:
 
-**Step 1.** Change your directory to the directory containing `docker-compose.yml` directory and run the following command to destroy your EKS cluster and WAS:
+**Step 1.** Update the `terraform/variables.tf` file with your WAS cluster info(aws_region, cluster name etc.)
+
+**Step 2.** Change your directory to the directory containing `docker-compose.yml` directory and run the following command to destroy your EKS cluster and WAS:
 
 	docker-compose up --build -d && clear && docker exec -it aws-setup-manager bash setup --delete
 
@@ -134,3 +136,38 @@ The following completely deletes everything including the kubernetes cluster, Wo
 **Step 2.** After completion, shutdown the aws-setup-manager by running the following command:
 
 	docker-compose down	-v
+
+---
+
+## Troubleshooting
+
+**1.** Backend configuration is changed error.
+```
+Building EKS - (can take upto 30 minutes) [ERROR] Failed with error: 1
+[ ✘ ]
+
+[ERROR] Something went wrong. Exiting.
+[ERROR] The last few log entries were:
+╷
+│ Error: Backend configuration changed
+│
+│ A change in the backend configuration has been detected, which may require
+│ migrating existing state.
+│
+│ If you wish to attempt automatic migration of the state, use “terraform
+│ init -migrate-state”.
+│ If you wish to store the current configuration with no changes to the
+│ state, use “terraform init -reconfigure”.
+```
+
+You need to check these bullet-points.
+
+* Check S3/DynamoDb for previous WAS setup states. If any of them exists, remove it manually on AWS Console.
+
+  
+
+* Remove docker container cache.
+
+  * Stop the running `aws-setup-manager` container with `docker kill <CONTAINER_ID>`
+  * `docker container prune -f`
+  * `docker volume prune -a -f`
