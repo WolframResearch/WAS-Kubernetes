@@ -441,7 +441,7 @@ saveCredsFunction() {
   creds_bucket_suffix="$lower_cluster_name-creds-"
   creds_bucket_name="$creds_bucket_suffix$account_id"
 
-  created_bucket=$(aws s3api create-bucket --bucket $creds_bucket_name --region $GET_REGION)
+  created_bucket=$(aws s3api create-bucket --bucket $creds_bucket_name --region $GET_REGION --create-bucket-configuration LocationConstraint=$GET_REGION)
 
   aws s3api put-bucket-encryption --bucket $creds_bucket_name --region $GET_REGION --server-side-encryption-configuration '{"Rules": [{"ApplyServerSideEncryptionByDefault": {"SSEAlgorithm": "AES256"}}]}'
   aws s3api put-public-access-block --bucket $creds_bucket_name --region $GET_REGION --public-access-block-configuration "BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true"
