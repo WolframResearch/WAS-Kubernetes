@@ -552,7 +552,7 @@ SetupFunction() {
   # Create dynamodb table for terraform
 
   dynamodb_table="terraform-state-locking-$lower_cluster_name"
-  dynamodb_check=$(aws dynamodb list-tables --output text | grep "$dynamodb_table" | awk '{print $2}')
+  dynamodb_check=$(aws dynamodb list-tables --output text | grep -w "$dynamodb_table" | awk '{print $2}')
 
   if [ -z $dynamodb_check ]; then
     run_ok "aws dynamodb create-table --region $GET_REGION --table-name $dynamodb_table --attribute-definitions AttributeName=LockID,AttributeType=S --key-schema AttributeName=LockID,KeyType=HASH --provisioned-throughput ReadCapacityUnits=1,WriteCapacityUnits=1" "Creating terraform dynamodb table"
