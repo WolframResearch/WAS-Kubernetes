@@ -40,7 +40,6 @@ spec:
         type: persistent-claim
         size: 10Gi
         deleteClaim: false
-        class: was-azurefile
   zookeeper:
     replicas: 3
     jvmOptions:
@@ -60,7 +59,6 @@ spec:
       type: persistent-claim
       size: 10Gi
       deleteClaim: false
-      class: was-azurefile
   entityOperator:
     topicOperator: {}
     userOperator: {}
