@@ -170,4 +170,4 @@ You need to check these bullet-points.
 
   * Stop the running `aws-setup-manager` container with `docker kill <CONTAINER_ID>`
   * `docker container prune -f`
-  * `docker volume prune -a -f`
+  * `docker volume prune -a -f` or `docker volume prune -f` , depends on the docker version.
