@@ -1,0 +1,71 @@
+name: File Validator
+on:
+  pull_request:
+    branches:
+      - master
+env:
+  AWS_DIRS: |
+    EnvironmentSetup/AWS/Source/cluster-autoscaler/
+    EnvironmentSetup/AWS/Source/deployments/
+    EnvironmentSetup/AWS/Source/hpa/
+    EnvironmentSetup/AWS/Source/ingress/
+    EnvironmentSetup/AWS/Source/ingress-controller/
+    EnvironmentSetup/AWS/Source/namespace/
+    EnvironmentSetup/AWS/Source/pvc/
+    EnvironmentSetup/AWS/Source/services/
+    EnvironmentSetup/AWS/Source/strimzi-kafka-deployment/
+  AZURE_DIRS: |
+    EnvironmentSetup/Azure/Source/deployments/
+    EnvironmentSetup/Azure/Source/hpa/
+    EnvironmentSetup/Azure/Source/ingress/
+    EnvironmentSetup/Azure/Source/ingress-controller/
+    EnvironmentSetup/Azure/Source/namespace/
+    EnvironmentSetup/Azure/Source/pvc/
+    EnvironmentSetup/Azure/Source/services/
+    EnvironmentSetup/Azure/Source/strimzi-kafka-deployment/
+jobs:
+  terraform-validation:
+    runs-on: ubuntu-latest
+    name: Validate Terraform
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: terraform-aws-validate
+        uses: dflook/terraform-validate@v1
+        id: terraform-aws-validate
+        with:
+          path: EnvironmentSetup/AWS/Source/terraform
+      - name: terraform-azure-validate
+        uses: dflook/terraform-validate@v1
+        id: terraform-azure-validate
+        with:
+          path: EnvironmentSetup/Azure/Source/terraform
+      - name: Validate failed
+        if: ${{ failure() && steps.validate.outputs.failure-reason == 'validate-failed' }}
+        run: echo "terraform validate failed"
+  kubernetes-validation:
+    runs-on: ubuntu-latest
+    name: Validate Kubernetes Manifests
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Install kubeconform
+        run: |
+          curl -L -o kubeconform.tar.gz https://github.com/yannh/kubeconform/releases/download/v0.6.3/kubeconform-linux-amd64.tar.gz
+          tar -xvf kubeconform.tar.gz
+          chmod +x kubeconform
+          mv kubeconform /usr/local/bin/
+      - name: String manipulation
+        id: replace-to-spaces
+        run: |
+          ENDLINE_REMOVED_AWS_DIRS="${AWS_DIRS//[$'\n']/$' '}"
+          ENDLINE_REMOVED_AZURE_DIRS="${AZURE_DIRS//[$'\n']/$' '}"
+          echo "endline-removed-aws-dirs=$ENDLINE_REMOVED_AWS_DIRS" >> $GITHUB_OUTPUT
+          echo "endline-removed-azure-dirs=$ENDLINE_REMOVED_AZURE_DIRS" >> $GITHUB_OUTPUT
+      - name: Validate AWS Kubernetes manifests
+        run: |
+          kubeconform -summary -strict -ignore-missing-schemas ${{ steps.replace-to-spaces.outputs.endline-removed-aws-dirs }}
+      - name: Validate Azure Kubernetes manifests
+        run: |
+          kubeconform -summary -strict -ignore-missing-schemas ${{ steps.replace-to-spaces.outputs.endline-removed-azure-dirs }}
