@@ -69,3 +69,35 @@ jobs:
       - name: Validate Azure Kubernetes manifests
         run: |
           kubeconform -summary -strict -ignore-missing-schemas ${{ steps.replace-to-spaces.outputs.endline-removed-azure-dirs }}
+  image-validation:
+      runs-on: ubuntu-latest
+      name: Validate Images
+      steps:
+        - name: Checkout code
+          uses: actions/checkout@v3
+        - name: Install yq
+          run: |
+            curl -LO "https://github.com/mikefarah/yq/releases/download/v4.12.0/yq_linux_amd64"
+            chmod +x yq_linux_amd64
+            sudo mv yq_linux_amd64 /usr/local/bin/yq
+          shell: bash
+        - name: Validate Images
+          run: |
+            if [ -n "$(find "EnvironmentSetup/" -type f -name '*.yaml' -o -name '*.yml')" ]; then
+              for file in $(find "EnvironmentSetup/" -type f -name '*.yaml' -o -name '*.yml'); do
+                images=$(yq eval '.spec.template.spec.containers[].image' "$file")
+                for image in $images; do
+                  if [[ $image == "---" || $image == "null" ]]; then
+                    continue
+                  fi 
+                  exists=$(docker manifest inspect $image > /dev/null ; echo $?)
+                  if [ "$exists" -ne 0 ]; then
+                    echo "Image $image does not exist on Docker Hub."
+                    exit 1
+                  else
+                    echo "$file::$image OK"
+                  fi
+                done
+              done
+            fi
+          working-directory: ${{ github.workspace }}
