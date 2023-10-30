@@ -298,8 +298,6 @@ subjects:
   namespace: ingress-nginx
 ---
 apiVersion: v1
-data:
-  allow-snippet-annotations: "true"
 kind: ConfigMap
 metadata:
   labels:
@@ -311,6 +309,7 @@ metadata:
   name: ingress-nginx-controller
   namespace: ingress-nginx
 data:
+  allow-snippet-annotations: "true"
   map-hash-bucket-size: "128"
   proxy-hide-headers: "Server"
   server-tokens: "False"
