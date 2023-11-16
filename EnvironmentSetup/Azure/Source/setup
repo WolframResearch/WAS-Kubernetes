@@ -422,7 +422,7 @@ saveCredsFunction() {
 
   WAS="was"
 
-  PARSED_TENANT=$(az account list | grep tenantId | cut -d$':' -f2 | cut -d'"' -f 2 | cut -d$"-" -f1)
+  PARSED_TENANT=$(cat Source/terraform/tenant-id.config | cut -d$':' -f2 | cut -d'"' -f 2 | cut -d$"-" -f1)
   CREDS_RG_NAME="$WAS-creds-rg-$PARSED_TENANT"
   CREDS_STORAGE_ACCOUNT_NAME="${WAS}sa${PARSED_TENANT}"
   CREDS_STORAGE_CONTAINER_NAME="$WAS$PARSED_TENANT"
