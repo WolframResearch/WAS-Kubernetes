@@ -659,6 +659,8 @@ SetupFunction() {
   fullazuredomain="$azuredomain.$GET_REGION.$domainsuf"
   AZURE_DOMAIN=$fullazuredomain
 
+  sed -i -e "s/domain.com/$fullazuredomain/g" deployments/active-web-elements-server-deployment.yaml
+
   run_ok "kubectl apply -f deployments/" "Setup Deployments"
   run_ok "deploymentStatus" "Waiting for Deployments To Be Ready"
   run_ok "endpointStatus" "Checking Base URL Accessible"
