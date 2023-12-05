@@ -18,7 +18,6 @@ env:
     EnvironmentSetup/Azure/Source/deployments/
     EnvironmentSetup/Azure/Source/hpa/
     EnvironmentSetup/Azure/Source/ingress/
-    EnvironmentSetup/Azure/Source/ingress-controller/
     EnvironmentSetup/Azure/Source/namespace/
     EnvironmentSetup/Azure/Source/pvc/
     EnvironmentSetup/Azure/Source/services/
