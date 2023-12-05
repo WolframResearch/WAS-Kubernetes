@@ -47,3 +47,22 @@ Use this to initiate a rolling restart of the Active Web Element Server instance
     * Example:
     		
     		Container restarted successfully!
+    * 
+## Kernel Initialization Status [GET]
+
+### Kernel Readiness [.applicationserver/kernel/readiness]
+
+Use this API to get the kernel initialization status. If all kernels fully initialized the API will return "Kernels fully initialized" message with 200 status code.
+
+* Request
+
+  	GET /.applicationserver/kernel/readiness
+  Example:
+
+  	GET "http://applicationserver.wolfram.com/.applicationserver/kernel/readiness"
+
+* Response 200 OK
+
+	* Example:
+
+	  	Kernels fully initialized
