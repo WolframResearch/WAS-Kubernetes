@@ -596,8 +596,9 @@ SetupFunction() {
 
   domainsuffix="was"
   azuredomain="$domainsuffix-$TENANTID"
-  sed -i -e "s~^    service.beta.kubernetes.io\/azure-dns-label-name: .*~    service.beta.kubernetes.io\/azure-dns-label-name: \"$azuredomain\"~g" ingress-controller/deploy.yml
-  run_ok "kubectl apply -f ingress-controller/deploy.yml & sleep 180" "Setup Ingress Controller"
+  run_ok "helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx && sleep 15" "Helm Repo Add"
+  run_ok "helm repo update && sleep 30" "Helm Repo Update"
+  run_ok "helm install ingress-nginx ingress-nginx/ingress-nginx --set rbac.create=true --version 4.8.3 --set controller.service.externalTrafficPolicy=\"Local\" --namespace ingress-nginx --set controller.service.annotations.\"service\.beta\.kubernetes\.io/azure-dns-label-name\"=\"${azuredomain}\" --create-namespace & sleep 180" "Setup Ingress Controller"
   run_ok "kubectl apply -f metrics-server/ & sleep 30" "Setup Metrics Server"
 
   echo
@@ -657,9 +658,6 @@ SetupFunction() {
   domainsuf="cloudapp.azure.com"
   fullazuredomain="$azuredomain.$GET_REGION.$domainsuf"
   AZURE_DOMAIN=$fullazuredomain
-  rm -rf ingress-controller/domain.config
-  echo $fullazuredomain >>ingress-controller/domain.config
-  sed -i -e "s/domain.com/$fullazuredomain/g" deployments/active-web-elements-server-deployment.yaml
 
   run_ok "kubectl apply -f deployments/" "Setup Deployments"
   run_ok "deploymentStatus" "Waiting for Deployments To Be Ready"
@@ -985,7 +983,6 @@ DeleteFunction() {
   log_debug "Phase 3 of 5: Delete Dependencies"
   printf "${GREEN}☑☑${YELLOW}☑${CYAN}□□${NORMAL} Phase ${YELLOW}3${NORMAL} of ${GREEN}5${NORMAL}: Delete Dependencies\\n"
   run_ok "kubectl delete --ignore-not-found=true -f metrics-server/" "Deleting Metrics Server"
-  run_ok "kubectl delete --ignore-not-found=true -f ingress-controller/" "Deleting Ingress Controller"
 
   echo
   log_debug "Phase 4 of 5: Delete Azure Kubernetes Cluster (AKS)"
@@ -999,8 +996,6 @@ DeleteFunction() {
   printf "${GREEN}☑☑☑☑${YELLOW}☑${NORMAL} Phase ${YELLOW}5${NORMAL} of ${GREEN}5${NORMAL}: Cleanup\\n"
 
   sed -i -e "s~$BASE_URL~http://domain.com/~g" deployments/active-web-elements-server-deployment.yaml
-
-  sed -i -e "s~^    service.beta.kubernetes.io\/azure-dns-label-name: .*~    service.beta.kubernetes.io\/azure-dns-label-name: \"domain\"~g" ingress-controller/deploy.yml
 
   # Reset deployment setup
 
