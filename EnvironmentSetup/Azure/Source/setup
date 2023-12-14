@@ -359,7 +359,7 @@ run_ok() {
   fi
 }
 
-version=3.3.1
+version=3.3.6
 # Temporary colors
 RED="$(tput setaf 1)"
 YELLOW="$(tput setaf 3)"
