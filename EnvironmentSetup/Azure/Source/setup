@@ -534,7 +534,7 @@ SetupFunction() {
   # Create terraform resource group
 
   run_ok "az group create --name $TF_RESOURCE_GROUP_NAME --location $GET_REGION" "Creating Resource Group"
-  spsuffix="AzureWAS"
+  spsuffix="Azure$GET_CLUSTER_NAME"
   spuser="$spsuffix$TENANTID"
 
   # Create app credentials
@@ -594,7 +594,7 @@ SetupFunction() {
 
   # Determine domain address
 
-  domainsuffix="was"
+  domainsuffix="$lower_cluster_name"
   azuredomain="$domainsuffix-$TENANTID"
   run_ok "helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx && sleep 15" "Helm Repo Add"
   run_ok "helm repo update && sleep 30" "Helm Repo Update"
@@ -900,9 +900,14 @@ parseCredsFunction() {
 DeleteFunction() {
   banner=true
 
-  WAS="was"
-  CREDS_STORAGE_ACCOUNT_NAME="${WAS}sa${PARSED_TENANT}"
-  CREDS_STORAGE_CONTAINER_NAME="$WAS$PARSED_TENANT"
+  GET_CLUSTER_NAME=$(grep -A1 -i cluster-name Source/terraform/variables.tf | grep -i default | awk '{print $3}' | sed -e 's/"//g' | tr -d '\n')
+  GET_CLUSTER_NAME=$(echo $GET_CLUSTER_NAME | tr -d '\r')
+  lower_cluster_name=$(echo $GET_CLUSTER_NAME | tr '[:upper:]' '[:lower:]')
+
+  PARSED_TENANT=$(cat Source/terraform/tenant-id.config)
+
+  CREDS_STORAGE_ACCOUNT_NAME="${lower_cluster_name}sa${PARSED_TENANT}"
+  CREDS_STORAGE_CONTAINER_NAME="$lower_cluster_name$PARSED_TENANT"
 
   # Download and parse creds
 

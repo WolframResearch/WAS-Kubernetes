@@ -1,5 +1,5 @@
 FROM ubuntu:focal
-ENV KUBECTL_VERSION='v1.24.0'
+ENV KUBECTL_VERSION='v1.27.0'
 ENV DEBIAN_FRONTEND=noninteractive 
 ENV TERM xterm-256color
 ENV COLORTERM truecolor

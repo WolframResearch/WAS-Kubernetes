@@ -11,7 +11,7 @@ The following CLI tools are required to be installed on your local machine to co
 
 * **Azure CLI** - https://docs.microsoft.com/en-us/cli/azure/install-azure-cli?view=azure-cli-latest
 
-* **Kubectl >=v1.23** - https://kubernetes.io/docs/tasks/tools/install-kubectl/
+* **Kubectl >=v1.27** - https://kubernetes.io/docs/tasks/tools/install-kubectl/
 
 * **Docker v20.10 or newer** - https://docs.docker.com/get-docker/
 
@@ -24,7 +24,7 @@ The following CLI tools are required to be installed on your local machine to co
 * AMI Instance Type: Standard_D8s_v3
 * Disk Size: 30GB
 * Node Group scaling configuration: [Minimum size: 2, Maximum size: 10, Desired size: 2]
-* Kubernetes Version: 1.22
+* Kubernetes Version: 1.27
 
 To change any of the above defaults open `Source/terraform/variables.tf` and modify accordingly and save file.
 
