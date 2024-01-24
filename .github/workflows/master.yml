@@ -9,7 +9,6 @@ env:
     EnvironmentSetup/AWS/Source/deployments/
     EnvironmentSetup/AWS/Source/hpa/
     EnvironmentSetup/AWS/Source/ingress/
-    EnvironmentSetup/AWS/Source/ingress-controller/
     EnvironmentSetup/AWS/Source/namespace/
     EnvironmentSetup/AWS/Source/pvc/
     EnvironmentSetup/AWS/Source/services/
