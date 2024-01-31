@@ -570,7 +570,9 @@ SetupFunction() {
   echo
   log_debug "Phase 3 of 5: Deploy Dependencies"
   printf "${GREEN}☑☑${YELLOW}☑${CYAN}□□${NORMAL} Phase ${YELLOW}3${NORMAL} of ${GREEN}5${NORMAL}: Deploy Dependencies\\n"
-  run_ok "kubectl apply -f ingress-controller/" "Setup Ingress Controller"
+  run_ok "helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx && sleep 15" "Helm Repo Add"
+  run_ok "helm repo update && sleep 30" "Helm Repo Update"
+  run_ok "helm install ingress-nginx ingress-nginx/ingress-nginx --set rbac.create=true --version 4.8.3 --set controller.service.externalTrafficPolicy=\"Local\" --namespace ingress-nginx --create-namespace & sleep 180" "Setup Ingress Controller"
   run_ok "kubectl apply -f metrics-server/" "Setup Metrics Server"
   sed -i -e 's/- --node-group-auto-discovery=asg:tag=k8s.io\/cluster-autoscaler\/enabled,k8s.io\/cluster-autoscaler\/.*/- --node-group-auto-discovery=asg:tag=k8s.io\/cluster-autoscaler\/enabled,k8s.io\/cluster-autoscaler\/'"$GET_CLUSTER_NAME"'/g' cluster-autoscaler/cluster-autoscaler-autodiscover.yaml
   run_ok "kubectl apply -f cluster-autoscaler/" "Setup Cluster Autoscaler"
@@ -610,30 +612,41 @@ fullnameOverride: ""
 
 replicaCount: 2
 
+useFIPS: false
+
 image:
   repository: amazon/aws-efs-csi-driver
-  tag: "v1.4.0"
+  tag: "v1.7.4"
   pullPolicy: IfNotPresent
 
 sidecars:
   livenessProbe:
     image:
       repository: public.ecr.aws/eks-distro/kubernetes-csi/livenessprobe
-      tag: v2.2.0-eks-1-18-13
+      tag: v2.11.0-eks-1-29-2
       pullPolicy: IfNotPresent
     resources: {}
+    securityContext:
+      readOnlyRootFilesystem: true
+      allowPrivilegeEscalation: false
   nodeDriverRegistrar:
     image:
       repository: public.ecr.aws/eks-distro/kubernetes-csi/node-driver-registrar
-      tag: v2.1.0-eks-1-18-13
+      tag: v2.9.3-eks-1-29-2
       pullPolicy: IfNotPresent
     resources: {}
+    securityContext:
+      readOnlyRootFilesystem: true
+      allowPrivilegeEscalation: false
   csiProvisioner:
     image:
       repository: public.ecr.aws/eks-distro/kubernetes-csi/external-provisioner
-      tag: v2.1.1-eks-1-18-13
+      tag: v3.6.3-eks-1-29-2
       pullPolicy: IfNotPresent
     resources: {}
+    securityContext:
+      readOnlyRootFilesystem: true
+      allowPrivilegeEscalation: false
 
 imagePullSecrets: []
 
@@ -653,7 +666,6 @@ controller:
   # Enable if you want the controller to also delete the
   # path on efs when deleteing an access point
   deleteAccessPointRootDir: false
-  volMetricsOptIn: false
   podAnnotations: {}
   resources:
     {}
@@ -668,6 +680,7 @@ controller:
     #   cpu: 100m
     #   memory: 128Mi
   nodeSelector: {}
+  updateStrategy: {}
   tolerations: []
   affinity: {}
   # Specifies whether a service account should be created
@@ -679,11 +692,22 @@ controller:
     #  eks.amazonaws.com/role-arn: arn:aws:iam::111122223333:role/efs-csi-role
   healthPort: 9909
   regionalStsEndpoints: false
+  # securityContext on the controller pod
+  securityContext:
+    runAsNonRoot: false
+    runAsUser: 0
+    runAsGroup: 0
+    fsGroup: 0
+
+
 ## Node daemonset variables
 
 node:
   # Number for the log level verbosity
   logLevel: 2
+  volMetricsOptIn: false
+  volMetricsRefreshPeriod: 240
+  volMetricsFsRateLimit: 5
   hostAliases:
     {}
     # For cross VPC EFS, you need to poison or overwrite the DNS for the efs volume as per
@@ -712,6 +736,10 @@ node:
     #   cpu: 100m
     #   memory: 128Mi
   nodeSelector: {}
+  updateStrategy: {}
+    # Override default strategy (RollingUpdate) to speed up deployment.
+    # This can be useful if helm timeouts are observed.
+    # type: OnDelete
   tolerations:
     - operator: Exists
   # Specifies whether a service account should be created
@@ -722,6 +750,13 @@ node:
     ## Enable if EKS IAM for SA is used
     #  eks.amazonaws.com/role-arn: arn:aws:iam::111122223333:role/efs-csi-role
   healthPort: 9809
+  # securityContext on the node pod
+  securityContext:
+    # The node pod must be run as root to bind to the registration/driver sockets
+    runAsNonRoot: false
+    runAsUser: 0
+    runAsGroup: 0
+    fsGroup: 0
 
 storageClasses: 
   - name: was-efs
@@ -1137,7 +1172,6 @@ DeleteFunction() {
   echo
   log_debug "Phase 3 of 5: Delete Dependencies"
   printf "${GREEN}☑☑${YELLOW}☑${CYAN}□□${NORMAL} Phase ${YELLOW}3${NORMAL} of ${GREEN}5${NORMAL}: Delete Dependencies\\n"
-  run_ok "kubectl delete --ignore-not-found=true -f ingress-controller/" "Deleting Ingress Controller"
   run_ok "kubectl delete --ignore-not-found=true -f metrics-server/" "Deleting Metrics Server"
   run_ok "kubectl delete --ignore-not-found=true -f cluster-autoscaler/" "Deleting Cluster Autoscaler"
   sed -i -e 's/- --node-group-auto-discovery=asg:tag=k8s.io\/cluster-autoscaler\/enabled,k8s.io\/cluster-autoscaler\/.*/- --node-group-auto-discovery=asg:tag=k8s.io\/cluster-autoscaler\/enabled,k8s.io\/cluster-autoscaler\/name/g' cluster-autoscaler/cluster-autoscaler-autodiscover.yaml

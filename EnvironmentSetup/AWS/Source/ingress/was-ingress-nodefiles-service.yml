@@ -7,16 +7,16 @@ metadata:
     app.kubernetes.io/name: ingress-nginx
     app.kubernetes.io/part-of: ingress-nginx
   annotations:
-    kubernetes.io/ingress.class: nginx
     nginx.ingress.kubernetes.io/use-regex: "true"
     nginx.ingress.kubernetes.io/proxy-body-size: 1g
     nginx.ingress.kubernetes.io/rewrite-target: /nodefiles/$1
 spec:
+  ingressClassName: nginx
   rules:
   - http:
       paths:
         - path: /nodefiles/?(.*)
-          pathType: Prefix
+          pathType: ImplementationSpecific
           backend:
             service:
               name: resource-manager
