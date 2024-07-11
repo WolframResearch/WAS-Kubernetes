@@ -43,7 +43,7 @@ spec:
           value: <your-resource-bucket-region>
         - name: NODEFILES.BUCKET.REGION
           value: <your-nodefiles-bucket-region>
-        image: wolframapplicationserver/resource-manager:1.2.2
+        image: wolframapplicationserver/resource-manager:1.2.6
         name: resource-manager
         ports:
         - containerPort: 9090
