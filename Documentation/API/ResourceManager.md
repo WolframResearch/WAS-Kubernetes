@@ -265,7 +265,7 @@ Use this to replace an existing resource. The API takes the resource path as inp
     		"message": "Unknown resource",
     		"path": "/resources/addOne.wl"
 		}]
-* If the `resourcePath` does not match the path variable: Response 404 Bad Request (application/json)
+* If the `resourcePath` does not match the path variable: Response 400 Bad Request (application/json)
 
 		[{
     		"timestamp": "2019-06-17T13:42:52.846+000",
@@ -345,7 +345,7 @@ Use this to modify an existing resource. The API takes the resource path as inpu
     		"path": "/resources/add.wl"
 		}]
 
-* If the `resourcePath` does not match the path variable: Response 404 Bad Request (application/json)
+* If the `resourcePath` does not match the path variable: Response 400 Bad Request (application/json)
 
 		[{
     		"timestamp": "2019-06-17T13:42:52.846+000",
