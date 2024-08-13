@@ -33,6 +33,14 @@ spec:
           value: kafka-persistent-kafka-bootstrap.kafka.svc.cluster.local:9092
         - name : API_REQUEST_TOPIC
           value: "api-request"
+        - name : RESOURCE_INFO_TOPIC
+          value: "resource-info"
+        - name : NODEFILE_INFO_TOPIC
+          value: "nodefile-info"
+        - name : ENDPOINT_INFO_TOPIC
+          value: "endpoint-info"
+        - name: API_RESPONSE_TOPIC
+          value: "api-response"
         - name: applicationserver.nodefiles.cachedirectory
           value: /opt/.wolframcache/nodefiles/
         - name: applicationserver.version
