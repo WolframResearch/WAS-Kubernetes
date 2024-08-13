@@ -423,14 +423,14 @@ saveCredsFunction() {
   echo "GET_CLUSTER_NAME:$GET_CLUSTER_NAME" >>creds
   echo "GET_REGION:$GET_REGION" >>creds
   echo "TERRAFORM_BUCKET:$terraform_bucket_name" >>creds
-  echo "MINIO_ACCESS_KEY:$MINIO_ACCESS_KEY" >>creds
-  echo "MINIO_SECRET_KEY:$MINIO_SECRET_KEY" >>creds
+  echo "ACCESS_KEY:$ACCESS_KEY" >>creds
+  echo "SECRET_KEY:$SECRET_KEY" >>creds
   echo "DYNAMODB_TABLE:$dynamodb_table" >>creds
   echo "WORKSPACE:$workspace" >>creds
   echo "S3_KEY:$s3_key" >>creds
   echo "EFS_FS_ID:$filesystem_id" >>creds
-  echo "RESOURCE_INFO_BUCKET:$resources_bucket_name" >>creds
-  echo "NODE_FILES_BUCKET:$nodefiles_bucket_name" >>creds
+  echo "RESOURCE_INFO_BUCKET:$RESOURCEINFO_BUCKET" >>creds
+  echo "NODEFILES_BUCKET:$NODEFILES_BUCKET" >>creds
   echo "BASE_URL:http://$BASE_URL/" >>creds
   echo "RESOURCE_MANAGER_URL:http://$BASE_URL/resources/" >>creds
   echo "NODEFILES_MANAGER_URL:http://$BASE_URL/nodefiles/" >>creds
@@ -454,8 +454,8 @@ saveCredsFunction() {
 awsKeysFunction() {
   CFILE=~/.aws/credentials
   if [ -f "$CFILE" ]; then
-    MINIO_ACCESS_KEY=$(cat ~/.aws/credentials | grep aws_access_key_id | awk '{print $3}')
-    MINIO_SECRET_KEY=$(cat ~/.aws/credentials | grep aws_secret_access_key | awk '{print $3}')
+    ACCESS_KEY=$(cat ~/.aws/credentials | grep aws_access_key_id | awk '{print $3}')
+    SECRET_KEY=$(cat ~/.aws/credentials | grep aws_secret_access_key | awk '{print $3}')
   else
     echo
     log_error "Cannot find aws access key and secret key. Did you run 'aws configure' ?"
@@ -475,6 +475,17 @@ SetupFunction() {
   GET_REGION=$(echo $GET_REGION | tr -d '\r')
 
   cd ..
+
+  RESOURCEINFO_BUCKET=$(cat buckets | grep resourceinfo-bucket | cut -d':' -f2 | tr -d '\n' | tr -d '\r')
+  NODEFILES_BUCKET=$(cat buckets | grep nodefiles-bucket | cut -d':' -f2 | tr -d '\n' | tr -d '\r')
+
+  if [ -z "$RESOURCEINFO_BUCKET" ] || [ -z "$NODEFILES_BUCKET" ]; then
+    echo
+    log_error "Check the Source/buckets file and make sure that it's already filled."
+    echo
+    exit 1
+  fi
+
   echo
   log_debug "Phase 1 of 5: Prequisites Checks"
   printf "${YELLOW}☑${CYAN}□□□□${NORMAL} Phase ${YELLOW}1${NORMAL} of ${GREEN}5${NORMAL}: Prequisites Checks\\n"
@@ -804,24 +815,26 @@ EOF
     fi
   done
 
-  # Minio deployment setup
-  CURRENT_MINIO_ACCESS_KEY=$(grep -A1 -i MINIO_ACCESS_KEY deployments/minio-deployment.yaml | grep -i value: | awk '{print $2}')
-  sed -i -e 's~'"$CURRENT_MINIO_ACCESS_KEY"'~'"$MINIO_ACCESS_KEY"'~g' deployments/minio-deployment.yaml
-  CURRENT_MINIO_SECRET_KEY=$(grep -A1 -i MINIO_SECRET_KEY deployments/minio-deployment.yaml | grep -i value: | awk '{print $2}')
-  sed -i -e 's~'"$CURRENT_MINIO_SECRET_KEY"'~'"$MINIO_SECRET_KEY"'~g' deployments/minio-deployment.yaml
-
   # Resource Manager deployment setup
-  CURRENT_MINIOACCESSKEY=$(grep -A1 -i MINIOACCESSKEY deployments/resource-manager-deployment.yaml | grep -i value: | awk '{print $2}')
-  sed -i -e 's~'"$CURRENT_MINIOACCESSKEY"'~'"$MINIO_ACCESS_KEY"'~g' deployments/resource-manager-deployment.yaml
-  CURRENT_MINIOSECRETKEY=$(grep -A1 -i MINIOSECRETKEY deployments/resource-manager-deployment.yaml | grep -i value: | awk '{print $2}')
-  sed -i -e 's~'"$CURRENT_MINIOSECRETKEY"'~'"$MINIO_SECRET_KEY"'~g' deployments/resource-manager-deployment.yaml
-  resources_bucket_name="$lower_cluster_name-resources-$account_id"
-  nodefiles_bucket_name="$lower_cluster_name-nodefiles-$account_id"
+  CURRENT_ACCESS_KEY=$(grep -A1 -i SPRING_CLOUD_AWS_CREDENTIALS_ACCESS-KEY deployments/resource-manager-deployment.yaml | grep -i value: | awk '{print $2}')
+  sed -i -e 's~'"$CURRENT_ACCESS_KEY"'~'"$ACCESS_KEY"'~g' deployments/resource-manager-deployment.yaml
+
+  CURRENT_SECRETKEY=$(grep -A1 -i SPRING_CLOUD_AWS_CREDENTIALS_SECRET-KEY deployments/resource-manager-deployment.yaml | grep -i value: | awk '{print $2}')
+  sed -i -e 's~'"$CURRENT_SECRETKEY"'~'"$SECRET_KEY"'~g' deployments/resource-manager-deployment.yaml
+
+  s3_endpoint="https://s3.$GET_REGION.amazonaws.com"
+
+  CURRENT_S3_REGION=$(grep -A1 -i SPRING_CLOUD_AWS_S3_REGION deployments/resource-manager-deployment.yaml | grep -i value: | awk '{print $2}')
+  sed -i -e 's~'"$CURRENT_S3_REGION"'~'"$GET_REGION"'~g' deployments/resource-manager-deployment.yaml
+
+  CURRENT_S3_ENDPOINT=$(grep -A1 -i SPRING_CLOUD_AWS_S3_ENDPOINT deployments/resource-manager-deployment.yaml | grep -i value: | awk '{print $2}')
+  sed -i -e 's~'"$CURRENT_S3_ENDPOINT"'~'"$s3_endpoint"'~g' deployments/resource-manager-deployment.yaml
+  
   CURRENT_RESOURCEINFOBUCKET=$(grep -A1 -i RESOURCEINFO.BUCKET deployments/resource-manager-deployment.yaml | grep -i value: | awk '{print $2}')
-  sed -i -e 's~'"$CURRENT_RESOURCEINFOBUCKET"'~'"$resources_bucket_name"'~g' deployments/resource-manager-deployment.yaml
+  sed -i -e 's~'"$CURRENT_RESOURCEINFOBUCKET"'~'"$RESOURCEINFO_BUCKET"'~g' deployments/resource-manager-deployment.yaml
   CURRENT_NODEFILESBUCKET=$(grep -A1 -i NODEFILES.BUCKET deployments/resource-manager-deployment.yaml | grep -i value: | awk '{print $2}' | cut -d ' ' -f 1)
   CURRENT_NODEFILESBUCKET=$(echo $CURRENT_NODEFILESBUCKET | awk '{print $1}')
-  sed -i -e 's~'"$CURRENT_NODEFILESBUCKET"'~'"$nodefiles_bucket_name"'~g' deployments/resource-manager-deployment.yaml
+  sed -i -e 's~'"$CURRENT_NODEFILESBUCKET"'~'"$NODEFILES_BUCKET"'~g' deployments/resource-manager-deployment.yaml
   CURRENT_RESOURCE_BUCKET_REGION=$(grep -A1 -i RESOURCE.BUCKET.REGION deployments/resource-manager-deployment.yaml | grep -i value: | awk '{print $2}')
   sed -i -e 's~'"$CURRENT_RESOURCE_BUCKET_REGION"'~'"$GET_REGION"'~g' deployments/resource-manager-deployment.yaml
   CURRENT_NODEFILES_BUCKET_REGION=$(grep -A1 -i NODEFILES.BUCKET.REGION deployments/resource-manager-deployment.yaml | grep -i value: | awk '{print $2}')

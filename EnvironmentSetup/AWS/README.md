@@ -53,6 +53,17 @@ This will interactively prompt for your AWS IAM user access key, secret key and 
 
 	cd WAS-Kubernetes/EnvironmentSetup/AWS/
 
+**Step 3.** Create two S3 buckets to use for WAS, these are needed for resource-manager, resourceinfo-bucket and nodefileinfo-bucket:
+
+	aws s3api create-bucket --bucket <RESOURCEINFOBUCKETNAME> --region <REGION> --create-bucket-configuration LocationConstraint=<REGION>
+	aws s3api create-bucket --bucket <NODEFILEINFOBUCKETNAME> --region <REGION> --create-bucket-configuration LocationConstraint=<REGION>
+
+**Step 3.** Update buckets file with these buckets
+
+	resourceinfo-bucket:<RESOURCEINFOBUCKETNAME>
+	nodefiles-bucket:<NODEFILEINFOBUCKETNAME>
+
+
 **Step 3.** Run the following command to set up EKS and deploy WAS:
 
 	mkdir -p ~/.kube && docker-compose up --build -d && clear && docker exec -it aws-setup-manager bash setup --create && sudo chown -R $USER ~/.kube
