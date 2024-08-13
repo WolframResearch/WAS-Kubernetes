@@ -55,23 +55,30 @@ This will interactively prompt for your AWS IAM user access key, secret key and 
 
 **Step 3.** Create two S3 buckets to use for WAS, these are needed for resource-manager, resourceinfo-bucket and nodefileinfo-bucket:
 
+	If the buckets will be in 'us-east-1'
+
+	aws s3api create-bucket --bucket <RESOURCEINFOBUCKETNAME>
+	aws s3api create-bucket --bucket <NODEFILEINFOBUCKETNAME>
+
+	If will be in any other regions(us-east-2, us-west-1 etc.)
+
 	aws s3api create-bucket --bucket <RESOURCEINFOBUCKETNAME> --region <REGION> --create-bucket-configuration LocationConstraint=<REGION>
 	aws s3api create-bucket --bucket <NODEFILEINFOBUCKETNAME> --region <REGION> --create-bucket-configuration LocationConstraint=<REGION>
 
-**Step 3.** Update buckets file with these buckets
+**Step 4.** Update buckets file with these buckets
 
 	resourceinfo-bucket:<RESOURCEINFOBUCKETNAME>
 	nodefiles-bucket:<NODEFILEINFOBUCKETNAME>
 
 
-**Step 3.** Run the following command to set up EKS and deploy WAS:
+**Step 5.** Run the following command to set up EKS and deploy WAS:
 
 	mkdir -p ~/.kube && docker-compose up --build -d && clear && docker exec -it aws-setup-manager bash setup --create && sudo chown -R $USER ~/.kube
 
 **Note:** This can take approximately 45 minutes to complete.
 
 
-**Step 4.** Run the following command to retrieve your base URL and application URLs:
+**Step 6.** Run the following command to retrieve your base URL and application URLs:
 
 	docker-compose up --build -d && clear && docker exec -it aws-setup-manager bash setup --endpoint-info
 
@@ -92,15 +99,15 @@ The output of this command will follow this pattern:
 
 
 
-**Step 5.** After completion, run this command to shutdown the aws-setup-manager:
+**Step 7.** After completion, run this command to shutdown the aws-setup-manager:
 
 	docker-compose down
 
 
-**Step 6.** Get a license file from your Wolfram Research sales representative.
+**Step 8.** Get a license file from your Wolfram Research sales representative.
 
 
-**Step 7.** This file needs to be deployed to WAS as a node file in the conventional location `.Wolfram/Licensing/mathpass`. From a Wolfram Language client, this may be achieved using the following code: 
+**Step 9.** This file needs to be deployed to WAS as a node file in the conventional location `.Wolfram/Licensing/mathpass`. From a Wolfram Language client, this may be achieved using the following code: 
 
     was = ServiceConnect["WolframApplicationServer", "http://<your-base-url>"];
     ServiceExecute[was, "DeployNodeFile",
@@ -114,7 +121,7 @@ Alternatively you may use the [node files REST API](../../Documentation/API/Node
     PacletInstall["WolframApplicationServer"];
     Needs["WolframApplicationServer`"]
 
-**Step 8.** Restart the application using the [restart API](../../Documentation/API/Utilities.md) to enable your Wolfram Engines.
+**Step 10.** Restart the application using the [restart API](../../Documentation/API/Utilities.md) to enable your Wolfram Engines.
 
 URL: `http://<your-base-url>/.applicationserver/kernel/restart`
 	
