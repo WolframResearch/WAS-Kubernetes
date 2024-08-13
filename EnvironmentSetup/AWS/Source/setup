@@ -816,10 +816,10 @@ EOF
   done
 
   # Resource Manager deployment setup
-  CURRENT_ACCESS_KEY=$(grep -A1 -i SPRING_CLOUD_AWS_CREDENTIALS_ACCESS-KEY deployments/resource-manager-deployment.yaml | grep -i value: | awk '{print $2}')
+  CURRENT_ACCESS_KEY=$(grep -A1 -i SPRING_CLOUD_AWS_CREDENTIALS_ACCESS_KEY deployments/resource-manager-deployment.yaml | grep -i value: | awk '{print $2}')
   sed -i -e 's~'"$CURRENT_ACCESS_KEY"'~'"$ACCESS_KEY"'~g' deployments/resource-manager-deployment.yaml
 
-  CURRENT_SECRETKEY=$(grep -A1 -i SPRING_CLOUD_AWS_CREDENTIALS_SECRET-KEY deployments/resource-manager-deployment.yaml | grep -i value: | awk '{print $2}')
+  CURRENT_SECRETKEY=$(grep -A1 -i SPRING_CLOUD_AWS_CREDENTIALS_SECRET_KEY deployments/resource-manager-deployment.yaml | grep -i value: | awk '{print $2}')
   sed -i -e 's~'"$CURRENT_SECRETKEY"'~'"$SECRET_KEY"'~g' deployments/resource-manager-deployment.yaml
 
   s3_endpoint="https://s3.$GET_REGION.amazonaws.com"
