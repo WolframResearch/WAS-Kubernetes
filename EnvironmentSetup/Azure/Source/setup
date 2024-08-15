@@ -666,7 +666,7 @@ SetupFunction() {
   sed -i -e 's~'"$CURRENT_RESOURCEINFOBUCKET"'~'"$RESOURCEINFO_BUCKET"'~g' deployments/resource-manager-deployment.yaml
   
   CURRENT_NODEFILESBUCKET=$(grep -A1 -i NODEFILES.BUCKET deployments/resource-manager-deployment.yaml | grep -i value: | awk '{print $2}')
-  sed -i -e 's~'"$CURRENT_NODEFILESBUCKET"'~'"$RESOURCEINFO_BUCKET"'~g' deployments/resource-manager-deployment.yaml
+  sed -i -e 's~'"$CURRENT_NODEFILESBUCKET"'~'"$NODEFILEINFO_BUCKET"'~g' deployments/resource-manager-deployment.yaml
 
   # AWES deployment setup
 
