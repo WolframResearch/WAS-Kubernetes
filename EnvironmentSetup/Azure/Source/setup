@@ -422,10 +422,10 @@ saveCredsFunction() {
 
   WAS="was"
 
-  PARSED_TENANT=$TENANTID
-  CREDS_RG_NAME="$WAS-creds-rg-$PARSED_TENANT"
-  CREDS_STORAGE_ACCOUNT_NAME="${WAS}sa${PARSED_TENANT}"
-  CREDS_STORAGE_CONTAINER_NAME="$WAS$PARSED_TENANT"
+  CUR_UNIX=$(date +%s | awk '{print substr($0, length($0)-5, 6)}')
+  CREDS_RG_NAME="$WAS-creds-rg-$CUR_UNIX"
+  CREDS_STORAGE_ACCOUNT_NAME="${WAS}sa${CUR_UNIX}"
+  CREDS_STORAGE_CONTAINER_NAME="$WAS$CUR_UNIX"
 
   echo "GET_CLUSTER_NAME:$GET_CLUSTER_NAME" >>creds
   echo "GET_REGION:$GET_REGION" >>creds
@@ -550,7 +550,8 @@ SetupFunction() {
 
   run_ok "az group create --name $TF_RESOURCE_GROUP_NAME --location $GET_REGION" "Creating Resource Group"
   spsuffix="Azure$GET_CLUSTER_NAME"
-  spuser="$spsuffix$TENANTID"
+  CUR_UNIX=$(date +%s | awk '{print substr($0, length($0)-5, 6)}')
+  spuser="$spsuffix$CUR_UNIX"
 
   # Create app credentials
   while true; do
@@ -917,7 +918,7 @@ DeleteFunction() {
   lower_cluster_name=$(echo $GET_CLUSTER_NAME | tr '[:upper:]' '[:lower:]')
 
   PARSED_TENANT=$(cat Source/terraform/tenant-id.config)
-
+  
   CREDS_STORAGE_ACCOUNT_NAME="${lower_cluster_name}sa${PARSED_TENANT}"
   CREDS_STORAGE_CONTAINER_NAME="$lower_cluster_name$PARSED_TENANT"
 
@@ -1037,7 +1038,8 @@ DeleteFunction() {
   lower_cluster_name=$(echo $lower_cluster_name | tr -d '\r')
   spsuffix="AzureWAS"
   spuser="$spsuffix$PARSED_TENANTID"
-  TF_RESOURCE_GROUP_NAME="$lower_cluster_name-rg-$PARSED_TENANTID"
+  CUR_UNIX=$(date +%s | awk '{print substr($0, length($0)-5, 6)}')
+  TF_RESOURCE_GROUP_NAME="$lower_cluster_name-rg-$CUR_UNIX"
   run_ok "az storage account delete --name $GET_SAN --resource-group $TF_RESOURCE_GROUP_NAME --yes" "Deleting Storage Account"
 
   # Delete active directory/app registration
