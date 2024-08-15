@@ -431,8 +431,6 @@ saveCredsFunction() {
   echo "GET_REGION:$GET_REGION" >>creds
   echo "GET_SAN:$GET_SAN" >>creds
   echo "ACCOUNT_KEY:$ACCOUNT_KEY" >>creds
-  echo "MINIO_ACCESS_KEY:$GET_SAN" >>creds
-  echo "MINIO_SECRET_KEY:$ACCOUNT_KEY" >>creds
   echo "TENANT_ID:$TENANT_ID" >>creds
   echo "RESOURCE_GROUP_NAME:$RESOURCE_GROUP_NAME" >>creds
   echo "TF_RESOURCE_GROUP_NAME:$TF_RESOURCE_GROUP_NAME" >>creds
@@ -488,12 +486,30 @@ azureKeysFunction() {
 
 SetupFunction() {
   banner=true
-  cd Source/terraform
+
+  cd Source/
+
+  SAN=$(cat containers | grep SAN | cut -d':' -f2 | tr -d '\n' | tr -d '\r')
+  ACCOUNT_KEY=$(cat containers | grep ACCOUNT_KEY | cut -d':' -f2 | tr -d '\n' | tr -d '\r')
+  RESOURCE_GROUP_NAME=$(cat containers | grep RESOURCE_GROUP_NAME | cut -d':' -f2 | tr -d '\n' | tr -d '\r')
+  GET_REGION=$(cat containers | grep LOCATION | cut -d':' -f2 | tr -d '\n' | tr -d '\r')
+  RESOURCEINFO_BUCKET=$(cat containers | grep RESOURCEINFO_BUCKET | cut -d':' -f2 | tr -d '\n' | tr -d '\r')
+  NODEFILEINFO_BUCKET=$(cat containers | grep NODEFILEINFO_BUCKET | cut -d':' -f2 | tr -d '\n' | tr -d '\r')
+
+  if [ -z "$SAN" ] || [ -z "$ACCOUNT_KEY" ] || [ -z "$RESOURCE_GROUP_NAME" ] || [ -z "$REGION" ] || [ -z "$RESOURCEINFO_BUCKET" ] || [ -z "$NODEFILEINFO_BUCKET" ]; then
+    echo
+    log_error "Check the Source/buckets file and make sure that it's already filled."
+    echo
+    exit 1
+  fi
+
+  cd terraform/
+
   GET_CLUSTER_NAME=$(grep -A1 -i cluster-name variables.tf | grep -i default | awk '{print $3}' | sed -e 's/"//g' | tr -d '\n')
   GET_CLUSTER_NAME=$(echo $GET_CLUSTER_NAME | tr -d '\r')
-  GET_REGION=$(grep -A1 -i aks_region variables.tf | grep -i default | awk '{print $3}' | sed -e 's/"//g' | tr -d '\n')
-  GET_REGION=$(echo $GET_REGION | tr -d '\r')
-
+  sed -i -e "s~RESOURCE_GROUP_NAME~$RESOURCE_GROUP_NAME~g" main.tf
+  sed -i -e "s~CLUSTER_REGION~$GET_REGION~g" main.tf
+  sed -i -e "s~CLUSTER_REGION~$GET_REGION~g" variables.tf
   echo
   log_debug "Phase 1 of 5: Prequisites Checks"
   printf "${YELLOW}☑${CYAN}□□□□${NORMAL} Phase ${YELLOW}1${NORMAL} of ${GREEN}5${NORMAL}: Prequisites Checks\\n"
@@ -526,7 +542,6 @@ SetupFunction() {
 
   lower_cluster_name=$(echo $GET_CLUSTER_NAME | tr '[:upper:]' '[:lower:]')
   lower_cluster_name=$(echo $lower_cluster_name | tr -d '\r')
-  RESOURCE_GROUP_NAME="WAS-rg"
   TENANT_ID=$(az account list | grep tenantId | cut -d$':' -f2 | cut -d'"' -f 2)
   TF_RESOURCE_GROUP_NAME="$lower_cluster_name-rg-$TENANTID"
   sed -i -e "s~XXXXXX~$TF_RESOURCE_GROUP_NAME~g" main.tf
@@ -633,25 +648,24 @@ SetupFunction() {
   done
   run_ok "kubectl apply -f ingress/" "Setup Ingress"
 
-  # Minio deployment setup
 
-  CURRENT_MINIO_ACCESS_KEY=$(grep -A1 -i MINIO_ACCESS_KEY deployments/minio-deployment.yaml | grep -i value: | awk '{print $2}')
-  sed -i -e 's~'"$CURRENT_MINIO_ACCESS_KEY"'~'"$GET_SAN"'~g' deployments/minio-deployment.yaml
-  CURRENT_MINIO_SECRET_KEY=$(grep -A1 -i MINIO_SECRET_KEY deployments/minio-deployment.yaml | grep -i value: | awk '{print $2}')
-  sed -i -e 's~'"$CURRENT_MINIO_SECRET_KEY"'~'"$ACCOUNT_KEY"'~g' deployments/minio-deployment.yaml
+  # Resource Manager deployment
+  storage_account_endpoint="https://$SAN.blob.core.windows.net/"
 
-  # Resource Manger deployment setup
+  STORAGE_ACCOUNT_NAME=$(grep -A1 -i SPRING_CLOUD_AZURE_STORAGE_BLOB_ACCOUNT_NAME deployments/resource-manager-deployment.yaml | grep -i value: | awk '{print $2}')
+  sed -i -e 's~'"$STORAGE_ACCOUNT_NAME"'~'"$SAN"'~g' deployments/resource-manager-deployment.yaml
 
-  CURRENT_MINIOACCESSKEY=$(grep -A1 -i MINIOACCESSKEY deployments/resource-manager-deployment.yaml | grep -i value: | awk '{print $2}')
-  sed -i -e 's~'"$CURRENT_MINIOACCESSKEY"'~'"$GET_SAN"'~g' deployments/resource-manager-deployment.yaml
-  CURRENT_MINIOSECRETKEY=$(grep -A1 -i MINIOSECRETKEY deployments/resource-manager-deployment.yaml | grep -i value: | awk '{print $2}')
-  sed -i -e 's~'"$CURRENT_MINIOSECRETKEY"'~'"$ACCOUNT_KEY"'~g' deployments/resource-manager-deployment.yaml
-  resources_bucket_name="was-resources-$TENANTID"
-  nodefiles_bucket_name="was-nodefiles-$TENANTID"
+  STORAGE_ACCOUNT_KEY=$(grep -A1 -i SPRING_CLOUD_AZURE_STORAGE_BLOB_ACCOUNT_KEY deployments/resource-manager-deployment.yaml | grep -i value: | awk '{print $2}')
+  sed -i -e 's~'"$STORAGE_ACCOUNT_KEY"'~'"$ACCOUNT_KEY"'~g' deployments/resource-manager-deployment.yaml
+
+  CURRENT_SA_ENDPOINT=$(grep -A1 -i SPRING_CLOUD_AZURE_STORAGE_BLOB_ENDPOINT deployments/resource-manager-deployment.yaml | grep -i value: | awk '{print $2}')
+  sed -i -e 's~'"$CURRENT_SA_ENDPOINT"'~'"$storage_account_endpoint"'~g' deployments/resource-manager-deployment.yaml
+
   CURRENT_RESOURCEINFOBUCKET=$(grep -A1 -i RESOURCEINFO.BUCKET deployments/resource-manager-deployment.yaml | grep -i value: | awk '{print $2}')
-  sed -i -e 's~'"$CURRENT_RESOURCEINFOBUCKET"'~'"$resources_bucket_name"'~g' deployments/resource-manager-deployment.yaml
+  sed -i -e 's~'"$CURRENT_RESOURCEINFOBUCKET"'~'"$RESOURCEINFO_BUCKET"'~g' deployments/resource-manager-deployment.yaml
+  
   CURRENT_NODEFILESBUCKET=$(grep -A1 -i NODEFILES.BUCKET deployments/resource-manager-deployment.yaml | grep -i value: | awk '{print $2}')
-  sed -i -e 's~'"$CURRENT_NODEFILESBUCKET"'~'"$nodefiles_bucket_name"'~g' deployments/resource-manager-deployment.yaml
+  sed -i -e 's~'"$CURRENT_NODEFILESBUCKET"'~'"$RESOURCEINFO_BUCKET"'~g' deployments/resource-manager-deployment.yaml
 
   # AWES deployment setup
 
@@ -874,8 +888,6 @@ parseCredsFunction() {
   GET_REGION=$(cat creds | cut -d$';' -f1 | grep GET_REGION | cut -d$':' -f2 | tr -d '\r')
   GET_SAN=$(cat creds | cut -d$';' -f1 | grep GET_SAN | cut -d$':' -f2 | tr -d '\r')
   ACCOUNT_KEY=$(cat creds | cut -d$';' -f1 | grep ACCOUNT_KEY | cut -d$':' -f2 | tr -d '\r')
-  MINIO_ACCESS_KEY=$(cat creds | cut -d$';' -f1 | grep MINIO_ACCESS_KEY | cut -d$':' -f2 | tr -d '\r')
-  MINIO_SECRET_KEY=$(cat creds | cut -d$';' -f1 | grep MINIO_SECRET_KEY | cut -d$':' -f2 | tr -d '\r')
   TENANT_ID=$(cat creds | cut -d$';' -f1 | grep TENANT_ID | cut -d$':' -f2 | tr -d '\r')
   TF_RESOURCE_GROUP_NAME=$(cat creds | cut -d$';' -f1 | grep TF_RESOURCE_GROUP_NAME | cut -d$':' -f2 | tr -d '\r')
   RESOURCE_GROUP_NAME=$(cat creds | cut -d$';' -f1 | grep -w "RESOURCE_GROUP_NAME" | cut -d$':' -f2 | tr -d '\r')
@@ -1006,14 +1018,10 @@ DeleteFunction() {
 
   # Reset deployment setup
 
-  CURRENT_MINIO_ACCESS_KEY=$(grep -A1 -i MINIO_ACCESS_KEY deployments/minio-deployment.yaml | grep -i value: | awk '{print $2}')
-  sed -i -e 's~'"$CURRENT_MINIO_ACCESS_KEY"'~<your-access-key>~g' deployments/minio-deployment.yaml
-  CURRENT_MINIO_SECRET_KEY=$(grep -A1 -i MINIO_SECRET_KEY deployments/minio-deployment.yaml | grep -i value: | awk '{print $2}')
-  sed -i -e 's~'"$CURRENT_MINIO_SECRET_KEY"'~<your-secret-key>~g' deployments/minio-deployment.yaml
-  CURRENT_MINIOACCESSKEY=$(grep -A1 -i MINIOACCESSKEY deployments/resource-manager-deployment.yaml | grep -i value: | awk '{print $2}')
-  sed -i -e 's~'"$CURRENT_MINIOACCESSKEY"'~<your-access-key>~g' deployments/resource-manager-deployment.yaml
-  CURRENT_MINIOSECRETKEY=$(grep -A1 -i MINIOSECRETKEY deployments/resource-manager-deployment.yaml | grep -i value: | awk '{print $2}')
-  sed -i -e 's~'"$CURRENT_MINIOSECRETKEY"'~<your-secret-key>~g' deployments/resource-manager-deployment.yaml
+  CURRENT_SAN=$(grep -A1 -i SPRING_CLOUD_AZURE_STORAGE_BLOB_ACCOUNT_NAME deployments/resource-manager-deployment.yaml | grep -i value: | awk '{print $2}')
+  sed -i -e 's~'"$CURRENT_SAN"'~<your-storage-account-name>~g' deployments/resource-manager-deployment.yaml
+  CURRENT_ACCOUNT_KEY=$(grep -A1 -i SPRING_CLOUD_AZURE_STORAGE_BLOB_ACCOUNT_KEY deployments/resource-manager-deployment.yaml | grep -i value: | awk '{print $2}')
+  sed -i -e 's~'"$CURRENT_ACCOUNT_KEY"'~<your-storage-account-key>~g' deployments/resource-manager-deployment.yaml
   CURRENT_RESOURCEINFOBUCKET=$(grep -A1 -i RESOURCEINFO.BUCKET deployments/resource-manager-deployment.yaml | grep -i value: | awk '{print $2}')
   sed -i -e 's~'"$CURRENT_RESOURCEINFOBUCKET"'~<your-resourceinfo-bucketname>~g' deployments/resource-manager-deployment.yaml
   CURRENT_NODEFILESBUCKET=$(grep -A1 -i NODEFILES.BUCKET deployments/resource-manager-deployment.yaml | grep -i value: | awk '{print $2}')

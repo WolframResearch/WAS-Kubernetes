@@ -19,8 +19,8 @@ provider "azurerm" {
 }
 
 resource "azurerm_resource_group" "default" {
-  name     = "${var.cluster-name}-rg"
-  location = "${var.aks_region}"
+  name     = "RESOURCE_GROUP_NAME"
+  location = "CLUSTER_REGION"
 
   tags = {
     environment = "Wolfram Application Server"

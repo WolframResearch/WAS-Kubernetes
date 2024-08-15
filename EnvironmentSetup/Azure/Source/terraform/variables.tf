@@ -3,7 +3,7 @@ variable "cluster-name" {
 }
 
 variable "aks_region" {
-  default = "eastus"
+  default = "CLUSTER_REGION"
 }
 
 variable "desired-worker-node" {
