@@ -1,6 +1,6 @@
-RESOURCE_GROUP_NAME:
-LOCATION:
-SAN:
-ACCOUNT_KEY:
-RESOURCEINFO_BUCKET:
-NODEFILEINFO_BUCKET:
+RESOURCE_GROUP_NAME:<resource group name, WAS-rg>
+REGION:<location of the resource group, eastus>
+SAN:<storage account name that created in step 3, azurewasa3280>
+SAN_ACCOUNT_KEY:<storage account key that created in step3, dGVzdDEyMyMkwr3CvntbXX0uIQo=>
+RESOURCEINFO_BUCKET:<blob name that WAS will create to store resources, was-resources-3280, name can be 	like given format>
+NODEFILEINFO_BUCKET:<blob name that WAS will create to store nodefiles, was-nodefiles-3280, name can be 	like given format>

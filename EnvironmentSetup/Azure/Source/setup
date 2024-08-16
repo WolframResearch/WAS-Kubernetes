@@ -420,30 +420,27 @@ install_msg
 
 saveCredsFunction() {
 
-  WAS="was"
+  lower_cluster_name=$(echo $GET_CLUSTER_NAME | tr '[:upper:]' '[:lower:]' | tr -d '\r' | tr -d '-')
 
-  CUR_UNIX=$(date +%s | awk '{print substr($0, length($0)-5, 6)}')
-  CREDS_RG_NAME="$WAS-creds-rg-$CUR_UNIX"
-  CREDS_STORAGE_ACCOUNT_NAME="${WAS}sa${CUR_UNIX}"
-  CREDS_STORAGE_CONTAINER_NAME="$WAS$CUR_UNIX"
+  PARSED_TENANT=$(cat terraform/tenant-id.config | cut -d$':' -f2 | cut -d'"' -f 2 | cut -d$"-" -f1)
+  CREDS_STORAGE_ACCOUNT_NAME="${lower_cluster_name}sa${PARSED_TENANT}"
+  CREDS_STORAGE_CONTAINER_NAME=""${lower_cluster_name}con${PARSED_TENANT}""
 
   echo "GET_CLUSTER_NAME:$GET_CLUSTER_NAME" >>creds
   echo "GET_REGION:$GET_REGION" >>creds
-  echo "GET_SAN:$GET_SAN" >>creds
-  echo "ACCOUNT_KEY:$ACCOUNT_KEY" >>creds
+  echo "SAN:$SAN" >>creds
+  echo "SAN_ACCOUNT_KEY:$SAN_ACCOUNT_KEY" >>creds
   echo "TENANT_ID:$TENANT_ID" >>creds
   echo "RESOURCE_GROUP_NAME:$RESOURCE_GROUP_NAME" >>creds
-  echo "TF_RESOURCE_GROUP_NAME:$TF_RESOURCE_GROUP_NAME" >>creds
   echo "AD_APP_ID:$AD_APP_ID" >>creds
   echo "AD_APP_PASSWORD:$AD_APP_PASSWORD" >>creds
   echo "AZURE_DOMAIN:$AZURE_DOMAIN" >>creds
   echo "STORAGE_CONTAINER_NAME:$STORAGE_CONTAINER_NAME" >>creds
-  echo "RESOURCE_INFO_BUCKET:$resources_bucket_name" >>creds
-  echo "NODE_FILES_BUCKET:$nodefiles_bucket_name" >>creds
-  echo "CREDS_RG_NAME:$CREDS_RG_NAME" >>creds
+  echo "RESOURCE_INFO_BUCKET:$RESOURCEINFO_BUCKET" >>creds
+  echo "NODEFILEINFO_BUCKET:$NODEFILEINFO_BUCKET" >>creds
   echo "CREDS_STORAGE_ACCOUNT_NAME:$CREDS_STORAGE_ACCOUNT_NAME" >>creds
   echo "CREDS_STORAGE_CONTAINER_NAME:$CREDS_STORAGE_CONTAINER_NAME" >>creds
-
+  echo "AD_APP_NAME:$spuser" >> creds
   echo "BASE_URL:http://$BASE_URL/" >>creds
   echo "RESOURCE_MANAGER_URL:http://$BASE_URL/resources/" >>creds
   echo "ENDPOINT_MANAGER_URL:http://$BASE_URL/endpoints/" >>creds
@@ -451,16 +448,11 @@ saveCredsFunction() {
   echo "ENDPOINTS_INFO_URL:http://$BASE_URL/.applicationserver/info" >>creds
   echo "RESTART_URL:http://$BASE_URL/.applicationserver/kernel/restart" >>creds
 
-  create_rg=$(az group create --name $CREDS_RG_NAME --location $GET_REGION)
-  create_sa=$(az storage account create --name $CREDS_STORAGE_ACCOUNT_NAME --resource-group $CREDS_RG_NAME --location $GET_REGION --encryption-services file --allow-blob-public-access false --allow-cross-tenant-replication false)
+  create_sa=$(az storage account create --name $CREDS_STORAGE_ACCOUNT_NAME --resource-group $RESOURCE_GROUP_NAME --location $GET_REGION --encryption-services file --allow-blob-public-access false --allow-cross-tenant-replication false)
   create_container=$(az storage container create --account-name $CREDS_STORAGE_ACCOUNT_NAME --name $CREDS_STORAGE_CONTAINER_NAME --auth-mode login)
   upload_creds=$(az storage blob upload --account-name $CREDS_STORAGE_ACCOUNT_NAME --container-name $CREDS_STORAGE_CONTAINER_NAME --name creds --file creds --auth-mode login)
 
   rm creds
-}
-
-deleteCredsFunction() {
-  delete_creds=$(az group delete --name $CREDS_RG_NAME --no-wait --yes)
 }
 
 azureKeysFunction() {
@@ -489,14 +481,14 @@ SetupFunction() {
 
   cd Source/
 
-  SAN=$(cat containers | grep SAN | cut -d':' -f2 | tr -d '\n' | tr -d '\r')
-  ACCOUNT_KEY=$(cat containers | grep ACCOUNT_KEY | cut -d':' -f2 | tr -d '\n' | tr -d '\r')
+  SAN=$(cat containers | grep -w SAN | cut -d':' -f2 | tr -d '\n' | tr -d '\r')
+  SAN_ACCOUNT_KEY=$(cat containers | grep SAN_ACCOUNT_KEY | cut -d':' -f2 | tr -d '\n' | tr -d '\r')
   RESOURCE_GROUP_NAME=$(cat containers | grep RESOURCE_GROUP_NAME | cut -d':' -f2 | tr -d '\n' | tr -d '\r')
-  GET_REGION=$(cat containers | grep LOCATION | cut -d':' -f2 | tr -d '\n' | tr -d '\r')
+  GET_REGION=$(cat containers | grep REGION | cut -d':' -f2 | tr -d '\n' | tr -d '\r')
   RESOURCEINFO_BUCKET=$(cat containers | grep RESOURCEINFO_BUCKET | cut -d':' -f2 | tr -d '\n' | tr -d '\r')
   NODEFILEINFO_BUCKET=$(cat containers | grep NODEFILEINFO_BUCKET | cut -d':' -f2 | tr -d '\n' | tr -d '\r')
 
-  if [ -z "$SAN" ] || [ -z "$ACCOUNT_KEY" ] || [ -z "$RESOURCE_GROUP_NAME" ] || [ -z "$REGION" ] || [ -z "$RESOURCEINFO_BUCKET" ] || [ -z "$NODEFILEINFO_BUCKET" ]; then
+  if [ -z "$SAN" ] || [ -z "$SAN_ACCOUNT_KEY" ] || [ -z "$RESOURCE_GROUP_NAME" ] || [ -z "$GET_REGION" ] || [ -z "$RESOURCEINFO_BUCKET" ] || [ -z "$NODEFILEINFO_BUCKET" ]; then
     echo
     log_error "Check the Source/buckets file and make sure that it's already filled."
     echo
@@ -507,9 +499,9 @@ SetupFunction() {
 
   GET_CLUSTER_NAME=$(grep -A1 -i cluster-name variables.tf | grep -i default | awk '{print $3}' | sed -e 's/"//g' | tr -d '\n')
   GET_CLUSTER_NAME=$(echo $GET_CLUSTER_NAME | tr -d '\r')
-  sed -i -e "s~RESOURCE_GROUP_NAME~$RESOURCE_GROUP_NAME~g" main.tf
-  sed -i -e "s~CLUSTER_REGION~$GET_REGION~g" main.tf
-  sed -i -e "s~CLUSTER_REGION~$GET_REGION~g" variables.tf
+  sed -i -e "s~XXXXXX~$RESOURCE_GROUP_NAME~g" main.tf
+  sed -i -e "s~ZZZZZZ~$RESOURCE_GROUP_NAME~g" variables.tf
+  sed -i -e "s~TTTTTT~$GET_REGION~g" variables.tf
   echo
   log_debug "Phase 1 of 5: Prequisites Checks"
   printf "${YELLOW}☑${CYAN}□□□□${NORMAL} Phase ${YELLOW}1${NORMAL} of ${GREEN}5${NORMAL}: Prequisites Checks\\n"
@@ -543,12 +535,7 @@ SetupFunction() {
   lower_cluster_name=$(echo $GET_CLUSTER_NAME | tr '[:upper:]' '[:lower:]')
   lower_cluster_name=$(echo $lower_cluster_name | tr -d '\r')
   TENANT_ID=$(az account list | grep tenantId | cut -d$':' -f2 | cut -d'"' -f 2)
-  TF_RESOURCE_GROUP_NAME="$lower_cluster_name-rg-$TENANTID"
-  sed -i -e "s~XXXXXX~$TF_RESOURCE_GROUP_NAME~g" main.tf
 
-  # Create terraform resource group
-
-  run_ok "az group create --name $TF_RESOURCE_GROUP_NAME --location $GET_REGION" "Creating Resource Group"
   spsuffix="Azure$GET_CLUSTER_NAME"
   CUR_UNIX=$(date +%s | awk '{print substr($0, length($0)-5, 6)}')
   spuser="$spsuffix$CUR_UNIX"
@@ -591,14 +578,15 @@ SetupFunction() {
   spuser=$(echo $spuser | tr -d '\r')
 
   GET_SAN=$spuser
-  GET_SAN=$(echo $GET_SAN | tr -d '\r')
+  GET_SAN=$(echo $GET_SAN | tr -d '\r' | tr -d '-')
   STORAGE_CONTAINER_NAME="tfstate"
 
   # Create storage account
 
+  sed -i -e "s~YYYYYY~$GET_SAN~g" main.tf
+
   run_ok "createStorageAccount" "Creating Storage Account"
   run_ok "az storage container create --name $STORAGE_CONTAINER_NAME --account-name $GET_SAN --account-key $ACCOUNT_KEY 2> /dev/null" "Creating Terraform Blob Container"
-  sed -i -e "s~YYYYYY~$GET_SAN~g" main.tf
 
   run_ok "terraform init && terraform refresh && terraform plan && terraform apply -auto-approve" "Building AKS - (can take upto 15 minutes)"
   run_ok "az aks get-credentials --resource-group $(terraform output resource_group_name | sed -e 's/"//g') --name $(terraform output kubernetes_cluster_name | sed -e 's/"//g') --overwrite-existing" "Generating kubeconfig configuration"
@@ -657,7 +645,7 @@ SetupFunction() {
   sed -i -e 's~'"$STORAGE_ACCOUNT_NAME"'~'"$SAN"'~g' deployments/resource-manager-deployment.yaml
 
   STORAGE_ACCOUNT_KEY=$(grep -A1 -i SPRING_CLOUD_AZURE_STORAGE_BLOB_ACCOUNT_KEY deployments/resource-manager-deployment.yaml | grep -i value: | awk '{print $2}')
-  sed -i -e 's~'"$STORAGE_ACCOUNT_KEY"'~'"$ACCOUNT_KEY"'~g' deployments/resource-manager-deployment.yaml
+  sed -i -e 's~'"$STORAGE_ACCOUNT_KEY"'~'"$SAN_ACCOUNT_KEY"'~g' deployments/resource-manager-deployment.yaml
 
   CURRENT_SA_ENDPOINT=$(grep -A1 -i SPRING_CLOUD_AZURE_STORAGE_BLOB_ENDPOINT deployments/resource-manager-deployment.yaml | grep -i value: | awk '{print $2}')
   sed -i -e 's~'"$CURRENT_SA_ENDPOINT"'~'"$storage_account_endpoint"'~g' deployments/resource-manager-deployment.yaml
@@ -709,8 +697,8 @@ SetupFunction() {
 }
 
 createStorageAccount() {
-  san=$(az storage account create --resource-group $TF_RESOURCE_GROUP_NAME --name $GET_SAN --sku Standard_LRS --encryption-services blob 2>/dev/null)
-  ACCOUNT_KEY=$(az storage account keys list --resource-group $TF_RESOURCE_GROUP_NAME --account-name $GET_SAN --query '[0].value' -o tsv 2>/dev/null)
+  san=$(az storage account create --resource-group $RESOURCE_GROUP_NAME --name $GET_SAN --sku Standard_LRS --encryption-services blob 2>/dev/null)
+  ACCOUNT_KEY=$(az storage account keys list --resource-group $RESOURCE_GROUP_NAME --account-name $GET_SAN --query '[0].value' -o tsv 2>/dev/null)
 }
 
 custommetricsSetup() {
@@ -809,96 +797,25 @@ kubectlFunction() {
 
 }
 
-kafkaShutdown() {
-  kubectl delete --ignore-not-found=true -f kafkabridge/ >>$LOG_PATH
-  kubectl delete --ignore-not-found=true -f kafka/ >>$LOG_PATH
-  sleep 60
-  while true; do
-    current=$(kubectl get pods -n kafka | grep -i "kafka-persistent-kafka-0" | awk '{print $1}' | head -qn1)
-    if [ -z $current ]; then
-      log_debug "kafka 0 not running"
-      break
-    else
-      log_debug "kafka 0 forcing shutdown"
-      kubectl delete pod kafka-persistent-kafka-0 -n kafka --grace-period=0 --force 2>/dev/null 2>&1
-    fi
-  done
-  while true; do
-    current=$(kubectl get pods -n kafka | grep -i "kafka-persistent-kafka-1" | awk '{print $1}' | head -qn1)
-    if [ -z $current ]; then
-      log_debug "kafka 1 not running"
-      break
-    else
-      log_debug "kafka 1 forcing shutdown"
-      kubectl delete pod kafka-persistent-kafka-1 -n kafka --grace-period=0 --force 2>/dev/null 2>&1
-    fi
-  done
-  while true; do
-    current=$(kubectl get pods -n kafka | grep -i "kafka-persistent-kafka-2" | awk '{print $1}' | head -qn1)
-    if [ -z $current ]; then
-      log_debug "kafka 2 not running"
-      break
-    else
-      log_debug "kafka 2 forcing shutdown"
-      kubectl delete pod kafka-persistent-kafka-2 -n kafka --grace-period=0 --force 2>/dev/null 2>&1
-    fi
-  done
-
-  while true; do
-    current=$(kubectl get pods -n kafka | grep -i "kafka-persistent-zookeeper-0" | awk '{print $1}' | head -qn1)
-    if [ -z $current ]; then
-      log_debug "zookeeper 0 not running"
-      break
-    else
-      log_debug "zookeeper 0 forcing shutdown"
-      kubectl delete pod kafka-persistent-zookeeper-0 -n kafka --grace-period=0 --force 2>/dev/null 2>&1
-    fi
-  done
-
-  while true; do
-    current=$(kubectl get pods -n kafka | grep -i "kafka-persistent-zookeeper-1" | awk '{print $1}' | head -qn1)
-    if [ -z $current ]; then
-      log_debug "zookeeper 1 not running"
-      break
-    else
-      log_debug "zookeeper 1 forcing shutdown"
-      kubectl delete pod kafka-persistent-zookeeper-1 -n kafka --grace-period=0 --force 2>/dev/null 2>&1
-    fi
-  done
-
-  while true; do
-    current=$(kubectl get pods -n kafka | grep -i "kafka-persistent-zookeeper-2" | awk '{print $1}' | head -qn1)
-    if [ -z $current ]; then
-      log_debug "zookeeper 2 not running"
-      break
-    else
-      log_debug "zookeeper 2 forcing shutdown"
-      kubectl delete pod kafka-persistent-zookeeper-2 -n kafka --grace-period=0 --force 2>/dev/null 2>&1
-    fi
-  done
-
-}
-
 deleteAR() {
-  app_id=$(az ad app list --all --display-name $spuser | grep appId | cut -d$':' -f2 | cut -d'"' -f 2 | tr -d '\r')
+  app_id=$(az ad app list --all --display-name $AD_APP_NAME | grep appId | cut -d$':' -f2 | cut -d'"' -f 2 | tr -d '\r')
   delete_app=$(az ad app delete --id $app_id --only-show-errors)
 }
 
 parseCredsFunction() {
   GET_CLUSTER_NAME=$(cat creds | cut -d$';' -f1 | grep GET_CLUSTER_NAME | cut -d$':' -f2 | tr -d '\r')
   GET_REGION=$(cat creds | cut -d$';' -f1 | grep GET_REGION | cut -d$':' -f2 | tr -d '\r')
-  GET_SAN=$(cat creds | cut -d$';' -f1 | grep GET_SAN | cut -d$':' -f2 | tr -d '\r')
-  ACCOUNT_KEY=$(cat creds | cut -d$';' -f1 | grep ACCOUNT_KEY | cut -d$':' -f2 | tr -d '\r')
+  SAN=$(cat creds | cut -d$';' -f1 | grep SAN | cut -d$':' -f2 | tr -d '\r')
+  SAN_ACCOUNT_KEY=$(cat creds | cut -d$';' -f1 | grep SAN_ACCOUNT_KEY | cut -d$':' -f2 | tr -d '\r')
   TENANT_ID=$(cat creds | cut -d$';' -f1 | grep TENANT_ID | cut -d$':' -f2 | tr -d '\r')
-  TF_RESOURCE_GROUP_NAME=$(cat creds | cut -d$';' -f1 | grep TF_RESOURCE_GROUP_NAME | cut -d$':' -f2 | tr -d '\r')
   RESOURCE_GROUP_NAME=$(cat creds | cut -d$';' -f1 | grep -w "RESOURCE_GROUP_NAME" | cut -d$':' -f2 | tr -d '\r')
   AD_APP_ID=$(cat creds | cut -d$';' -f1 | grep AD_APP_ID | cut -d$':' -f2 | tr -d '\r')
   AD_APP_PASSWORD=$(cat creds | cut -d$';' -f1 | grep AD_APP_PASSWORD | cut -d$':' -f2 | tr -d '\r')
   AZURE_DOMAIN=$(cat creds | cut -d$';' -f1 | grep AZURE_DOMAIN | cut -d$':' -f2 | tr -d '\r')
   STORAGE_CONTAINER_NAME=$(cat creds | cut -d$';' -f1 | grep -w "STORAGE_CONTAINER_NAME" | cut -d$':' -f2 | tr -d '\r')
   RESOURCE_INFO_BUCKET=$(cat creds | cut -d$';' -f1 | grep RESOURCE_INFO_BUCKET | cut -d$':' -f2 | tr -d '\r')
-  NODE_FILES_BUCKET=$(cat creds | cut -d$';' -f1 | grep NODE_FILES_BUCKET | cut -d$':' -f2 | tr -d '\r')
-  CREDS_RG_NAME=$(cat creds | cut -d$';' -f1 | grep CREDS_RG_NAME | cut -d$':' -f2 | tr -d '\r')
+  NODEFILEINFO_BUCKET=$(cat creds | cut -d$';' -f1 | grep NODEFILEINFO_BUCKET | cut -d$':' -f2 | tr -d '\r')
+  AD_APP_NAME=$(cat creds | cut -d$';' -f1 | grep AD_APP_NAME | cut -d$':' -f2 | tr -d '\r')
   CREDS_STORAGE_ACCOUNT_NAME=$(cat creds | cut -d$';' -f1 | grep CREDS_STORAGE_ACCOUNT_NAME | cut -d$':' -f2 | tr -d '\r')
   CREDS_STORAGE_CONTAINER_NAME=$(cat creds | cut -d$';' -f1 | grep CREDS_STORAGE_CONTAINER_NAME | cut -d$':' -f2 | tr -d '\r')
   BASE_URL=$(cat creds | cut -d$';' -f1 | grep BASE_URL | cut -d ":" -f 2- | tr -d '\r')
@@ -920,7 +837,7 @@ DeleteFunction() {
   PARSED_TENANT=$(cat Source/terraform/tenant-id.config)
   
   CREDS_STORAGE_ACCOUNT_NAME="${lower_cluster_name}sa${PARSED_TENANT}"
-  CREDS_STORAGE_CONTAINER_NAME="$lower_cluster_name$PARSED_TENANT"
+  CREDS_STORAGE_CONTAINER_NAME=""${lower_cluster_name}con${PARSED_TENANT}""
 
   # Download and parse creds
 
@@ -945,11 +862,13 @@ DeleteFunction() {
   sed -i -e 's~'"eastus"'~'"$GET_REGION"'~g' terraform/variables.tf
   sed -i -e "s/XXXXXX/$AD_APP_ID/g" terraform/variables.tf
   sed -i -e "s/YYYYYY/$AD_APP_PASSWORD/g" terraform/variables.tf
-  sed -i -e "s~XXXXXX~$TF_RESOURCE_GROUP_NAME~g" terraform/main.tf
+  sed -i -e "s~ZZZZZZ~$RESOURCE_GROUP_NAME~g" terraform/variables.tf
+  sed -i -e "s~TTTTTT~$GET_REGION~g" terraform/variables.tf
+  sed -i -e "s~XXXXXX~$RESOURCE_GROUP_NAME~g" terraform/main.tf
   sed -i -e "s~YYYYYY~$GET_SAN~g" terraform/main.tf
 
   echo
-  log_debug "Phase 1 of 5: Prequisites Checks"
+  log_debug "Phase 1 of 3: Prequisites Checks"
   printf "${YELLOW}☑${CYAN}□□□□${NORMAL} Phase ${YELLOW}1${NORMAL} of ${GREEN}5${NORMAL}: Prequisites Checks\\n"
   run_ok "kubectlFunction" "Checking Kubectl Installed"
   run_ok "terraformFunction" "Checking Terraform Installed"
@@ -965,54 +884,14 @@ DeleteFunction() {
   fi
 
   echo
-  log_debug "Phase 2 of 5: Delete Wolfram Application Server Deployments"
-  printf "${GREEN}☑${YELLOW}☑${CYAN}□□□${NORMAL} Phase ${YELLOW}2${NORMAL} of ${GREEN}5${NORMAL}: Delete Wolfram Application Server Deployments\\n"
-
-  kubernetes_cluster_name=$GET_CLUSTER_NAME-aks
-
-  CFILE=~/.kube/config
-  if [ -f "$CFILE" ]; then
-    log_debug "Already has kubeconfig"
-    chmod 700 ~/.kube/config
-  else
-    mkdir -p ~/.kube
-    touch ~/.kube/config
-    chmod 700 ~/.kube/config
-  fi
-
-  # Update kube config
-  update_kubeconfig=$(az aks get-credentials --name $kubernetes_cluster_name --resource-group $RESOURCE_GROUP_NAME --overwrite --only-show-errors)
-
-  # Switch context
-  run_ok "kubectl config use-context $kubernetes_cluster_name " "Switching Context"
-
-  run_ok "kubectl delete --ignore-not-found=true -f deployments/" "Deleting Deployments"
-  run_ok "kafkaShutdown" "Deleting Kafka Cluster"
-  run_ok "kubectl delete secret generic basic-auth --ignore-not-found=true" "Deleting NGINX Auth"
-
-  run_ok "kubectl delete --ignore-not-found=true -f ingress/" "Deleting Ingress"
-  run_ok "kubectl delete --ignore-not-found=true -f hpa/" "Deleting Horizontal Pod Autoscaler"
-  run_ok "kubectl delete --ignore-not-found=true -f services/" "Deleting Services"
-  run_ok "kubectl delete --ignore-not-found=true -f pvc/" "Deleting Persistent Volume Claims"
-
-  run_ok "kubectl delete --ignore-not-found=true -f strimzi-kafka-deployment/020-RoleBinding-strimzi-cluster-operator.yaml -n kafkacluster && kubectl delete --ignore-not-found=true -f strimzi-kafka-deployment/032-RoleBinding-strimzi-cluster-operator-topic-operator-delegation.yaml -n kafkacluster && kubectl delete --ignore-not-found=true -f strimzi-kafka-deployment/031-RoleBinding-strimzi-cluster-operator-entity-operator-delegation.yaml -n kafkacluster && kubectl delete --ignore-not-found=true -f strimzi-kafka-deployment/ -n kafka && kubectl delete --ignore-not-found=true -f kafka && kubectl delete --ignore-not-found=true -f kafkabridge" "Deleting Kafka Cluster Operator"
-  run_ok "kubectl delete --ignore-not-found=true apiservice v1beta1.custom.metrics.k8s.io && kubectl delete --ignore-not-found=true -f namespace/" "Deleting WAS Namespace"
-  run_ok "kubectl config set-context --current --namespace=default" "Reset Namespace"
-
-  echo
-  log_debug "Phase 3 of 5: Delete Dependencies"
-  printf "${GREEN}☑☑${YELLOW}☑${CYAN}□□${NORMAL} Phase ${YELLOW}3${NORMAL} of ${GREEN}5${NORMAL}: Delete Dependencies\\n"
-  run_ok "kubectl delete --ignore-not-found=true -f metrics-server/" "Deleting Metrics Server"
-
-  echo
-  log_debug "Phase 4 of 5: Delete Azure Kubernetes Cluster (AKS)"
+  log_debug "Phase 2 of 3: Delete Azure Kubernetes Cluster (AKS)"
   printf "${GREEN}☑☑☑${YELLOW}☑${CYAN}□${NORMAL} Phase ${YELLOW}4${NORMAL} of ${GREEN}5${NORMAL}: Delete Azure Kubernetes Cluster (AKS)\\n"
   cd terraform
   run_ok "sleep 5 && terraform init && terraform refresh && terraform destroy -auto-approve" "Deleting AKS"
   cd ..
 
   echo
-  log_debug "Phase 5 of 5: Cleanup"
+  log_debug "Phase 3 of 3: Cleanup"
   printf "${GREEN}☑☑☑☑${YELLOW}☑${NORMAL} Phase ${YELLOW}5${NORMAL} of ${GREEN}5${NORMAL}: Cleanup\\n"
 
   sed -i -e "s~$BASE_URL~http://domain.com/~g" deployments/active-web-elements-server-deployment.yaml
@@ -1020,13 +899,13 @@ DeleteFunction() {
   # Reset deployment setup
 
   CURRENT_SAN=$(grep -A1 -i SPRING_CLOUD_AZURE_STORAGE_BLOB_ACCOUNT_NAME deployments/resource-manager-deployment.yaml | grep -i value: | awk '{print $2}')
-  sed -i -e 's~'"$CURRENT_SAN"'~<your-storage-account-name>~g' deployments/resource-manager-deployment.yaml
+  sed -i -e 's~'"$CURRENT_SAN"'~STORAGE_ACCOUNT_NAME~g' deployments/resource-manager-deployment.yaml
   CURRENT_ACCOUNT_KEY=$(grep -A1 -i SPRING_CLOUD_AZURE_STORAGE_BLOB_ACCOUNT_KEY deployments/resource-manager-deployment.yaml | grep -i value: | awk '{print $2}')
-  sed -i -e 's~'"$CURRENT_ACCOUNT_KEY"'~<your-storage-account-key>~g' deployments/resource-manager-deployment.yaml
+  sed -i -e 's~'"$CURRENT_ACCOUNT_KEY"'~STORAGE_ACCOUNT_KEY~g' deployments/resource-manager-deployment.yaml
   CURRENT_RESOURCEINFOBUCKET=$(grep -A1 -i RESOURCEINFO.BUCKET deployments/resource-manager-deployment.yaml | grep -i value: | awk '{print $2}')
-  sed -i -e 's~'"$CURRENT_RESOURCEINFOBUCKET"'~<your-resourceinfo-bucketname>~g' deployments/resource-manager-deployment.yaml
+  sed -i -e 's~'"$CURRENT_RESOURCEINFOBUCKET"'~RESOURCEINFO.BUCKETNAME~g' deployments/resource-manager-deployment.yaml
   CURRENT_NODEFILESBUCKET=$(grep -A1 -i NODEFILES.BUCKET deployments/resource-manager-deployment.yaml | grep -i value: | awk '{print $2}')
-  sed -i -e 's~'"$CURRENT_NODEFILESBUCKET"'~<your-nodefiles-bucketname>~g' deployments/resource-manager-deployment.yaml
+  sed -i -e 's~'"$CURRENT_NODEFILESBUCKET"'~NODEFILES.BUCKETNAME~g' deployments/resource-manager-deployment.yaml
 
   # Delete terraform storage account
 
@@ -1036,11 +915,7 @@ DeleteFunction() {
   PARSED_TENANTID=$(echo $PARSED_TENANTID | tr -d '\r')
   lower_cluster_name=$(echo $GET_CLUSTER_NAME | tr '[:upper:]' '[:lower:]')
   lower_cluster_name=$(echo $lower_cluster_name | tr -d '\r')
-  spsuffix="AzureWAS"
-  spuser="$spsuffix$PARSED_TENANTID"
-  CUR_UNIX=$(date +%s | awk '{print substr($0, length($0)-5, 6)}')
-  TF_RESOURCE_GROUP_NAME="$lower_cluster_name-rg-$CUR_UNIX"
-  run_ok "az storage account delete --name $GET_SAN --resource-group $TF_RESOURCE_GROUP_NAME --yes" "Deleting Storage Account"
+
 
   # Delete active directory/app registration
 
@@ -1050,8 +925,7 @@ DeleteFunction() {
 
   # Delete terraform and was resource groups
 
-  run_ok "az group delete --name $TF_RESOURCE_GROUP_NAME --no-wait --yes && az group delete --name NetworkWatcherRG --no-wait --yes" "Deleting Resource Group"
-  run_ok "az group delete --name "${GET_CLUSTER_NAME}-rg" --no-wait --yes || true" "Deleting WAS Resource Group"
+  run_ok "az group delete --name "${RESOURCE_GROUP_NAME}-rg" --no-wait --yes || true" "Deleting WAS Resource Group"
   set +e
 
   # Cleanup
@@ -1060,11 +934,13 @@ DeleteFunction() {
 
   awk '!/storage_account_name/' variables.tf >tmpfile && mv tmpfile variables.tf >>$LOG_PATH
 
-  sed -i -e 's/'"$TF_RESOURCE_GROUP_NAME"'/XXXXXX/g' main.tf
+  sed -i -e 's/'"$RESOURCE_GROUP_NAME"'~XXXXXX~g' main.tf
 
-  sed -i -e 's/'"$GET_SAN"'/YYYYYY/g' main.tf
+  sed -i -e 's/'"$GET_SAN"'~YYYYYY~g' main.tf
 
-  sed -i -e 's~'"$AD_APP_ID"'~XXXXXX~g' variables.tf
+  sed -i -e 's/'"$RESOURCE_GROUP_NAME"'~ZZZZZZ~g' variables.tf
+
+  sed -i -e 's~'"$GET_REGION"'~TTTTTT~g' variables.tf
 
   sed -i -e 's~'"$AD_APP_PASSWORD"'~YYYYYY~g' variables.tf
 
@@ -1076,10 +952,6 @@ DeleteFunction() {
   rm -rf custom-metrics/stopspinning
   rm -rf tmpfile
   cd ..
-
-  # Delete creds resource group
-
-  deleteCredsFunction
 
   echo
   echo "Deleted AKS Cluster and Wolfram Application Server. Our warmest appreciation to you for running Wolfram Application Server on Azure environment. Thank You!"

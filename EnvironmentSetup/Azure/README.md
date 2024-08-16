@@ -60,19 +60,19 @@ RESOURCE_GROUP_NAME: The name of the resource group, WAS-rg
 ```
 **Step 4.** Create storage account and store account key
 
-	az storage account create --resource-group <RESOURCE_GROUP_NAME> --name <SA-NAME> --sku Standard_LRS --encryption-services blob
+	az storage account create --resource-group <RESOURCE_GROUP_NAME> --name <SAN> --sku Standard_LRS --encryption-services blob
 
-`**SA-NAME**: The storage account name, there shouldn't be any space and characters between letters`
+`**SAN**: The storage account name, there shouldn't be any space and characters between letters`
 
-	az storage account keys list --resource-group <RESOURCE_GROUP_NAME> --account-name <SA-NAME> --query '[0].value' -o tsv
-`The command will return the **ACCOUNT_KEY**`
+	az storage account keys list --resource-group <RESOURCE_GROUP_NAME> --account-name <SAN> --query '[0].value' -o tsv
+`The command will return the **SAN_ACCOUNT_KEY**`
 
 **Step 5.** Update the **containers** files with proper values
 
 	RESOURCE_GROUP_NAME:<resource group name, WAS-rg>
 	REGION:<location of the resource group, eastus>
 	SAN:<storage account name that created in step 3, azurewasa3280>
-	ACCOUNT_KEY:<storage account key that created in step3, dGVzdDEyMyMkwr3CvntbXX0uIQo=>
+	SAN_ACCOUNT_KEY:<storage account key that created in step3, dGVzdDEyMyMkwr3CvntbXX0uIQo=>
 	RESOURCEINFO_BUCKET:<blob name that WAS will create to store resources, was-resources-3280, name can be 	like given format>
 	NODEFILEINFO_BUCKET:<blob name that WAS will create to store nodefiles, was-nodefiles-3280, name can be 	like given format>
 

@@ -18,19 +18,10 @@ provider "azurerm" {
   features {}
 }
 
-resource "azurerm_resource_group" "default" {
-  name     = "RESOURCE_GROUP_NAME"
-  location = "CLUSTER_REGION"
-
-  tags = {
-    environment = "Wolfram Application Server"
-  }
-}
-
 resource "azurerm_kubernetes_cluster" "default" {
   name                = "${var.cluster-name}-aks"
-  location            = azurerm_resource_group.default.location
-  resource_group_name = azurerm_resource_group.default.name
+  location            = "${var.region}"
+  resource_group_name = "${var.resource-group}"
   dns_prefix          = "${var.cluster-name}-k8s"
   kubernetes_version  = "${var.cluster-version}"
 
