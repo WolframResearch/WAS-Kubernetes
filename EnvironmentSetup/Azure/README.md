@@ -51,7 +51,32 @@ Once your total region CPU of 40 or higher is confirmed available, authenticate 
 
 	cd WAS-Kubernetes/EnvironmentSetup/Azure/
 
-**Step 3.** Replace the tag with your tenant ID and run the following command to set up AKS and deploy WAS:
+**Step 3.** Create resource group and store name
+
+	az group create -l <LOCATION> -n <RESOURCE_GROUP_NAME>
+```
+LOCATION: The region of the resource group will use, eastus
+RESOURCE_GROUP_NAME: The name of the resource group, WAS-rg
+```
+**Step 4.** Create storage account and store account key
+
+	az storage account create --resource-group <RESOURCE_GROUP_NAME> --name <SAN> --sku Standard_LRS --encryption-services blob
+
+`**SAN**: The storage account name, there shouldn't be any space and characters between letters`
+
+	az storage account keys list --resource-group <RESOURCE_GROUP_NAME> --account-name <SAN> --query '[0].value' -o tsv
+`The command will return the **SAN_ACCOUNT_KEY**`
+
+**Step 5.** Update the **containers** files with proper values
+
+	RESOURCE_GROUP_NAME:<resource group name, WAS-rg>
+	REGION:<location of the resource group, eastus>
+	SAN:<storage account name that created in step 3, azurewasa3280>
+	SAN_ACCOUNT_KEY:<storage account key that created in step3, dGVzdDEyMyMkwr3CvntbXX0uIQo=>
+	RESOURCEINFO_BUCKET:<blob name that WAS will create to store resources, was-resources-3280, name can be 	like given format>
+	NODEFILEINFO_BUCKET:<blob name that WAS will create to store nodefiles, was-nodefiles-3280, name can be 	like given format>
+
+**Step 6.** Replace the tag with your tenant ID and run the following command to set up AKS and deploy WAS:
 
 	YOURTENANTID=<your-tenant-id> && rm -rf Source/terraform/tenant-id.config && echo $YOURTENANTID >> Source/terraform/tenant-id.config && mkdir -p ~/.kube && docker-compose up --build -d && clear && docker exec -it azure-setup-manager bash setup --create && sudo chown -R $USER ~/.kube
 
@@ -63,7 +88,7 @@ Example:
 **Note:** This can take approximately 25 minutes to complete.
 
 
-**Step 4.** Run the following command to retrieve your base URL and application URLs:
+**Step 7.** Run the following command to retrieve your base URL and application URLs:
 
 	docker-compose up --build -d && clear && docker exec -it azure-setup-manager bash setup --endpoint-info
 
@@ -84,15 +109,15 @@ The output of this command will follow this pattern:
 
 
 
-**Step 5.** After completion, run this command to shutdown the azure-setup-manager:
+**Step 8.** After completion, run this command to shutdown the azure-setup-manager:
 
 	docker-compose down
 
 
-**Step 6.** Get a license file from your Wolfram Research sales representative.
+**Step 9.** Get a license file from your Wolfram Research sales representative.
 
 
-**Step 7.** This file needs to be deployed to WAS as a node file in the conventional location `.Wolfram/Licensing/mathpass`. From a Wolfram Language client, this may be achieved using the following code: 
+**Step 10.** This file needs to be deployed to WAS as a node file in the conventional location `.Wolfram/Licensing/mathpass`. From a Wolfram Language client, this may be achieved using the following code: 
 
     was = ServiceConnect["WolframApplicationServer", "http://<your-base-url>"];
 	ServiceExecute[was, "DeployNodeFile",
@@ -106,7 +131,7 @@ Alternatively you may use the [node files REST API](../../Documentation/API/Node
     Needs["WolframApplicationServer`"]
 
 
-**Step 8.** Restart the application using the [restart API](../../Documentation/API/Utilities.md) to enable your Wolfram Engines.
+**Step 11.** Restart the application using the [restart API](../../Documentation/API/Utilities.md) to enable your Wolfram Engines.
 
 URL: `http://<your-base-url>/.applicationserver/kernel/restart`
 	

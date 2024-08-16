@@ -65,6 +65,10 @@ spec:
           value: docker
         - name: LOG_LOCATION
           value: /opt/app/logs
+        - name: RESOURCE_INFO_TOPIC
+          value: "resource-info"
+        - name: ENDPOINT_INFO_TOPIC
+          value: "endpoint-info"
         - name: KAFKA.BOOTSTRAP-SERVERS
           value: kafka-persistent-kafka-bootstrap.kafka.svc.cluster.local:9092
         image: wolframapplicationserver/endpoint-manager:1.2.5
@@ -92,9 +96,6 @@ spec:
         - mountPath: "/opt/app/logs"
           name: endpoint-logs-storage
       initContainers:
-      - name: init-minio
-        image: bash
-        command: ["bash", "-c", "for i in $(seq 1 3000); do nc -zvw1 minio 9000 && exit 0 || sleep 3; done; exit 1"]
       - name: init-kafka
         image: bash
         command: ["bash", "-c", "for i in $(seq 1 3000); do nc -zvw1 kafka-persistent-kafka-bootstrap.kafka.svc.cluster.local 9092 && exit 0 || sleep 3; done; exit 1"]

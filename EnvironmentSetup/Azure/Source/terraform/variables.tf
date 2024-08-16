@@ -2,10 +2,6 @@ variable "cluster-name" {
   default = "WAS"
 }
 
-variable "aks_region" {
-  default = "eastus"
-}
-
 variable "desired-worker-node" {
   default = "2"
 }
@@ -40,5 +36,13 @@ variable "appId" {
 
 variable "password" {
   default = "YYYYYY"
+}
+
+variable "resource-group" {
+  default = "ZZZZZZ"
+}
+
+variable "region" {
+  default = "TTTTTT"
 }
 

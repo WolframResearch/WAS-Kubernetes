@@ -29,16 +29,26 @@ spec:
           value: docker
         - name: LOG_LOCATION
           value: /opt/app/logs
+        - name: RESOURCE_INFO_TOPIC
+          value: "resource-info"
+        - name: NODEFILE_INFO_TOPIC
+          value: "nodefile-info"
         - name: KAFKA.BOOTSTRAP-SERVERS
           value: kafka-persistent-kafka-bootstrap.kafka.svc.cluster.local:9092
-        - name: MINIOACCESSKEY
-          value: <your-access-key>
-        - name: MINIOSECRETKEY
-          value: <your-secret-key>
+        - name: STORAGE_PROVIDER
+          value: "azure"
+        - name: SPRING_CLOUD_AZURE_STORAGE_BLOB_ENABLED
+          value: "true"
+        - name: SPRING_CLOUD_AZURE_STORAGE_BLOB_ACCOUNT_NAME
+          value: "STORAGE_ACCOUNT_NAME"
+        - name: SPRING_CLOUD_AZURE_STORAGE_BLOB_ACCOUNT_KEY
+          value: "STORAGE_ACCOUNT_KEY"
+        - name: SPRING_CLOUD_AZURE_STORAGE_BLOB_ENDPOINT
+          value: "https://SAN.blob.core.windows.net/"
         - name: RESOURCEINFO.BUCKET
-          value: <your-resourceinfo-bucketname>
+          value: RESOURCEINFO.BUCKETNAME
         - name: NODEFILES.BUCKET
-          value: <your-nodefiles-bucketname>
+          value: NODEFILES.BUCKETNAME
         image: wolframapplicationserver/resource-manager:1.2.6
         name: resource-manager
         ports:
@@ -53,20 +63,17 @@ spec:
         readinessProbe:
           tcpSocket:
             port: 9090
-          initialDelaySeconds: 5
-          periodSeconds: 10
+          initialDelaySeconds: 10
+          periodSeconds: 30
         livenessProbe:
           tcpSocket:
             port: 9090
-          initialDelaySeconds: 15
+          initialDelaySeconds: 30
           periodSeconds: 20   
         volumeMounts:
         - mountPath: "/opt/app/logs"
           name: resources-logs-storage
       initContainers:
-      - name: init-minio
-        image: bash
-        command: ["bash", "-c", "for i in $(seq 1 3000); do nc -zvw1 minio 9000 && exit 0 || sleep 3; done; exit 1"]
       - name: init-kafka
         image: bash
         command: ["bash", "-c", "for i in $(seq 1 3000); do nc -zvw1 kafka-persistent-kafka-bootstrap.kafka.svc.cluster.local 9092 && exit 0 || sleep 3; done; exit 1"]

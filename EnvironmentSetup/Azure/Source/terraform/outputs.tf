@@ -1,7 +1,7 @@
 output "resource_group_name" {
-  value = azurerm_resource_group.default.name
+  value = "${var.resource-group}"
 }
 
 output "kubernetes_cluster_name" {
-  value = azurerm_kubernetes_cluster.default.name
+  value = "${var.cluster-name}-aks"
 }
