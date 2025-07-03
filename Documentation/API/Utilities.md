@@ -66,3 +66,62 @@ Use this API to get the kernel initialization status. If all kernels fully initi
 	* Example:
 
 	  	Kernels fully initialized
+
+## Kernel Pool Status [GET]
+
+### Information about kernels in the kernel pool [.applicationserver/kernel/stats]
+
+Use this API to get information about the kernels in a kernel pool.
+
+* Request
+
+    GET /.applicationserver/kernel/stats
+  Example:
+
+     GET "http://applicationserver.wolfram.com/.applicationserver/kernel/stats"
+
+* Response 200 OK
+  
+  * Example:
+  
+        [
+          {
+            "poolName":"MSP",
+            "note":null,
+            "acquiredKernelPercentage":0.0,
+            "numberWaitingForKernels":0,
+            "configuredKernelCount":2,
+            "liveKernelCount":2
+          },
+          {
+            "poolName":"Public",
+            "note":null,
+            "acquiredKernelPercentage":50.0,
+            "numberWaitingForKernels":0,
+            "configuredKernelCount":2,
+            "liveKernelCount":2
+          }
+        ]
+
+* Optional query parameter
+    * `pool={name,...}`: restrict to a particular kernel pool
+        * Example: `GET "http://applicationserver.wolfram.com/.applicationserver/kernel/stats?pool=Public"`
+        * Response 200 OK
+        
+        [
+          {
+            "poolName":"Public",
+            "note":null,
+            "acquiredKernelPercentage":50.0,
+            "numberWaitingForKernels":0,
+            "configuredKernelCount":2,
+            "liveKernelCount":2
+          }
+        ]
+
+* Optional query parameter
+    * `require-running-kernels=true` (defaults to `false`): if `true` and the number of
+kernels in a pool, including leased kernels, (`liveKernelCount`) is 0 then
+the endpoint returns Response 500 Internal Server Error
+unless the `configuredKernelCount` for that pool is also 0.
+
