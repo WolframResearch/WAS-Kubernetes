@@ -79,22 +79,22 @@ spec:
           requests:
             cpu: 2
             memory: 6Gi
-        # startupProbe:
-        #   httpGet:
-        #     path: /.applicationserver/kernel/readiness
-        #     port: 8080
-        #   initialDelaySeconds: 15
-        #   periodSeconds: 10
-        #   failureThreshold: 100
-        # livenessProbe:
-        #   failureThreshold: 3
-        #   httpGet:
-        #     path: '/.applicationserver/kernel/stats?require-running-kernels=true'
-        #     port: 8080
-        #   initialDelaySeconds: 20
-        #   periodSeconds: 20
-        #   successThreshold: 1
-        #   timeoutSeconds: 1
+        startupProbe:
+          httpGet:
+            path: /.applicationserver/kernel/readiness
+            port: 8080
+          initialDelaySeconds: 15
+          periodSeconds: 10
+          failureThreshold: 100
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: '/.applicationserver/kernel/stats?require-running-kernels=true'
+            port: 8080
+          initialDelaySeconds: 20
+          periodSeconds: 20
+          successThreshold: 1
+          timeoutSeconds: 1
         volumeMounts:
         - mountPath: "/opt/app/logs"
           name: awes-logs-storage
