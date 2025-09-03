@@ -1,0 +1,13 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: kafka-standardssd-xfs
+provisioner: disk.csi.azure.com
+allowVolumeExpansion: true
+parameters:
+  skuname: StandardSSD_LRS
+  kind: Managed
+  cachingMode: None
+  fsType: xfs
+reclaimPolicy: Delete
+volumeBindingMode: WaitForFirstConsumer

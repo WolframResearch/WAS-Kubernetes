@@ -1,16 +1,12 @@
-variable "cluster-name" {
+variable "cluster_name" {
   default = "WAS"
 }
 
-variable "desired-worker-node" {
+variable "min_worker_node" {
   default = "2"
 }
 
-variable "min-worker-node" {
-  default = "2"
-}
-
-variable "max-worker-node" {
+variable "max_worker_node" {
   default = "10"
 }
 
@@ -18,11 +14,11 @@ variable "max_pods" {
   default = "100"
 }
 
-variable "cluster-version" {
-  default = "1.27"
+variable "cluster_version" {
+  default = "1.33"
 }
 
-variable "disk-size" {
+variable "disk_size" {
   default = "30"
 }
 
@@ -38,7 +34,7 @@ variable "password" {
   default = "YYYYYY"
 }
 
-variable "resource-group" {
+variable "resource_group" {
   default = "ZZZZZZ"
 }
 
@@ -46,3 +42,10 @@ variable "region" {
   default = "TTTTTT"
 }
 
+variable "subscription_id" {
+  default = "UUUUUU"
+}
+
+variable "tenant_id" {
+  default = "VVVVVV"
+}

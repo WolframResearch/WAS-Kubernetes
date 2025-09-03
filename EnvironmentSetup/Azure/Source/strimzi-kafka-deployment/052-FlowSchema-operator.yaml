@@ -1,0 +1,32 @@
+apiVersion: flowcontrol.apiserver.k8s.io/v1
+kind: FlowSchema
+metadata:
+  name: strimzi-operator
+spec:
+  matchingPrecedence: 100
+  priorityLevelConfiguration:
+    name: strimzi-high
+  rules:
+    - subjects:
+        - kind: ServiceAccount
+          serviceAccount:
+            name: strimzi-cluster-operator
+            namespace: kafka
+      resourceRules:
+        # Strimzi CRs (namespaced)
+        - apiGroups: ["kafka.strimzi.io"]
+          resources: ["*"]
+          verbs: ["*"]
+          namespaces: ["kafka"]
+        # Core + common groups Strimzi watches (namespaced)
+        - apiGroups: ["", "apps", "batch", "coordination.k8s.io", "events.k8s.io",
+                      "networking.k8s.io", "policy", "rbac.authorization.k8s.io",
+                      "monitoring.coreos.com"]
+          resources: ["*"]
+          verbs: ["get","list","watch"]
+          namespaces: ["kafka"]
+        # Cluster-scoped reads (no namespace allowed here)
+        - apiGroups: ["*"]
+          resources: ["*"]
+          verbs: ["get","list","watch"]
+          clusterScope: true

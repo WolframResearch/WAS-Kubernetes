@@ -8,32 +8,34 @@ terraform {
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
-	  version = "~> 3.13"
+	    version = ">= 4.38.0, < 5.0.0"
     }
   }
-  required_version = "~> 1.2.4"
+  required_version = ">= 1.13.1, < 1.14"
 }
 
 provider "azurerm" {
   features {}
+  subscription_id = "${var.subscription_id}"
+  tenant_id       = "${var.tenant_id}"
+
 }
 
 resource "azurerm_kubernetes_cluster" "default" {
-  name                = "${var.cluster-name}-aks"
+  name                = "${var.cluster_name}-aks"
   location            = "${var.region}"
-  resource_group_name = "${var.resource-group}"
-  dns_prefix          = "${var.cluster-name}-k8s"
-  kubernetes_version  = "${var.cluster-version}"
+  resource_group_name = "${var.resource_group}"
+  dns_prefix          = "${var.cluster_name}-k8s"
+  kubernetes_version  = "${var.cluster_version}"
 
   default_node_pool {
     name                = "workernodes"
-    node_count          = "${var.desired-worker-node}"
     vm_size             = "${var.instance_type}"
-    os_disk_size_gb     = "${var.disk-size}"
+    os_disk_size_gb     = "${var.disk_size}"
+    auto_scaling_enabled = true
 	  max_pods            = "${var.max_pods}"
-	  enable_auto_scaling = true
-    min_count           = "${var.min-worker-node}"
-    max_count           = "${var.max-worker-node}"
+    min_count           = "${var.min_worker_node}"
+    max_count           = "${var.max_worker_node}"
   }
 
   service_principal {

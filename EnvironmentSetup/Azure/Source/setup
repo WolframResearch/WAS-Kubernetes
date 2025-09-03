@@ -497,7 +497,7 @@ SetupFunction() {
 
   cd terraform/
 
-  GET_CLUSTER_NAME=$(grep -A1 -i cluster-name variables.tf | grep -i default | awk '{print $3}' | sed -e 's/"//g' | tr -d '\n')
+  GET_CLUSTER_NAME=$(grep -A1 -i cluster_name variables.tf | grep -i default | awk '{print $3}' | sed -e 's/"//g' | tr -d '\n')
   GET_CLUSTER_NAME=$(echo $GET_CLUSTER_NAME | tr -d '\r')
   sed -i -e "s~XXXXXX~$RESOURCE_GROUP_NAME~g" main.tf
   sed -i -e "s~ZZZZZZ~$RESOURCE_GROUP_NAME~g" variables.tf
@@ -518,8 +518,13 @@ SetupFunction() {
     exit 1
   fi
 
+  SUBSCRIPTION_ID=$(az account show --query id -o tsv)
+  TENANT_ID=$(az account show --query tenantId -o tsv)
+  sed -i -e "s~UUUUUU~$SUBSCRIPTION_ID~g" variables.tf
+  sed -i -e "s~VVVVVV~$TENANT_ID~g" variables.tf
+
   echo
-  log_debug "Phase 2 of 5: Build Azure Kubernetes Cluster (EKS)"
+  log_debug "Phase 2 of 5: Build Azure Kubernetes Cluster (AKS)"
   printf "${GREEN}☑${YELLOW}☑${CYAN}□□□${NORMAL} Phase ${YELLOW}2${NORMAL} of ${GREEN}5${NORMAL}: Build Azure Kubernetes Cluster (AKS)\\n"
 
   CFILE=~/.kube/config
@@ -534,7 +539,6 @@ SetupFunction() {
 
   lower_cluster_name=$(echo $GET_CLUSTER_NAME | tr '[:upper:]' '[:lower:]')
   lower_cluster_name=$(echo $lower_cluster_name | tr -d '\r')
-  TENANT_ID=$(az account list | grep tenantId | cut -d$':' -f2 | cut -d'"' -f 2)
 
   spsuffix="Azure$GET_CLUSTER_NAME"
   CUR_UNIX=$(date +%s | awk '{print substr($0, length($0)-5, 6)}')
@@ -597,7 +601,9 @@ SetupFunction() {
   printf "${GREEN}☑☑${YELLOW}☑${CYAN}□□${NORMAL} Phase ${YELLOW}3${NORMAL} of ${GREEN}5${NORMAL}: Deploy Dependencies\\n"
 
   # Determine domain address
-
+  lower_cluster_name=${GET_CLUSTER_NAME,,}
+  lower_cluster_name=${lower_cluster_name//$'\r'/}
+  lower_cluster_name=${lower_cluster_name//$'\n'/}
   domainsuffix="$lower_cluster_name"
   azuredomain="$domainsuffix-$TENANTID"
   run_ok "helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx && sleep 15" "Helm Repo Add"
@@ -834,7 +840,7 @@ DeleteFunction() {
   GET_CLUSTER_NAME=$(echo $GET_CLUSTER_NAME | tr -d '\r')
   lower_cluster_name=$(echo $GET_CLUSTER_NAME | tr '[:upper:]' '[:lower:]')
 
-  PARSED_TENANT=$(cat Source/terraform/tenant-id.config)
+  PARSED_TENANT=$(az account show --query tenantId -o tsv)
   
   CREDS_STORAGE_ACCOUNT_NAME="${lower_cluster_name}sa${PARSED_TENANT}"
   CREDS_STORAGE_CONTAINER_NAME=""${lower_cluster_name}con${PARSED_TENANT}""
@@ -992,7 +998,7 @@ CURRENTAKSCHECK() {
 getCredsFunction() {
   banner=true
 
-  PARSED_TENANT=$(az account list | grep tenantId | cut -d$':' -f2 | cut -d'"' -f 2 | cut -d$"-" -f1)
+  PARSED_TENANT=$(az account show --query tenantId -o tsv)
   WAS="was"
   CREDS_STORAGE_ACCOUNT_NAME="${WAS}sa${PARSED_TENANT}"
   CREDS_STORAGE_CONTAINER_NAME="$WAS$PARSED_TENANT"

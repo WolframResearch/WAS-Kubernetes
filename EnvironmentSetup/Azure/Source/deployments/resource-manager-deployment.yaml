@@ -49,7 +49,7 @@ spec:
           value: RESOURCEINFO.BUCKETNAME
         - name: NODEFILES.BUCKET
           value: NODEFILES.BUCKETNAME
-        image: wolframapplicationserver/resource-manager:1.2.6
+        image: wolframapplicationserver/resource-manager:1.2.9
         name: resource-manager
         ports:
         - containerPort: 9090

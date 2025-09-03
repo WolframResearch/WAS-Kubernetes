@@ -71,7 +71,7 @@ spec:
           value: "endpoint-info"
         - name: KAFKA.BOOTSTRAP-SERVERS
           value: kafka-persistent-kafka-bootstrap.kafka.svc.cluster.local:9092
-        image: wolframapplicationserver/endpoint-manager:1.2.5
+        image: wolframapplicationserver/endpoint-manager:1.2.8
         name: endpoint-manager
         ports:
         - containerPort: 8085
