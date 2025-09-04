@@ -469,7 +469,7 @@ SetupFunction() {
   banner=true
   cd Source/terraform
 
-  GET_CLUSTER_NAME=$(grep -A1 -i cluster-name variables.tf | grep -i default | awk '{print $3}' | sed -e 's/"//g' | tr -d '\n')
+  GET_CLUSTER_NAME=$(grep -A1 -i cluster_name variables.tf | grep -i default | awk '{print $3}' | sed -e 's/"//g' | tr -d '\n')
   GET_CLUSTER_NAME=$(echo $GET_CLUSTER_NAME | tr -d '\r')
   GET_REGION=$(grep -A1 -i aws_region variables.tf | grep -i default | awk '{print $3}' | sed -e 's/"//g' | tr -d '\n')
   GET_REGION=$(echo $GET_REGION | tr -d '\r')
@@ -566,8 +566,10 @@ SetupFunction() {
   dynamodb_check=$(aws dynamodb list-tables --output text | grep -w "$dynamodb_table" | awk '{print $2}')
 
   if [ -z $dynamodb_check ]; then
-    run_ok "aws dynamodb create-table --region $GET_REGION --table-name $dynamodb_table --attribute-definitions AttributeName=LockID,AttributeType=S --key-schema AttributeName=LockID,KeyType=HASH --provisioned-throughput ReadCapacityUnits=1,WriteCapacityUnits=1" "Creating terraform dynamodb table"
+    run_ok "aws dynamodb create-table --region $GET_REGION --table-name $dynamodb_table --attribute-definitions AttributeName=LockID,AttributeType=S --key-schema AttributeName=LockID,KeyType=HASH --provisioned-throughput ReadCapacityUnits=1,WriteCapacityUnits=1 --no-cli-pager" "Creating terraform dynamodb table"
   fi
+
+  aws dynamodb wait table-exists --table-name "$dynamodb_table" --no-cli-pager
 
   workspace="$lower_cluster_name-$GET_REGION"
 
@@ -576,6 +578,7 @@ SetupFunction() {
   # Update kubeconfig
 
   run_ok "aws eks --region $GET_REGION update-kubeconfig --name $GET_CLUSTER_NAME" "Generate kubeconfig configuration"
+  efs_csi_role_arn=$(terraform output -raw efs_csi_role_arn)
   cd ..
 
   echo
@@ -585,8 +588,6 @@ SetupFunction() {
   run_ok "helm repo update && sleep 30" "Helm Repo Update"
   run_ok "helm install ingress-nginx ingress-nginx/ingress-nginx --set rbac.create=true --version 4.8.3 --set controller.service.externalTrafficPolicy=\"Local\" --namespace ingress-nginx --create-namespace & sleep 180" "Setup Ingress Controller"
   run_ok "kubectl apply -f metrics-server/" "Setup Metrics Server"
-  sed -i -e 's/- --node-group-auto-discovery=asg:tag=k8s.io\/cluster-autoscaler\/enabled,k8s.io\/cluster-autoscaler\/.*/- --node-group-auto-discovery=asg:tag=k8s.io\/cluster-autoscaler\/enabled,k8s.io\/cluster-autoscaler\/'"$GET_CLUSTER_NAME"'/g' cluster-autoscaler/cluster-autoscaler-autodiscover.yaml
-  run_ok "kubectl apply -f cluster-autoscaler/" "Setup Cluster Autoscaler"
   cd efs
   kubectl patch storageclass gp2 -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"false"}}}' >>$LOG_PATH
   kubectl apply -f namespace.yaml >>$LOG_PATH
@@ -598,23 +599,59 @@ SetupFunction() {
   region=$GET_REGION
   vpc_id=$(aws eks describe-cluster --name $cluster_name --query "cluster.resourcesVpcConfig.vpcId" --output text)
   cidr_block=$(aws ec2 describe-vpcs --vpc-ids $vpc_id --query "Vpcs[].CidrBlock" --output text)
-  
+
   # Create security groups
-  temp_group_id=$(aws ec2 create-security-group --description $description --group-name $group_name --vpc-id $vpc_id)
-  group_id=$(echo $temp_group_id | awk '{print $3}' | sed 's|["]||g')
-  nfs_inbound=$(aws ec2 authorize-security-group-ingress --group-id $group_id --protocol tcp --port 2049 --cidr $cidr_block)
-  
-  # Create EFS file system
-  temp_file_systemid=$(aws efs create-file-system --throughput-mode bursting --encrypted --region $region --creation-token $token_name)
-  filesystem_id=$(echo $temp_file_systemid | grep -Po '"FileSystemId":.*?[^\\]",' | awk '{print $2}' | sed 's|[",]||g')
-  get_subnets=$(aws ec2 describe-subnets --region $region --filters "Name=vpc-id,Values=$vpc_id")
-  subnets=$(echo $get_subnets | grep -Po '"SubnetId":.*?[^\\]",' | awk '{print $2}' | sed 's|[",]||g')
-  
+  temp_group_id=$(
+    aws ec2 create-security-group \
+      --description "$description" \
+      --group-name "$group_name" \
+      --vpc-id "$vpc_id" \
+      --region "$region" \
+      --query 'GroupId' --output text 2>/dev/null \
+    || aws ec2 describe-security-groups \
+         --group-names "$group_name" \
+         --region "$region" \
+         --query 'SecurityGroups[0].GroupId' --output text
+  )
+  group_id="$temp_group_id"
+
+  # Allow NFS 2049 from your VPC CIDR
+  nfs_inbound=$(aws ec2 authorize-security-group-ingress \
+    --group-id "$group_id" \
+    --protocol tcp --port 2049 \
+    --cidr "$cidr_block" \
+    --region "$region" || true)
+
+  # Create EFS file system
+  filesystem_id=$(
+    aws efs create-file-system \
+      --throughput-mode bursting \
+      --encrypted \
+      --region "$region" \
+      --creation-token "$token_name" \
+      --query 'FileSystemId' --output text 2>/dev/null \
+    || aws efs describe-file-systems \
+         --region "$region" \
+         --creation-token "$token_name" \
+         --query 'FileSystems[0].FileSystemId' --output text
+  )
+
+  # Fetch subnet IDs (space-separated)
+  subnets=$(aws ec2 describe-subnets \
+    --region "$region" \
+    --filters "Name=vpc-id,Values=$vpc_id" \
+    --query 'Subnets[].SubnetId' --output text)
+
   # Create EFS mount targets
   for eachval in $subnets; do
-    output=$(aws efs create-mount-target --file-system-id $filesystem_id --subnet-id $eachval --security-group $group_id 2>/dev/null)
-    sleep 10
+    mount_target=$(aws efs create-mount-target \
+      --file-system-id "$filesystem_id" \
+      --subnet-id "$eachval" \
+      --security-groups "$group_id" \
+      --region "$region" 2>/dev/null || true)
+    sleep 5
   done
+  
   install_chart_stable=$(helm repo add stable https://charts.helm.sh/stable >>$LOG_PATH)
   rm -rf values*
   cat <<EOF >>values.yaml
@@ -671,9 +708,9 @@ controller:
   # If set, add pv/pvc metadata to plugin create requests as parameters.
   extraCreateMetadata: true
   # Add additional tags to access points
+  regionalStsEndpoints: true
   tags:
-    environment: prod
-    region: $region
+    'efs.csi.aws.com/cluster': "true"
   # Enable if you want the controller to also delete the
   # path on efs when deleteing an access point
   deleteAccessPointRootDir: false
@@ -698,9 +735,8 @@ controller:
   serviceAccount:
     create: true
     name: efs-csi-controller-sa
-    annotations: {}
-    ## Enable if EKS IAM for SA is used
-    #  eks.amazonaws.com/role-arn: arn:aws:iam::111122223333:role/efs-csi-role
+    annotations:
+      eks.amazonaws.com/role-arn: ${efs_csi_role_arn}
   healthPort: 9909
   regionalStsEndpoints: false
   # securityContext on the controller pod
@@ -758,8 +794,6 @@ node:
     create: true
     name: efs-csi-node-sa
     annotations: {}
-    ## Enable if EKS IAM for SA is used
-    #  eks.amazonaws.com/role-arn: arn:aws:iam::111122223333:role/efs-csi-role
   healthPort: 9809
   # securityContext on the node pod
   securityContext:
@@ -778,7 +812,7 @@ storageClasses:
     - tls
     parameters:
       provisioningMode: efs-ap
-      fileSystemId: $filesystem_id
+      fileSystemId: ${filesystem_id}
       directoryPerms: "700"
       gidRangeStart: "1000"
       gidRangeEnd: "2000"
@@ -1085,13 +1119,13 @@ DeleteFunction() {
   account_id=$(echo $get_user_info | grep -oP '(?<="Account": ")[^"]*')
   
 
-  GET_CLUSTER_NAME=$(grep -A1 -i cluster-name variables.tf | grep -i default | awk '{print $3}' | sed -e 's/"//g' | tr -d '\n')
+  GET_CLUSTER_NAME=$(grep -A1 -i cluster_name variables.tf | grep -i default | awk '{print $3}' | sed -e 's/"//g' | tr -d '\n')
   GET_CLUSTER_NAME=$(echo $GET_CLUSTER_NAME | tr -d '\r')
   GET_REGION=$(grep -A1 -i aws_region variables.tf | grep -i default | awk '{print $3}' | sed -e 's/"//g' | tr -d '\n')
   GET_REGION=$(echo $GET_REGION | tr -d '\r')
   region=$(echo $GET_REGION | tr -d '\r')
 
-  GET_CLUSTER_NAME=$(grep -A1 -i cluster-name variables.tf | grep -i default | awk '{print $3}' | sed -e 's/"//g' | tr -d '\n')
+  GET_CLUSTER_NAME=$(grep -A1 -i cluster_name variables.tf | grep -i default | awk '{print $3}' | sed -e 's/"//g' | tr -d '\n')
   GET_CLUSTER_NAME=$(echo $GET_CLUSTER_NAME | tr -d '\r')
 
   lower_cluster_name=$(echo $GET_CLUSTER_NAME | tr '[:upper:]' '[:lower:]')
@@ -1186,8 +1220,6 @@ DeleteFunction() {
   log_debug "Phase 3 of 5: Delete Dependencies"
   printf "${GREEN}☑☑${YELLOW}☑${CYAN}□□${NORMAL} Phase ${YELLOW}3${NORMAL} of ${GREEN}5${NORMAL}: Delete Dependencies\\n"
   run_ok "kubectl delete --ignore-not-found=true -f metrics-server/" "Deleting Metrics Server"
-  run_ok "kubectl delete --ignore-not-found=true -f cluster-autoscaler/" "Deleting Cluster Autoscaler"
-  sed -i -e 's/- --node-group-auto-discovery=asg:tag=k8s.io\/cluster-autoscaler\/enabled,k8s.io\/cluster-autoscaler\/.*/- --node-group-auto-discovery=asg:tag=k8s.io\/cluster-autoscaler\/enabled,k8s.io\/cluster-autoscaler\/name/g' cluster-autoscaler/cluster-autoscaler-autodiscover.yaml
   cd efs
   set -e
   kubectl patch storageclass gp2 -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}' >>$LOG_PATH
@@ -1215,7 +1247,7 @@ DeleteFunction() {
   log_debug "Phase 4 of 5: Delete Amazon Kubernetes Cluster (EKS)"
   printf "${GREEN}☑☑☑${YELLOW}☑${CYAN}□${NORMAL} Phase ${YELLOW}4${NORMAL} of ${GREEN}5${NORMAL}: Delete Amazon Kubernetes Cluster (EKS)\\n"
   cd terraform
-  sed -i -e 's~'"terraform-tfstate-"'$'"{var.cluster-name}"~$TERRAFORM_BUCKET~g main.tf
+  sed -i -e 's~'"terraform-tfstate-"'$'"{var.cluster_name}"~$TERRAFORM_BUCKET~g main.tf
   sed -i -e 's~'"$"'{var.aws-region}'~$GET_REGION~g main.tf
   run_ok "sleep 5 && terraform init && terraform workspace select $WORKSPACE && terraform refresh && terraform destroy -auto-approve || true" "Deleting EKS"
   set +e
@@ -1246,8 +1278,8 @@ cleanconfiguration() {
   echo
   log_debug "Phase 1 of 1: Clean Configuration"
 
-  sed -i -e 's/'"$GET_CLUSTER_NAME"'/${var.cluster-name}/g' main.tf
-  sed -i -e 's/'"$TERRAFORM_BUCKET"'/terraform-tfstate-${var.cluster-name}/g' main.tf
+  sed -i -e 's/'"$GET_CLUSTER_NAME"'/${var.cluster_name}/g' main.tf
+  sed -i -e 's/'"$TERRAFORM_BUCKET"'/terraform-tfstate-${var.cluster_name}/g' main.tf
   GET_REGION=$(echo $GET_REGION | tr -d '\r')
   sed -i -e 's/'"$GET_REGION"'/us-east-1/g' variables.tf
   awk '!/terraform-s3-bucket-name/' variables.tf >tmpfile && mv tmpfile variables.tf >>$LOG_PATH
@@ -1346,7 +1378,7 @@ getCredsFunction() {
 
   cd /Source/terraform
 
-  GET_CLUSTER_NAME=$(grep -A1 -i cluster-name variables.tf | grep -i default | awk '{print $3}' | sed -e 's/"//g' | tr -d '\n')
+  GET_CLUSTER_NAME=$(grep -A1 -i cluster_name variables.tf | grep -i default | awk '{print $3}' | sed -e 's/"//g' | tr -d '\n')
   GET_CLUSTER_NAME=$(echo $GET_CLUSTER_NAME | tr -d '\r')
   region=$(grep -A1 -i aws_region variables.tf | grep -i default | awk '{print $3}' | sed -e 's/"//g' | tr -d '\n')
   region=$(echo $GET_REGION | tr -d '\r')

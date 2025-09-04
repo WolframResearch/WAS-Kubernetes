@@ -1,0 +1,16 @@
+apiVersion: flowcontrol.apiserver.k8s.io/v1
+kind: PriorityLevelConfiguration
+metadata:
+  name: strimzi-high
+spec:
+  type: Limited
+  limited:
+    nominalConcurrencyShares: 200
+    lendablePercent: 50
+    borrowingLimitPercent: 50
+    limitResponse:
+      type: Queue
+      queuing:
+        queues: 128
+        handSize: 8
+        queueLengthLimit: 1000

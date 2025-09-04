@@ -71,7 +71,7 @@ spec:
           value: "endpoint-info"
         - name : RESOURCE_INFO_TOPIC
           value: "resource-info"
-        image: wolframapplicationserver/endpoint-manager:1.2.5
+        image: wolframapplicationserver/endpoint-manager:1.2.8
         name: endpoint-manager
         ports:
         - containerPort: 8085

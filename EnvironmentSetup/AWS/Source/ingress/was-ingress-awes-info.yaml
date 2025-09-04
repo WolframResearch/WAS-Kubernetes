@@ -1,0 +1,26 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: was-ingress-awes-info
+  namespace: was
+  labels:
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/part-of: ingress-nginx
+  annotations:
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "360"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "360"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "360"
+    nginx.ingress.kubernetes.io/load-balance: "ewma"
+spec:
+  ingressClassName: nginx
+  rules:
+  - http:
+      paths:
+        - path: /\.applicationserver/(info|kernel/stats)
+          pathType: ImplementationSpecific
+          backend:
+            service:
+              name: active-web-elements-server-info
+              port:
+                number: 8082

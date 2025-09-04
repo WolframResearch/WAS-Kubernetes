@@ -11,7 +11,7 @@ The following CLI tools are required to be installed on your local machine to co
 
 * **AWS CLIv2** - https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html#getting-started-install-instructions
 
-* **Kubectl >= 1.24** - https://kubernetes.io/docs/tasks/tools/install-kubectl/
+* **Kubectl >= 1.34.0** - https://kubernetes.io/docs/tasks/tools/install-kubectl/
 
 * **Docker v20.10 or newer** - https://docs.docker.com/get-docker/
 
@@ -26,7 +26,7 @@ The automated configuration tool will use the following default values when buil
 * AMI Instance Type: c5.2xlarge
 * Disk Size: 30GB
 * Node Group scaling configuration: [Minimum size: 2, Maximum size: 10, Desired size: 2]
-* Kubernetes Version: 1.22
+* Kubernetes Version: 1.33
 
 To change any of the above defaults open `Source/terraform/variables.tf`, modify accordingly and save file.
 
@@ -131,6 +131,27 @@ The default credentials for this API are:
 	
 	Password: P7g[/Y8v?KR}#YvN
 
+**Step 11.** Need to uncomment livenessProbe and startupProbe in active-web-elements-server-deployment.yaml file and apply it on was namespace as;
+
+```
+        # startupProbe:
+        #   httpGet:
+        #     path: /.applicationserver/kernel/readiness
+        #     port: 8080
+        #   initialDelaySeconds: 15
+        #   periodSeconds: 10
+        #   failureThreshold: 100
+        # livenessProbe:
+        #   failureThreshold: 3
+        #   httpGet:
+        #     path: '/.applicationserver/kernel/stats?require-running-kernels=true'
+        #     port: 8080
+        #   initialDelaySeconds: 20
+        #   periodSeconds: 20
+        #   successThreshold: 1
+        #   timeoutSeconds: 1
+```
+	kubectl apply -f active-web-elements-server-deployment.yaml -n was
 
 To change these, see the [configuration documentation](../../Configuration.md).
 
