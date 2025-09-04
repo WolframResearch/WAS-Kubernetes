@@ -19,3 +19,18 @@ spec:
     targetPort: 8181
   selector:
     app: active-web-elements-server
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: active-web-elements-server
+  name: active-web-elements-server-info
+  namespace: was
+spec:
+  ports:
+  - name: "8082"
+    port: 8082
+    targetPort: 8080
+  selector:
+    app: active-web-elements-server

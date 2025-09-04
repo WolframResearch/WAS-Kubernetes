@@ -40,6 +40,11 @@ spec:
         type: persistent-claim
         size: 10Gi
         deleteClaim: false
+    template:
+      pod:
+        securityContext:
+          fsGroup: 1001
+          fsGroupChangePolicy: OnRootMismatch
   zookeeper:
     replicas: 3
     jvmOptions:
@@ -50,15 +55,20 @@ spec:
           value: "false"
     resources:
       requests:
-        cpu: 100m
-        memory: 128Mi
+        cpu: 200m
+        memory: 512Mi
       limits:
         cpu: 500m
-        memory: 512Mi
+        memory: 1Gi
     storage:
       type: persistent-claim
       size: 10Gi
       deleteClaim: false
+    template:
+      pod:
+        securityContext:
+          fsGroup: 1001
+          fsGroupChangePolicy: OnRootMismatch
   entityOperator:
     topicOperator: {}
     userOperator: {}

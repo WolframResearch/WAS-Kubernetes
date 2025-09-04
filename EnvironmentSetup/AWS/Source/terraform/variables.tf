@@ -1,16 +1,16 @@
 variable "aws_region" {
-  default = "us-east-1"
+  default = "us-east-2"
 }
 
-variable "cluster-name" {
+variable "cluster_name" {
   default = "WAS"
 }
 
-variable "cluster-version" {
-  default = "1.27"
+variable "cluster_version" {
+  default = "1.33"
 }
 
-variable "disk-size" {
+variable "disk_size" {
   default = "30"
 }
 
@@ -18,14 +18,14 @@ variable "instance_type" {
   default = "c5.2xlarge"
 }
 
-variable "desired-worker-node" {
+variable "desired_worker_node" {
   default = "2"
 }
 
-variable "min-worker-node" {
+variable "min_worker_node" {
   default = "2"
 }
 
-variable "max-worker-node" {
+variable "max_worker_node" {
   default = "10"
 }
