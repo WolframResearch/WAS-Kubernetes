@@ -1,23 +1,59 @@
-FROM ubuntu:focal
-ENV KUBECTL_VERSION='v1.27.0'
-ENV DEBIAN_FRONTEND=noninteractive 
-ENV TERM=xterm-256color
-ENV COLORTERM=truecolor
-ENV LANG='en_US.UTF-8' LANGUAGE='en_US:en' LC_ALL='en_US.UTF-8'
-ENV TF_DATA_DIR=/terraform-state
-RUN apt-get update && apt-get install software-properties-common apt-transport-https locales curl tar git procps libncurses-dev --reinstall ca-certificates -y && \
-	locale-gen en_US.utf8 && locale -a  && \
-	update-locale LANG=en_US.UTF-8 LANG=en_US.UTF8 LC_CTYPE=en_US.UTF8 LC_COLLATE=en_US.UTF8 && \
+FROM ubuntu:22.04
+
+ARG KUBECTL_VERSION="v1.34.0"
+ARG TERRAFORM_VERSION="1.13.1"
+ARG HELM_VERSION="v3.15.2"
+ARG TARGETARCH=amd64
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    LANG='en_US.UTF-8' \
+    LANGUAGE='en_US:en' \
+    LC_ALL='en_US.UTF-8'
+
+RUN \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+    ca-certificates \
+    curl \
+    unzip \
+    git \
+    procps \
+    vim-tiny \
+    locales \
+    && \
+	update-ca-certificates && \
+	\
+    locale-gen en_US.utf8 && \
+    \
+    # Install Azure CLI
 	curl -sL https://aka.ms/InstallAzureCLIDeb | bash && \
-	curl -LO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl" && \
-    chmod +x ./kubectl && \
-    mv ./kubectl /usr/local/bin/kubectl  && \
-    kubectl version --client  && \
-	cd /tmp  && curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 && \
-	chmod 700 get_helm.sh && \
-	bash get_helm.sh && \
-	curl -fsSL https://apt.releases.hashicorp.com/gpg | apt-key add -  && \
-	echo "deb [arch=amd64] https://apt.releases.hashicorp.com focal main" | tee /etc/apt/sources.list && \
-	apt-get update && apt-get install terraform=1.2.4 -y
+    \
+    # Install kubectl
+    curl -fLO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/${TARGETARCH}/kubectl" && \
+    install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl && \
+    \
+    # Install Helm
+    curl -fL "https://get.helm.sh/helm-${HELM_VERSION}-linux-${TARGETARCH}.tar.gz" | tar -xz && \
+    install -o root -g root -m 0755 linux-${TARGETARCH}/helm /usr/local/bin/helm && \
+    \
+    # Install Terraform
+    curl -fL "https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_${TARGETARCH}.zip" -o "terraform.zip" && \
+    unzip -o terraform.zip -d /usr/local/bin && \
+    \
+    apt-get purge -y --auto-remove unzip && \
+    rm -rf \
+        /var/lib/apt/lists/* \
+        kubectl \
+        helm \
+        linux-${TARGETARCH}/ \
+        terraform.zip && \
+    \
+    echo "--- Verifying Installations ---" && \
+    kubectl version --client && \
+    helm version && \
+    terraform --version && \
+    az --version && \
+    echo "--- Verification Complete ---"
+
 WORKDIR /
 ENTRYPOINT ["bash"]

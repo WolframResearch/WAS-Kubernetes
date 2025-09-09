@@ -11,7 +11,7 @@ The following CLI tools are required to be installed on your local machine to co
 
 * **Azure CLI** - https://docs.microsoft.com/en-us/cli/azure/install-azure-cli?view=azure-cli-latest
 
-* **Kubectl >=v1.27** - https://kubernetes.io/docs/tasks/tools/install-kubectl/
+* **Kubectl >=v1.34** - https://kubernetes.io/docs/tasks/tools/install-kubectl/
 
 * **Docker v20.10 or newer** - https://docs.docker.com/get-docker/
 
@@ -24,7 +24,7 @@ The following CLI tools are required to be installed on your local machine to co
 * AMI Instance Type: Standard_D8s_v3
 * Disk Size: 30GB
 * Node Group scaling configuration: [Minimum size: 2, Maximum size: 10, Desired size: 2]
-* Kubernetes Version: 1.27
+* Kubernetes Version: 1.33
 
 To change any of the above defaults open `Source/terraform/variables.tf` and modify accordingly and save file.
 
@@ -140,6 +140,28 @@ The default credentials for this API are:
 	Username: applicationserver
 	
 	Password: P7g[/Y8v?KR}#YvN
+
+**Step 12.** Need to uncomment livenessProbe and startupProbe in active-web-elements-server-deployment.yaml file and apply it on was namespace as;
+
+```
+        # startupProbe:
+        #   httpGet:
+        #     path: /.applicationserver/kernel/readiness
+        #     port: 8080
+        #   initialDelaySeconds: 15
+        #   periodSeconds: 10
+        #   failureThreshold: 100
+        # livenessProbe:
+        #   failureThreshold: 3
+        #   httpGet:
+        #     path: '/.applicationserver/kernel/stats?require-running-kernels=true'
+        #     port: 8080
+        #   initialDelaySeconds: 20
+        #   periodSeconds: 20
+        #   successThreshold: 1
+        #   timeoutSeconds: 1
+```
+	kubectl apply -f active-web-elements-server-deployment.yaml -n was
 
 
 To change these, see the [configuration documentation](../../Configuration.md).

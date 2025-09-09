@@ -101,6 +101,8 @@ spec:
                   fieldPath: metadata.namespace
             - name: STRIMZI_FEATURE_GATES
               value: ""
+            - name: STRIMZI_KUBERNETES_VERSION
+              value: "major=1,minor=33"
           livenessProbe:
             httpGet:
               path: /healthy

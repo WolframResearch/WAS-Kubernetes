@@ -1,7 +1,7 @@
 output "resource_group_name" {
-  value = "${var.resource-group}"
+  value = "${var.resource_group}"
 }
 
 output "kubernetes_cluster_name" {
-  value = "${var.cluster-name}-aks"
+  value = "${var.cluster_name}-aks"
 }
