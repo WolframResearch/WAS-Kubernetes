@@ -13,9 +13,9 @@ The following CLI tools are required to be installed on your local machine to co
 
 * **Kubectl >= 1.34.0** - https://kubernetes.io/docs/tasks/tools/install-kubectl/
 
-* **Docker v20.10 or newer** - https://docs.docker.com/get-docker/
+* **Docker v28.4.0 or newer** - https://docs.docker.com/get-docker/
 
-* **Docker Compose  v1.28.6 or newer** - https://docs.docker.com/compose/install/
+* **Docker Compose  v2.39.4 or newer** - https://docs.docker.com/compose/install/
 
 
 ### Default Configuration
@@ -73,14 +73,14 @@ This will interactively prompt for your AWS IAM user access key, secret key and 
 
 **Step 5.** Run the following command to set up EKS and deploy WAS:
 
-	mkdir -p ~/.kube && docker-compose up --build -d && clear && docker exec -it aws-setup-manager bash setup --create && sudo chown -R $USER ~/.kube
+	mkdir -p ~/.kube && docker compose build --progress=plain && docker compose up -d &&clear && docker exec -it aws-setup-manager bash setup --create && sudo chown -R $USER ~/.kube
 
 **Note:** This can take approximately 45 minutes to complete.
 
 
 **Step 6.** Run the following command to retrieve your base URL and application URLs:
 
-	docker-compose up --build -d && clear && docker exec -it aws-setup-manager bash setup --endpoint-info
+	docker compose build --progress=plain && docker compose up -d && clear && docker exec -it aws-setup-manager bash setup --endpoint-info
 
 
 The output of this command will follow this pattern:
