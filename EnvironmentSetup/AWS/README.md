@@ -73,7 +73,7 @@ This will interactively prompt for your AWS IAM user access key, secret key and 
 
 **Step 5.** Run the following command to set up EKS and deploy WAS:
 
-	mkdir -p ~/.kube && docker compose build --progress=plain && docker compose up -d &&clear && docker exec -it aws-setup-manager bash setup --create && sudo chown -R $USER ~/.kube
+	mkdir -p ~/.kube && docker compose build --progress=plain && docker compose up -d && clear && docker exec -it aws-setup-manager bash setup --create && sudo chown -R $USER ~/.kube
 
 **Note:** This can take approximately 45 minutes to complete.
 
