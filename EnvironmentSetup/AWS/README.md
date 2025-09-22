@@ -101,7 +101,7 @@ The output of this command will follow this pattern:
 
 **Step 7.** After completion, run this command to shutdown the aws-setup-manager:
 
-	docker-compose down
+	docker compose down
 
 
 **Step 8.** Get a license file from your Wolfram Research sales representative.
@@ -168,13 +168,13 @@ The following completely deletes everything including the kubernetes cluster, Wo
 
 **Step 2.** Change your directory to the directory containing `docker-compose.yml` directory and run the following command to destroy your EKS cluster and WAS:
 
-	docker-compose up --build -d && clear && docker exec -it aws-setup-manager bash setup --delete
+	docker compose build --progress=plain && docker compose up -d && clear && docker exec -it aws-setup-manager bash setup --delete
 
 **Warning:** All data will be destroyed.
 
 **Step 2.** After completion, shutdown the aws-setup-manager by running the following command:
 
-	docker-compose down	-v
+	docker compose down	-v
 
 ---
 
