@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   aws-setup-manager:
     platform: linux/amd64
@@ -13,15 +11,9 @@ services:
     container_name: aws-setup-manager
     volumes:
       - ./Source:/Source
-      - type: bind
-        source: ./Source/setup
-        target: /setup
-      - type: bind
-        source: ~/.aws
-        target: /root/.aws
-      - type: bind
-        source: ~/.kube
-        target: /root/.kube
+      - ./Source/setup:/setup
+      - ${HOME}/.aws:/root/.aws
+      - ${HOME}/.kube:/root/.kube
       - tmp:/tmp
       - terraform-state:/terraform-state
         
