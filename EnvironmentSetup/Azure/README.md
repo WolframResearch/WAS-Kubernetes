@@ -13,9 +13,9 @@ The following CLI tools are required to be installed on your local machine to co
 
 * **Kubectl >=v1.34** - https://kubernetes.io/docs/tasks/tools/install-kubectl/
 
-* **Docker v20.10 or newer** - https://docs.docker.com/get-docker/
+* **Docker v28.4.0 or newer** - https://docs.docker.com/get-docker/
 
-* **Docker Compose  v1.28.6 or newer** - https://docs.docker.com/compose/install/
+* **Docker Compose v2.39.4 or newer** - https://docs.docker.com/compose/install/
 
 ### Default Configuration
 
@@ -78,11 +78,11 @@ RESOURCE_GROUP_NAME: The name of the resource group, WAS-rg
 
 **Step 6.** Replace the tag with your tenant ID and run the following command to set up AKS and deploy WAS:
 
-	YOURTENANTID=<your-tenant-id> && rm -rf Source/terraform/tenant-id.config && echo $YOURTENANTID >> Source/terraform/tenant-id.config && mkdir -p ~/.kube && docker-compose up --build -d && clear && docker exec -it azure-setup-manager bash setup --create && sudo chown -R $USER ~/.kube
+	YOURTENANTID=<your-tenant-id> && rm -rf Source/terraform/tenant-id.config && echo $YOURTENANTID >> Source/terraform/tenant-id.config && mkdir -p ~/.kube && docker compose build --progress=plain && docker compose up -d && clear && docker exec -it azure-setup-manager bash setup --create && sudo chown -R $USER ~/.kube
 
 Example:
 
-	YOURTENANTID=QQQQQQQ-9810-46e1-bef2-hswqw56sf && rm -rf Source/terraform/tenant-id.config && echo $YOURTENANTID >> Source/terraform/tenant-id.config && mkdir -p ~/.kube && docker-compose up --build -d && clear && docker exec -it azure-setup-manager bash setup --create && sudo chown -R $USER ~/.kube
+	YOURTENANTID=QQQQQQQ-9810-46e1-bef2-hswqw56sf && rm -rf Source/terraform/tenant-id.config && echo $YOURTENANTID >> Source/terraform/tenant-id.config && mkdir -p ~/.kube && docker compose build --progress=plain && docker compose up -d && clear && docker exec -it azure-setup-manager bash setup --create && sudo chown -R $USER ~/.kube
 
 
 **Note:** This can take approximately 25 minutes to complete.
@@ -90,7 +90,7 @@ Example:
 
 **Step 7.** Run the following command to retrieve your base URL and application URLs:
 
-	docker-compose up --build -d && clear && docker exec -it azure-setup-manager bash setup --endpoint-info
+	docker compose build --progress=plain && docker compose up -d && clear && docker exec -it azure-setup-manager bash setup --endpoint-info
 
 
 The output of this command will follow this pattern:
@@ -111,7 +111,7 @@ The output of this command will follow this pattern:
 
 **Step 8.** After completion, run this command to shutdown the azure-setup-manager:
 
-	docker-compose down
+	docker compose down
 
 
 **Step 9.** Get a license file from your Wolfram Research sales representative.
@@ -178,13 +178,13 @@ The following completely deletes everything including the kubernetes cluster, Wo
 
 **Step 1.** Change your directory to the directory containing `docker-compose.yml` directory and run the following command to destroy your AKS cluster and WAS:
 
-	docker-compose up --build -d && clear && docker exec -it azure-setup-manager bash setup --delete
+	docker compose build --progress=plain && docker compose up -d && clear && docker exec -it azure-setup-manager bash setup --delete
 
 **Warning:** All data will be destroyed.
 
 **Step 2.**  After completion, shutdown the azure-setup-manager by running the following command:
 
-	docker-compose down -v
+	docker compose down -v
 
 ---
 ## Troubleshooting
