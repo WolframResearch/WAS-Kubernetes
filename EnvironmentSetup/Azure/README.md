@@ -141,30 +141,6 @@ The default credentials for this API are:
 	
 	Password: P7g[/Y8v?KR}#YvN
 
-**Step 12.** Need to uncomment livenessProbe and startupProbe in active-web-elements-server-deployment.yaml file and apply it on was namespace as;
-
-```
-        # startupProbe:
-        #   httpGet:
-        #     path: /.applicationserver/kernel/readiness
-        #     port: 8080
-        #   initialDelaySeconds: 15
-        #   periodSeconds: 10
-        #   failureThreshold: 100
-        # livenessProbe:
-        #   failureThreshold: 3
-        #   httpGet:
-        #     path: '/.applicationserver/kernel/stats?require-running-kernels=true'
-        #     port: 8080
-        #   initialDelaySeconds: 20
-        #   periodSeconds: 20
-        #   successThreshold: 1
-        #   timeoutSeconds: 1
-```
-	kubectl apply -f active-web-elements-server-deployment.yaml -n was
-
-
-To change these, see the [configuration documentation](../../Configuration.md).
 
 **Note:** Active Web Elements Server will restart and activate using the mathpass. Upon successful activation, the application shall start. 
 
