@@ -7,16 +7,37 @@ This API covers the resource endpoint lifecycle required for making resources pu
 * Model (application/json)
 
 		[ EndpointInfo{
-				endpointPath : string
+				endpointPath | endpointPrefix : string
 				resourcePath : string
 			} ]
 
-This API uses the `EndpointInfo` JSON model for creation of the endpoint and to communicate information about the endpoint. The model contains the endpointPath and the resourcePath parameters.
+This API uses the `EndpointInfo` JSON model for creation of the endpoint and to communicate information about the endpoint. The model contains the endpointPath and the resourcePath parameters.  Starting with version 1.4 of the endpoint manager, and 4.2 of active web elements server, the endpointPrefix can be used instead of the endpointPath.
 
 Use of each parameter is described below:
 
-* endpointPath (required, string): This path uniquely identifies an endpoint which is publicly accessible from the active web elements server. If it is a hierarchical endpoint path (with a directory structure), it should be specified without a leading slash. For example, if under the directory `test` we have endpoint `add`, the path should be written `test/add`.
+* endpointPath (string): This path uniquely identifies an endpoint which is publicly accessible from the active web elements server. If it is a hierarchical endpoint path (with a directory structure), it should be specified without a leading slash. For example, if under the directory `test` we have endpoint `add`, the path should be written `test/add`.
+* endpointPrefix (string): This path uniquely identifies the root for the set of endpoints that are publicly accessible from the active web elements server.
+An `endpintPrefix` functions as both an endpoint path and an endpoint directory.
+For example, if the endpoint prefix is `test/add` then the resource at `resourcePath` will be used to serve not just `test/add` but also `test/add/one`; however, it will not serve
+`/test/addone`.
+This is useful for e.g. deploying a [`URLDispatcher`](http://reference.wolfram.com/language/ref/URLDispatcher.html) to WAS.
 * resourcePath (required, string): This path uniquely identifies a resource that should be accessible though the resource manager.
+
+Exactly one of `endpointPath` and `endpointPrefix` must be specified.
+When multiple endpoints have been deployed such that there's an `endpointPath` or
+`endpointPrefix` for one that is inside a directory specified by another deployed
+`endpointPrefix`, the more specific (i.e. the innermost one) takes precedence.
+That is, for the following deployments:
+
+        { "endpointPrefix": "foo", "resourcePath": "fooResource" }
+        { "endpointPrefix": "foo/bar", "resourcePath": "barResource" }
+        { "endpointPath": "foo/bar/baz", "resourcePath": "bazResource" }
+
+then calls to:
+* `foo/one` will fire `fooResource`
+* `foo/bar/one` will fire `barResource`
+* `foo/bar/baz` will fire `bazResource`
+* `foo/bar/baz/one` will fire `barResource` (because `bazResource` is at a path, not a prefix)
 
 ## Endpoints [/endpoints]
 
@@ -159,11 +180,13 @@ Use this to get information about a specific endpoint. The API takes an endpoint
 
 ### PUT
 
-Use this to modify an endpoint.  The API takes an endpointPath as a path variable
+Use this to modify an endpoint.  The API takes an endpointPath 
+(or, as of version 1.4, endpointPrefix) as a path variable
 and the EndpointInfo object should be provided in the request body as JSON.
 In this case, the endpointPath need not be redundantly specified in the request body,
-but it must match if it is provided.
-The API returns the endpointPath of the newly created endpoint.
+unless the intent is to change whether the path is a strict path or a prefix.
+If specified, the endpointPath or endpointPrefix must match the path element of the request.
+The API returns the endpointPath or endpointPrefix of the newly created endpoint.
 
 Note that PUT cannot be used with version 1.2.5 of endpoint-manager or earlier.
 
