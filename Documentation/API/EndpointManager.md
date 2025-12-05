@@ -35,7 +35,7 @@ Use this to retrieve the complete set of endpoints created. The API returns list
 	Example:
 
 		{
-  			"add" : {
+			"add" : {
 				endpointPath : "add"
 				resourcePath : "api/add.wl"
 			}
@@ -43,12 +43,12 @@ Use this to retrieve the complete set of endpoints created. The API returns list
 				endpointPath : "country"
 				resourcePath : "api/country.wl"
 			}
-  		}
+		}
 
 
 ### POST
 
-Use this to create or modify an endpoint for a specified resource file. The EndpointInfo object should be provided in the request body as JSON. The API returns the endpointPath of the newly created endpoint.
+Use this to create an endpoint for a specified resource file. The EndpointInfo object should be provided in the request body as JSON. The API returns the endpointPath of the newly created endpoint.
 
 * Request
 
@@ -58,9 +58,9 @@ Use this to create or modify an endpoint for a specified resource file. The Endp
 		POST "http://applicationserver.wolfram.com/endpoints"
  	Request body example (application/json):
 
- 		{
- 			"endpointPath":"add"
- 			"resourcePath":"api/add.wl"
+		{
+			"endpointPath":"add"
+			"resourcePath":"api/add.wl"
 		}
 
 
@@ -77,23 +77,38 @@ Use this to create or modify an endpoint for a specified resource file. The Endp
 		}
 * If the endpointPath is null or empty: Response 400 Bad Request (application/json)
 
-  		[{
-  			"timestamp": "2019-07-16T18:32:17.516+0000",
-  			"status": 400,
-  			"error": "Bad Request",
-  			"message": "endpointPath cannot be null or empty",
-  			"path": "/endpoints"
-  		}]
+		{
+			"timestamp": "2019-07-16T18:32:17.516+0000",
+			"status": 400,
+			"error": "Bad Request",
+			"message": "endpointPath cannot be null or empty",
+			"path": "/endpoints"
+		}
+
+* If the endpointPath already exists: Response 400 Bad Request (application/json)
+
+		{
+			"timestamp": "2025-07-02T21:36:44.970730653Z",
+			"status": 400,
+			"error": "Bad Request",
+			"message": "There is already an endpoint at add",
+			"path": "/endpoints"
+		}
+
+In this case, use `PUT` instead as described below.
+This is a change from endpoint-manager version 1.2.5 and earlier.
 
 * If the resourcePath is null or empty: Response 400 Bad Request (application/json)
 
-  		[{
-  			"timestamp": "2019-07-16T18:32:17.516+0000",
-  			"status": 400,
-  			"error": "Bad Request",
-  			"message": "resourcePath cannot be null or empty",
-  			"path": "/endpoints"
-  		}]
+		{
+			"timestamp": "2019-07-16T18:32:17.516+0000",
+			"status": 400,
+			"error": "Bad Request",
+			"message": "resourcePath cannot be null or empty",
+			"path": "/endpoints"
+		}
+ 
+ 
 
 **Note:** Wolfram Application Server reserves a small number of endpointPath paths for internal usage. Attempting to assign a resource to one those paths will generate a 403 Forbidden error response.
 
@@ -103,12 +118,12 @@ Use this to create or modify an endpoint for a specified resource file. The Endp
 
 * If the endpointPath is a reserved path: Response 403 Forbidden (application/json)
 
-  		[{
-  			"timestamp": "2020-04-30T19:16:50.965+0000",
-  			"status": 403,
-  			"error": "Forbidden",
-  			"message": "This endpointPath is reserved for internal purpose"
-  		}]
+		{
+			"timestamp": "2020-04-30T19:16:50.965+0000",
+			"status": 403,
+			"error": "Forbidden",
+			"message": "This endpointPath is reserved for internal purpose"
+		}
 
 ## Endpoints [/endpoints/{path}]
 
@@ -130,17 +145,87 @@ Use this to get information about a specific endpoint. The API takes an endpoint
 		{
     		"endpointPath": "add",
     		"resourcePath": "api/add.wl"
-
 		}
+
 * If the endpointPath not exist: Response 404 Not Found (application/json)
 
-  		[{
-  			"timestamp": "2019-05-16T18:32:17.516+0000",
-  			"status": 404,
-  			"error": "Not Found",
-  			"message": "Unknown endpoint",
-  			"path": "/endpoints/add"
-  		}]
+		{
+			"timestamp": "2019-05-16T18:32:17.516+0000",
+			"status": 404,
+			"error": "Not Found",
+			"message": "Unknown endpoint",
+			"path": "/endpoints/add"
+		}
+
+### PUT
+
+Use this to modify an endpoint.  The API takes an endpointPath as a path variable
+and the EndpointInfo object should be provided in the request body as JSON.
+In this case, the endpointPath need not be redundantly specified in the request body,
+but it must match if it is provided.
+The API returns the endpointPath of the newly created endpoint.
+
+Note that PUT cannot be used with version 1.2.5 of endpoint-manager or earlier.
+
+* Parameter
+	* endpointPath (String) : This path uniquely identify an endpoint.
+
+* Request
+
+		PUT /endpoints/{path}"
+		
+ 	Request body example (application/json):
+
+		{
+			"endpointPath":"add"
+			"resourcePath":"api/add.wl"
+		}
+
+* Response 202 Accepted.
+If the endpoint did not yet exist: Response 201 Created.
+
+* If the resource referenced in resourcePath does not exist: Response 202 Accepted (application/json)
+
+		{
+			endpointPath : "add",
+			warning: "no resource found at api/add.wl; users accessing this endpoint may receive a 404 Not Found error."
+		}
+
+* If the endpointPath in the request body does not match the path in the PUT request: Response 400 Bad Request (application/json).  For example, `PUT /endpoints/add` with request body
+
+		{
+			"endpointPath":"subtract"
+			"resourcePath":"api/add.wl"
+		}
+
+Response 400 Bad Request (application/json)
+
+		{
+			"timestamp": "2025-07-02T21:58:10.601525827Z",
+			"status": 400,
+			"error":"Bad Request",
+			"message":"To modify subtract invoke PUT at /endpoints/subtract, not at /endpoints/add",
+			"path":"/endpoints/add"
+		}
+
+However, `PUT /endpoints/add` with request body
+
+		{
+			"resourcePath":"api/add.wl"
+		}
+
+Response 202 Accepted.
+
+* If the resourcePath is null or empty: Response 400 Bad Request (application/json)
+
+		{
+			"timestamp": "2019-07-16T18:32:17.516+0000",
+			"status": 400,
+			"error": "Bad Request",
+			"message": "resourcePath cannot be null or Empty",
+			"path": "/endpoints/add"
+		}
+
 
 ### DELETE
 
