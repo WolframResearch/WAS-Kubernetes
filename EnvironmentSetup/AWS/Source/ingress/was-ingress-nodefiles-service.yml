@@ -15,7 +15,7 @@ spec:
   rules:
   - http:
       paths:
-        - path: /nodefiles/?(.*)
+        - path: /?nodefiles(?:$|/(.*))
           pathType: ImplementationSpecific
           backend:
             service:

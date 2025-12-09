@@ -14,7 +14,7 @@ spec:
   rules:
   - http:
       paths:
-        - path: /endpoints/?(.*)
+        - path: /?endpoints(?:$|/(.*))
           pathType: ImplementationSpecific
           backend:
             service:
