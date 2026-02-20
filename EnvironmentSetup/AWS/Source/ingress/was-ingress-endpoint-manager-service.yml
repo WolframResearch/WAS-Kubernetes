@@ -8,7 +8,8 @@ metadata:
     app.kubernetes.io/part-of: ingress-nginx
   annotations:
     nginx.ingress.kubernetes.io/use-regex: "true"
-    nginx.ingress.kubernetes.io/rewrite-target: /endpoints/$1   
+    nginx.ingress.kubernetes.io/rewrite-target: /endpoints/$1
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
 spec:
   ingressClassName: nginx
   rules:
