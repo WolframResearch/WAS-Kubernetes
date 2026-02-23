@@ -93,9 +93,19 @@ module "eks" {
       desired_size   = var.desired_worker_node
       min_size       = var.min_worker_node
       max_size       = var.max_worker_node
-      disk_size      = var.disk_size
       instance_types = [var.instance_type]
       ami_type       = "AL2023_x86_64_STANDARD"
+
+      block_device_mappings = {
+        xvda = {
+          device_name = "/dev/xvda"
+          ebs = {
+            volume_size           = var.disk_size
+            volume_type           = "gp3"
+            delete_on_termination = true
+          }
+        }
+      }
 
       iam_role_additional_policies = {
         workers = aws_iam_policy.worker_policy.arn

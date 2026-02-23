@@ -19,7 +19,7 @@ variable "cluster_version" {
 }
 
 variable "disk_size" {
-  default = "30"
+  default = "50"
 }
 
 variable "instance_type" {
