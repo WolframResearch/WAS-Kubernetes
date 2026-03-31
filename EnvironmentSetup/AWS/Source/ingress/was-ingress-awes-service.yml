@@ -46,7 +46,7 @@ spec:
   rules:
   - http:
       paths:
-        - path: /.applicationserver/kernel/restart
+        - path: /\.applicationserver/kernel/restart
           pathType: ImplementationSpecific
           backend:
             service:
