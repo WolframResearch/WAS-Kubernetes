@@ -823,7 +823,7 @@ EOF
 
   helm repo add aws-efs-csi-driver 'https://kubernetes-sigs.github.io/aws-efs-csi-driver/'
   helm repo update
-  run_ok "helm install aws-efs-csi-driver -f values.yaml --namespace kube-system aws-efs-csi-driver/aws-efs-csi-driver && sleep 120" "Creating EFS Storage System"
+  run_ok "helm install aws-efs-csi-driver -f values.yaml --namespace kube-system --version 3.4.0 aws-efs-csi-driver/aws-efs-csi-driver && sleep 120" "Creating EFS Storage System"
   cd ..
 
   echo
@@ -925,7 +925,7 @@ custommetricsSetup() {
 deploymentStatus() {
   while true; do
     currentawesStatus=$(kubectl get pods --field-selector=status.phase=Running -n was | grep -i "active-web-elements-server-deployment-" | awk '{print $2}' | head -qn1)
-    if [ X"$currentawesStatus" = X"1/1" ]; then
+    if [ X"$currentawesStatus" = X"1/1" ] || [ X"$currentawesStatus" = X"0/1" ]; then
       log_debug "awes ready"
       break
     else
@@ -939,8 +939,8 @@ deploymentStatus() {
 endpointStatus() {
   BASE_URL=$(kubectl get svc -n ingress-nginx | awk '{print $4}' | sed -n '2p')
   while true; do
-    currentendpointStatus=$(curl -s -o /dev/null -I -w "%{http_code}" http://$BASE_URL/)
-    if [ X"$currentendpointStatus" = X"503" ]; then
+    currentendpointStatus=$(curl -s -o /dev/null -I -w "%{http_code}" http://$BASE_URL/.applicationserver/info)
+    if [ X"$currentendpointStatus" = X"200" ]; then
       log_debug "endpoint accessible"
       break
     else

@@ -7,7 +7,7 @@ variable "cluster_name" {
 }
 
 variable "cluster_version" {
-  default = "1.33"
+  default = "1.35"
 }
 
 variable "disk_size" {
