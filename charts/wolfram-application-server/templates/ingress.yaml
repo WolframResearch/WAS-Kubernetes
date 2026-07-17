@@ -1,0 +1,185 @@
+{{/* ── 1. Main AWES service (all traffic to /) ──────────────────────────── */}}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: was-ingress-awes
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    app.kubernetes.io/part-of: ingress-nginx
+    app.kubernetes.io/component: ingress
+    {{- include "was.labels" . | nindent 4 }}
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "360"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "360"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "360"
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/load-balance: "ewma"
+    {{- include "was.ingress.tlsAnnotations" . | nindent 4 }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  rules:
+  - host: {{ .Values.ingress.host }}
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: active-web-elements-server
+            port:
+              number: 8080
+  {{- include "was.ingress.tlsSpec" . | nindent 2 }}
+---
+{{/* ── 2. Restart endpoint (basic-auth protected) ──────────────────────── */}}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: was-ingress-endpoints-restart-rollout
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    app.kubernetes.io/part-of: ingress-nginx
+    app.kubernetes.io/component: ingress
+    {{- include "was.labels" . | nindent 4 }}
+  annotations:
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/rewrite-target: /restart/kubernetes/active-web-elements-server-deployment
+    nginx.ingress.kubernetes.io/auth-type: basic
+    nginx.ingress.kubernetes.io/auth-secret: {{ .Values.basicAuth.secretName }}
+    nginx.ingress.kubernetes.io/auth-realm: "Authentication Required"
+    {{- include "was.ingress.tlsAnnotations" . | nindent 4 }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  rules:
+  - host: {{ .Values.ingress.host }}
+    http:
+      paths:
+      - path: /\.applicationserver/kernel/restart
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: endpoint-manager
+            port:
+              number: 8085
+  {{- include "was.ingress.tlsSpec" . | nindent 2 }}
+---
+{{/* ── 3. Info and kernel/stats endpoints ──────────────────────────────── */}}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: was-ingress-awes-info
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    app.kubernetes.io/part-of: ingress-nginx
+    app.kubernetes.io/component: ingress
+    {{- include "was.labels" . | nindent 4 }}
+  annotations:
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "360"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "360"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "360"
+    nginx.ingress.kubernetes.io/load-balance: "ewma"
+    {{- include "was.ingress.tlsAnnotations" . | nindent 4 }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  rules:
+  - host: {{ .Values.ingress.host }}
+    http:
+      paths:
+      - path: /\.applicationserver/(info|kernel/stats)
+        pathType: {{ .Values.ingress.pathType }}
+        backend:
+          service:
+            name: active-web-elements-server-info
+            port:
+              number: 8082
+  {{- include "was.ingress.tlsSpec" . | nindent 2 }}
+---
+{{/* ── 4. Resource Manager (/resources) ───────────────────────────────── */}}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: was-ingress-resources
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    app.kubernetes.io/part-of: ingress-nginx
+    app.kubernetes.io/component: ingress
+    {{- include "was.labels" . | nindent 4 }}
+  annotations:
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/rewrite-target: /resources/$1
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    {{- include "was.ingress.tlsAnnotations" . | nindent 4 }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  rules:
+  - host: {{ .Values.ingress.host }}
+    http:
+      paths:
+      - path: /?resources(?:$|/(.*))
+        pathType: {{ .Values.ingress.pathType }}
+        backend:
+          service:
+            name: resource-manager
+            port:
+              number: 9090
+  {{- include "was.ingress.tlsSpec" . | nindent 2 }}
+---
+{{/* ── 5. Endpoint Manager (/endpoints) ───────────────────────────────── */}}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: was-ingress-endpoints
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    app.kubernetes.io/part-of: ingress-nginx
+    app.kubernetes.io/component: ingress
+    {{- include "was.labels" . | nindent 4 }}
+  annotations:
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/rewrite-target: /endpoints/$1
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    {{- include "was.ingress.tlsAnnotations" . | nindent 4 }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  rules:
+  - host: {{ .Values.ingress.host }}
+    http:
+      paths:
+      - path: /?endpoints(?:$|/(.*))
+        pathType: {{ .Values.ingress.pathType }}
+        backend:
+          service:
+            name: endpoint-manager
+            port:
+              number: 8085
+  {{- include "was.ingress.tlsSpec" . | nindent 2 }}
+---
+{{/* ── 6. Nodefiles (/nodefiles) ───────────────────────────────────────── */}}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: was-ingress-nodefiles
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    app.kubernetes.io/part-of: ingress-nginx
+    app.kubernetes.io/component: ingress
+    {{- include "was.labels" . | nindent 4 }}
+  annotations:
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/rewrite-target: /nodefiles/$1
+    nginx.ingress.kubernetes.io/proxy-body-size: 1g
+    {{- include "was.ingress.tlsAnnotations" . | nindent 4 }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  rules:
+  - host: {{ .Values.ingress.host }}
+    http:
+      paths:
+      - path: /?nodefiles(?:$|/(.*))
+        pathType: {{ .Values.ingress.pathType }}
+        backend:
+          service:
+            name: resource-manager
+            port:
+              number: 9090
+  {{- include "was.ingress.tlsSpec" . | nindent 2 }}

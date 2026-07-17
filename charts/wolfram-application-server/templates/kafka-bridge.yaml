@@ -1,0 +1,15 @@
+{{- if eq .Values.kafka.mode "builtin" }}
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaBridge
+metadata:
+  name: kafka
+  namespace: {{ .Values.kafka.namespace }}
+  labels:
+    app.kubernetes.io/component: kafka
+    {{- include "was.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.kafkaBridge.replicas }}
+  bootstrapServers: {{ .Values.kafka.clusterName }}-kafka-bootstrap:9092
+  http:
+    port: {{ .Values.kafkaBridge.http.port }}
+{{- end }}

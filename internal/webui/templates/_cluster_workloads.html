@@ -1,0 +1,42 @@
+{{define "_cluster_workloads"}}
+<div class="section-block content-region"
+     id="section-workloads">
+  <div class="content-region__loading" aria-hidden="true"></div>
+  <div class="section-block__head">
+    <span class="section-block__title">Workloads</span>
+    <button class="btn btn--secondary btn--sm"
+            hx-get="/clusters/{{.ClusterName}}/sections/workloads?refresh=true"
+            hx-target="#section-workloads"
+            hx-swap="outerHTML"
+            hx-indicator="closest .content-region">Refresh</button>
+  </div>
+
+  {{if and .Report .Report.Workloads}}
+  <div class="cluster-list">
+    <div class="cluster-list__head" style="grid-template-columns: 1fr 120px 160px">
+      <span>Deployment</span>
+      <span>Ready</span>
+      <span>Uptime</span>
+    </div>
+    {{range .Report.Workloads}}
+    <div class="cluster-list__row" style="grid-template-columns: 1fr 120px 160px">
+      <span class="cluster-list__name">{{.Name}}</span>
+      <span>
+        {{if eq .Ready .Desired}}
+        <span class="badge badge--deployed">{{.Ready}}/{{.Desired}}</span>
+        {{else}}
+        <span class="badge badge--installing">{{.Ready}}/{{.Desired}}</span>
+        {{end}}
+      </span>
+      <span class="cluster-list__time">{{.UptimeStr}}</span>
+    </div>
+    {{end}}
+  </div>
+  {{else}}
+  <div class="section-unavailable">
+    <span class="brand-marker text-sm">\[SectionUnavailable]</span>
+    <p class="text-muted text-sm">{{if .SectionError}}{{.SectionError}}{{else}}No workloads found{{end}}</p>
+  </div>
+  {{end}}
+</div>
+{{end}}

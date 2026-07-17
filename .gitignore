@@ -1,0 +1,28 @@
+# Helm subchart tarballs — populated by `helm dependency update`, not committed
+charts/wolfram-application-server/charts/
+charts/wolfram-application-server/*.tgz
+*.tgz
+
+# Terraform — never commit state, lock, or plan files
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.auto.tfvars
+!*.example
+
+
+# Embed stubs — populated by `go generate ./internal/assets/`, not committed.
+# Only .gitkeep placeholders should be tracked; the real files are generated.
+internal/assets/terraform/bootstrap/
+internal/assets/terraform/stack/
+internal/assets/terraform/azure-bootstrap/
+internal/assets/terraform/azure-stack/
+internal/assets/chart/
+
+# Local Terraform var / backend files (examples/*.example are committed)
+**/terraform.tfvars
+**/backend.hcl
+**/backend.tfvars
+infra/**/examples/backend-*.hcl
+infra/**/examples/backend-*.tfvars

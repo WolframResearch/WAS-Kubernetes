@@ -1,0 +1,21 @@
+{{/*
+Required-value validation. This file renders no Kubernetes resources.
+It uses `fail` to produce a clear error when mandatory values are absent.
+*/}}
+{{- if not .Values.ingress.host -}}
+{{- fail "ingress.host is required: provide the public DNS hostname for WAS (e.g. --set ingress.host=was.example.com)" -}}
+{{- end -}}
+{{- /* Let's Encrypt refuses *.amazonaws.com (ELB hostnames). */ -}}
+{{- if and (eq (include "was.ingressTLSEnabled" .) "true") (contains ".amazonaws.com" .Values.ingress.host) -}}
+{{- fail (printf "ingress.host %q cannot be used with TLS/Let's Encrypt — ACME refuses *.amazonaws.com (ELB names). Use a DNS name you control (CNAME → ELB), e.g. was.example.com" .Values.ingress.host) -}}
+{{- end -}}
+{{- if eq .Values.cloud "aws" -}}
+{{- if and (not .Values.objectStorage.region) (not .Values.objectStorage.endpoint) -}}
+{{- fail "objectStorage.region is required when cloud=aws (used to construct the S3 endpoint). Set it with --set objectStorage.region=<region> or override the endpoint with --set objectStorage.endpoint=<url>" -}}
+{{- end -}}
+{{- end -}}
+{{- if eq .Values.cloud "azure" -}}
+{{- if and (not .Values.objectStorage.azure.accountName) (not .Values.objectStorage.endpoint) -}}
+{{- fail "objectStorage.azure.accountName is required when cloud=azure (used to construct the Blob endpoint). Set it with --set objectStorage.azure.accountName=<account> or override the endpoint with --set objectStorage.endpoint=<url>" -}}
+{{- end -}}
+{{- end -}}

@@ -1,0 +1,150 @@
+{{define "title"}}Values Editor — {{.Release}} — Wolfram Application Server{{end}}
+
+{{define "content"}}
+<div class="page-heading page-heading--with-action">
+  <h1 class="page-heading__title">
+    Chart values — <span class="text-mono">{{.Release}}</span>
+  </h1>
+  <a href="/chart-only" class="btn btn--secondary btn--sm">← Back</a>
+</div>
+
+<div class="editor-layout">
+
+  {{/* ── Left pane: form ── */}}
+  <div class="editor-form-pane">
+    <form id="values-form"
+          hx-post="/chart-only/render"
+          hx-target="#preview-pane"
+          hx-swap="innerHTML"
+          hx-trigger="change delay:500ms from:#values-form input,#values-form select,#values-form textarea"
+          hx-indicator="#preview-pane">
+      <input type="hidden" name="kubeconfig_b64" value="{{.Kubeconfig}}">
+      <input type="hidden" name="release" value="{{.Release}}">
+
+      {{range .Groups}}
+      <div class="editor-group">
+        <div class="editor-group__head" x-data="{open:true}" @click="open=!open">
+          <span class="editor-group__name">{{.Name}}</span>
+          <span class="editor-group__toggle" x-text="open ? '▾' : '▸'">▾</span>
+        </div>
+        <div x-show="open" class="editor-group__body">
+          {{range .Fields}}
+          <div class="editor-field {{if .Required}}editor-field--required{{end}}">
+            <label class="editor-field__label" for="ef-{{replace .Path "." "-"}}">
+              {{.Label}}{{if .Required}} <span class="required-star">*</span>{{end}}
+            </label>
+
+            {{if eq .Type "bool"}}
+            <input class="editor-field__checkbox" type="checkbox"
+                   id="ef-{{replace .Path "." "-"}}"
+                   name="{{.Path}}"
+                   {{if eq .Default "true"}}checked{{end}}
+                   value="true">
+            {{else if .Enum}}
+            <select class="form-field__select editor-field__select"
+                    id="ef-{{replace .Path "." "-"}}"
+                    name="{{.Path}}">
+              {{$def := .Default}}
+              {{range .Enum}}
+              <option value="{{.}}" {{if eq . $def}}selected{{end}}>{{.}}</option>
+              {{end}}
+            </select>
+            {{else if eq .Type "text"}}
+            <textarea class="form-field__input editor-field__textarea"
+                      id="ef-{{replace .Path "." "-"}}"
+                      name="{{.Path}}"
+                      rows="4"
+                      spellcheck="false">{{.Default}}</textarea>
+            {{else if eq .Type "int"}}
+            <input class="form-field__input editor-field__input--narrow"
+                   type="number"
+                   id="ef-{{replace .Path "." "-"}}"
+                   name="{{.Path}}"
+                   value="{{.Default}}">
+            {{else}}
+            <input class="form-field__input"
+                   type="text"
+                   id="ef-{{replace .Path "." "-"}}"
+                   name="{{.Path}}"
+                   value="{{.Default}}"
+                   {{if eq .Type "hostname"}}pattern="[a-zA-Z0-9][a-zA-Z0-9\-\.]*\.[a-zA-Z]{2,}"{{end}}>
+            {{end}}
+
+            {{if .Description}}
+            <span class="editor-field__hint">{{.Description}}</span>
+            {{end}}
+          </div>
+          {{end}}
+        </div>
+      </div>
+      {{end}}
+
+      <div class="editor-form-footer">
+        <a href="/chart-only" class="btn btn--secondary">← Cancel</a>
+        <button id="refresh-btn" type="button" class="btn btn--secondary"
+                hx-post="/chart-only/render"
+                hx-target="#preview-pane"
+                hx-swap="innerHTML"
+                hx-include="#values-form"
+                hx-indicator="#preview-pane, #refresh-btn"
+                hx-disabled-elt="this">
+          <span class="btn__label">Refresh preview</span>
+          <span class="btn__spinner" aria-hidden="true"></span>
+          <span class="sr-only htmx-indicator">Loading…</span>
+        </button>
+        <button type="submit" form="preview-submit-form" class="btn btn--primary">
+          Review &amp; apply →
+        </button>
+      </div>
+    </form>
+
+    {{/* Hidden form for preview navigation (full-page POST to /chart-only/preview) */}}
+    <form id="preview-submit-form" method="POST" action="/chart-only/preview" style="display:none">
+      {{/* Values are mirrored here via JS on submit */}}
+    </form>
+  </div>
+
+  {{/* ── Right pane: rendered manifests ── */}}
+  <div class="editor-preview-pane">
+    <div class="editor-preview-head">
+      <span class="section-block__title">Rendered manifests</span>
+    </div>
+    <div id="preview-pane" class="editor-preview-body content-region">
+      <div class="empty-state">
+        <div class="brand-marker">\[NoPreviewYet]</div>
+        <p class="empty-state__sub">Change a value to see the rendered manifests.</p>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// Mirror values-form fields into preview-submit-form on submit.
+document.getElementById('preview-submit-form').addEventListener('submit', function() {
+  this.innerHTML = '';
+  var src = document.getElementById('values-form');
+  var inputs = src.querySelectorAll('input, select, textarea');
+  inputs.forEach(function(el) {
+    if (!el.name) return;
+    var clone = document.createElement('input');
+    clone.type = 'hidden';
+    clone.name = el.name;
+    clone.value = el.type === 'checkbox' ? (el.checked ? 'true' : 'false') : el.value;
+    this.appendChild(clone);
+  }.bind(this));
+});
+</script>
+{{end}}
+
+{{/* ── _preview_pane fragment ─ returned by POST /chart-only/render ── */}}
+{{define "_preview_pane"}}
+{{if .Error}}
+<div class="error-state" style="margin:12px">
+  <div class="brand-marker">\[HelmTemplateError]</div>
+  <pre class="error-pre">{{.Error}}</pre>
+</div>
+{{else}}
+<pre class="yaml-preview">{{.YAML}}</pre>
+{{end}}
+{{end}}

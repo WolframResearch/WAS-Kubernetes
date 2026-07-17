@@ -1,0 +1,100 @@
+{{define "title"}}Destroy {{.ClusterName}} — Wolfram Application Server{{end}}
+
+{{define "content"}}
+<div class="breadcrumb">
+  <a href="/">Clusters</a>
+  <span class="breadcrumb__sep">/</span>
+  <a href="/clusters/{{.ClusterName}}">{{.ClusterName}}</a>
+  <span class="breadcrumb__sep">/</span>
+  <span>Destroy</span>
+</div>
+
+<div class="destroy-page">
+
+  <div class="destroy-warning">
+    <div class="destroy-warning__icon">⚠</div>
+    <div>
+      <p class="destroy-warning__title">This action is irreversible</p>
+      <p class="destroy-warning__sub">
+        All cluster resources will be permanently deleted. This cannot be undone.
+      </p>
+    </div>
+  </div>
+
+  <div class="destroy-summary">
+    <h2 class="destroy-summary__title">What will be destroyed</h2>
+    <ul class="destroy-list">
+      {{if eq .Cloud "azure"}}
+      <li class="destroy-list__item">AKS cluster <strong>{{.ClusterName}}-aks</strong> in <strong>{{.ClusterName}}-rg</strong> ({{.Region}})</li>
+      <li class="destroy-list__item">Node pools and the managed node resource group (MC_*)</li>
+      <li class="destroy-list__item">Azure Files share and blob storage (resource + nodefile containers)</li>
+      <li class="destroy-list__item">VNet, subnets, and networking infrastructure</li>
+      <li class="destroy-list__item">Load balancer and ingress endpoints</li>
+      {{else}}
+      <li class="destroy-list__item">EKS cluster <strong>{{.ClusterName}}</strong> ({{.Region}})</li>
+      <li class="destroy-list__item">All node groups and EC2 instances</li>
+      <li class="destroy-list__item">EFS file system and all stored resources</li>
+      <li class="destroy-list__item">NAT Gateway, VPC, and networking infrastructure</li>
+      <li class="destroy-list__item">Load balancer and all DNS entries</li>
+      {{end}}
+      <li class="destroy-list__item">Strimzi Kafka cluster and all topics</li>
+      <li class="destroy-list__item">All WAS workloads (AWES, Resource Manager, Endpoint Manager)</li>
+    </ul>
+    <p class="destroy-summary__note">
+      {{if eq .Cloud "azure"}}
+      Application blob containers are emptied during infrastructure teardown.
+      Checking the box below also deletes the Terraform state storage account,
+      the wasctl meta storage account (<code>wolfram-{{.ClusterName}}-meta</code>), and workspace metadata.
+      {{else}}
+      Application S3 buckets (resource and nodefile buckets) will be automatically emptied during destruction.
+      The Terraform state S3 bucket, DynamoDB lock table, and shared workspace metadata keys can also be completely deleted by checking the box below.
+      {{end}}
+    </p>
+  </div>
+
+  <div class="destroy-confirm-form"
+       x-data="{typed: '', confirmed: false}"
+       x-init="$watch('typed', v => confirmed = (v === {{.ClusterName | printf "%q"}}))">
+    <label class="destroy-confirm-label" for="confirm-input">
+      Type <strong>{{.ClusterName}}</strong> to confirm:
+    </label>
+    <input id="confirm-input"
+           class="destroy-confirm-input"
+           type="text"
+           autocomplete="off"
+           autocorrect="off"
+           spellcheck="false"
+           x-model="typed"
+           placeholder="{{.ClusterName}}">
+
+    <form method="POST" action="/clusters/{{.ClusterName}}/destroy">
+      <input type="hidden" name="confirm_name" :value="typed">
+      
+      <div style="margin: 16px 0; display: flex; align-items: center; gap: 8px;">
+        <input type="checkbox"
+               id="destroy-state-backend"
+               name="destroy_state_backend"
+               class="editor-field__checkbox"
+               checked>
+        <label for="destroy-state-backend" style="font-size: 13px; color: var(--text); cursor: pointer; user-select: none;">
+          {{if eq .Cloud "azure"}}
+          Destroy state backend (delete Terraform state SA, wasctl meta SA/RG, and workspace metadata)
+          {{else}}
+          Destroy state backend (delete S3 state bucket, DynamoDB lock table, and workspace metadata)
+          {{end}}
+        </label>
+      </div>
+
+      <div class="destroy-actions">
+        <a href="/clusters/{{.ClusterName}}" class="btn btn--secondary">Cancel</a>
+        <button type="submit"
+                class="btn btn--danger"
+                :disabled="!confirmed">
+          Destroy cluster
+        </button>
+      </div>
+    </form>
+  </div>
+
+</div>
+{{end}}

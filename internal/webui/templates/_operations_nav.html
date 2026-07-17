@@ -1,0 +1,12 @@
+{{define "_operations_nav"}}
+<nav class="ops-nav" aria-label="Operations sections">
+  <a href="/clusters/{{.ClusterName}}/operations"
+     class="ops-nav__link{{if eq .ActiveTab "doctor"}} ops-nav__link--active{{end}}">Diagnostics</a>
+  <a href="/clusters/{{.ClusterName}}/operations/versions"
+     class="ops-nav__link{{if eq .ActiveTab "versions"}} ops-nav__link--active{{end}}">Versions</a>
+  <a href="/clusters/{{.ClusterName}}/operations/bundle"
+     class="ops-nav__link{{if eq .ActiveTab "bundle"}} ops-nav__link--active{{end}}">Bundle</a>
+  <a href="/clusters/{{.ClusterName}}/operations/history"
+     class="ops-nav__link{{if eq .ActiveTab "history"}} ops-nav__link--active{{end}}">History</a>
+</nav>
+{{end}}

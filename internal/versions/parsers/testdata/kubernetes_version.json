@@ -1,0 +1,13 @@
+{
+  "clientVersion": {
+    "gitVersion": "v1.30.2"
+  },
+  "serverVersion": {
+    "major": "1",
+    "minor": "31",
+    "gitVersion": "v1.31.2",
+    "buildDate": "2024-09-11T21:27:48Z",
+    "goVersion": "go1.22.6",
+    "platform": "linux/amd64"
+  }
+}

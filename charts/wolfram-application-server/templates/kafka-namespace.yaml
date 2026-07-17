@@ -1,0 +1,22 @@
+{{- /*
+  Creates the Kafka namespace when:
+    - kafka.mode=builtin (chart manages the Strimzi Kafka CR)
+    - kafka.namespace differs from the WAS namespace
+
+  Without this, the Strimzi Kafka CR lands in a namespace that doesn't exist
+  and the install fails. helm's --create-namespace only creates the release
+  namespace (was); it does not create cross-namespace targets in templates.
+
+  NOTE: helm uninstall will delete this namespace and all Kafka data inside it.
+  If you need to preserve Kafka data across chart uninstalls, set
+  kafka.mode=external and manage the Kafka cluster out-of-band.
+*/}}
+{{- if and (eq .Values.kafka.mode "builtin") (ne .Values.kafka.namespace .Values.namespace.name) }}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Values.kafka.namespace }}
+  labels:
+    {{- include "was.labels" . | nindent 4 }}
+    app.kubernetes.io/component: kafka-namespace
+{{- end }}

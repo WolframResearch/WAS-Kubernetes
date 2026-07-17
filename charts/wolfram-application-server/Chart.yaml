@@ -1,0 +1,70 @@
+apiVersion: v2
+name: wolfram-application-server
+description: Deploys the Wolfram Application Server (AWES, Resource Manager, Endpoint Manager) with Strimzi Kafka on EKS or AKS
+type: application
+version: 0.1.0
+appVersion: "4.3.0"
+kubeVersion: ">=1.30.0-0 <1.37.0-0"
+keywords:
+  - wolfram
+  - application-server
+  - kafka
+  - strimzi
+sources:
+  - https://github.com/WolframResearch/WAS-Kubernetes
+
+# Every dependency is OFF by default (condition: <alias>.enabled = false).
+# Enable individually via --set <alias>.enabled=true or in your values file.
+# Run `helm dependency update` before `helm install` when any toggle is true.
+dependencies:
+  - name: ingress-nginx
+    version: "~4.11.0"
+    repository: https://kubernetes.github.io/ingress-nginx
+    condition: ingress-nginx.enabled
+    alias: ingress-nginx
+
+  # Strimzi < 0.44.0 crashes on Kubernetes 1.33+ due to fabric8 kubernetes-client
+  # 6.13.3 rejecting the new emulationMajor field added to the API server's
+  # VersionInfo response. 0.44.0 bundles fabric8 6.13.4+ which tolerates the field.
+  # See docs/Troubleshooting.md#14-strimzi-cluster-operator-crashloopbackoff-on-k8s-133
+  - name: strimzi-kafka-operator
+    version: "~0.44.0"
+    repository: https://strimzi.io/charts/
+    condition: strimzi-kafka-operator.enabled
+    alias: strimzi-kafka-operator
+
+  - name: kube-prometheus-stack
+    version: "~65.0.0"
+    repository: https://prometheus-community.github.io/helm-charts
+    condition: kube-prometheus-stack.enabled
+    alias: kube-prometheus-stack
+
+  - name: prometheus-adapter
+    version: "~4.11.0"
+    repository: https://prometheus-community.github.io/helm-charts
+    condition: prometheus-adapter.enabled
+    alias: prometheus-adapter
+
+  - name: metrics-server
+    version: "~3.12.0"
+    repository: https://kubernetes-sigs.github.io/metrics-server/
+    condition: metrics-server.enabled
+    alias: metrics-server
+
+  - name: aws-efs-csi-driver
+    version: "~3.0.0"
+    repository: https://kubernetes-sigs.github.io/aws-efs-csi-driver
+    condition: aws-efs-csi-driver.enabled
+    alias: aws-efs-csi-driver
+
+  - name: azurefile-csi-driver
+    version: "~1.30.0"
+    repository: https://raw.githubusercontent.com/kubernetes-sigs/azurefile-csi-driver/master/charts
+    condition: azurefile-csi-driver.enabled
+    alias: azurefile-csi-driver
+
+  - name: cert-manager
+    version: "~1.15.0"
+    repository: https://charts.jetstack.io
+    condition: cert-manager.enabled
+    alias: cert-manager

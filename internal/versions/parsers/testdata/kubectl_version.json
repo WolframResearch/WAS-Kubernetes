@@ -1,0 +1,12 @@
+{
+  "clientVersion": {
+    "major": "1",
+    "minor": "30",
+    "gitVersion": "v1.30.2",
+    "gitCommit": "39683505b630ff2121012f3c5b16215a1449d5ed",
+    "buildDate": "2024-06-11T20:23:04Z",
+    "goVersion": "go1.22.4",
+    "compiler": "gc",
+    "platform": "linux/amd64"
+  }
+}

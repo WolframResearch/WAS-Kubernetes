@@ -1,0 +1,55 @@
+{{define "title"}}{{.ClusterName}} — Version Matrix — Wolfram Application Server{{end}}
+
+{{define "content"}}
+<div class="breadcrumb">
+  <a href="/">Clusters</a>
+  <span class="breadcrumb__sep">/</span>
+  <a href="/clusters/{{.ClusterName}}">{{.ClusterName}}</a>
+  <span class="breadcrumb__sep">/</span>
+  <span>Operations</span>
+</div>
+
+<div class="ops-page">
+  {{template "_operations_nav" .}}
+
+  <div class="ops-content">
+    {{if .Error}}
+    <div class="error-state">
+      <div class="brand-marker">\[VersionsUnavailable]</div>
+      <p class="error-state__detail">{{.Error}}</p>
+    </div>
+    {{else}}
+    <div class="ops-section">
+      <h2 class="ops-section__title">Version Compatibility</h2>
+      <p class="text-body ops-section__desc">
+        Shows installed tool versions against the wasctl compatibility matrix.
+        Tools not detected are skipped silently — install them to enable the relevant checks.
+      </p>
+
+      <table class="data-table versions-table">
+        <thead>
+          <tr>
+            <th>Component</th>
+            <th>Current</th>
+            <th>Supported range</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{range .Rows}}
+          <tr class="data-table__row">
+            <td class="data-table__cell">{{.Component}}</td>
+            <td class="data-table__cell mono">{{if .Current}}{{.Current}}{{else}}<span class="text-muted">—</span>{{end}}</td>
+            <td class="data-table__cell mono text-muted">{{.Range}}</td>
+            <td class="data-table__cell">
+              <span class="versions-status versions-status--{{.Status}}">{{.StatusMsg}}</span>
+            </td>
+          </tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+    {{end}}
+  </div>
+</div>
+{{end}}

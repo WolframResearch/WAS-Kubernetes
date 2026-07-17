@@ -1,0 +1,118 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: endpoint-manager-deployment
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    app: endpoint-manager
+    app.kubernetes.io/component: endpoint-manager
+    {{- include "was.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      app: endpoint-manager
+  minReadySeconds: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 50%
+      maxUnavailable: 50%
+  template:
+    metadata:
+      labels:
+        app: endpoint-manager
+    spec:
+      serviceAccountName: awesrestartpods
+      restartPolicy: Always
+      containers:
+      - name: endpoint-manager
+        image: {{ .Values.endpointManager.image.repository }}:{{ .Values.endpointManager.image.tag }}
+        imagePullPolicy: {{ .Values.endpointManager.image.pullPolicy }}
+        ports:
+        - containerPort: 8085
+        resources:
+          {{- toYaml .Values.endpointManager.resources | nindent 10 }}
+        readinessProbe:
+          tcpSocket:
+            port: 8085
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        livenessProbe:
+          tcpSocket:
+            port: 8085
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        env:
+        - name: SPRING_PROFILES_ACTIVE
+          value: docker
+        - name: LOG_LOCATION
+          value: /opt/app/logs
+        - name: KAFKA.BOOTSTRAP-SERVERS
+          value: {{ include "was.kafkaBootstrap" . | quote }}
+        - name: ENDPOINT_INFO_TOPIC
+          value: "endpoint-info"
+        - name: RESOURCE_INFO_TOPIC
+          value: "resource-info"
+        volumeMounts:
+        - mountPath: "/opt/app/logs"
+          name: endpoint-logs-storage
+      initContainers:
+      - name: init-kafka
+        image: bash
+        command:
+        - bash
+        - -c
+        - |
+          ADDR="{{ include "was.kafkaBootstrap" . }}"
+          HOST="${ADDR%:*}"; PORT="${ADDR##*:}"
+          for i in $(seq 1 3000); do
+            nc -zvw1 "$HOST" "$PORT" && exit 0 || sleep 3
+          done; exit 1
+      {{- if eq .Values.kafka.mode "builtin" }}
+      - name: init-kafka-resources-topic
+        image: bash
+        command:
+        - bash
+        - -c
+        - |
+          apk --update add curl; set -x
+          while true; do
+            response=$(curl -s {{ include "was.kafkaBridgeService" . }}/topics)
+            if [[ ${response} =~ .*\"resource-info\".* ]]; then break; else sleep 5; fi
+          done
+      - name: init-kafka-endpoints-topic
+        image: bash
+        command:
+        - bash
+        - -c
+        - |
+          apk --update add curl; set -x
+          while true; do
+            response=$(curl -s {{ include "was.kafkaBridgeService" . }}/topics)
+            if [[ ${response} =~ .*\"endpoint-info\".* ]]; then break; else sleep 5; fi
+          done
+      - name: init-kafka-nodefiles-topic
+        image: bash
+        command:
+        - bash
+        - -c
+        - |
+          apk --update add curl; set -x
+          while true; do
+            response=$(curl -s {{ include "was.kafkaBridgeService" . }}/topics)
+            if [[ ${response} =~ .*\"nodefile-info\".* ]]; then break; else sleep 5; fi
+          done
+      {{- end }}
+      - name: init-resource-manager
+        image: bash
+        command:
+        - bash
+        - -c
+        - |
+          for i in $(seq 1 3000); do
+            nc -zvw1 resource-manager 9090 && exit 0 || sleep 3
+          done; exit 1
+      volumes:
+      - name: endpoint-logs-storage
+        persistentVolumeClaim:
+          claimName: endpoint-logs

@@ -1,0 +1,100 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - "release/**"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build wasctl binaries
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.26"
+          cache: true
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.16.3
+
+      - name: Resolve version from branch
+        id: ver
+        run: |
+          # refs/heads/release/4.0.0 → 4.0.0 (no leading "v")
+          BRANCH="${GITHUB_REF_NAME}"
+          VERSION="${BRANCH#release/}"
+          if [[ -z "${VERSION}" || "${VERSION}" == "${BRANCH}" ]]; then
+            echo "::error::Expected branch release/<version> (e.g. release/4.0.0), got: ${BRANCH}"
+            exit 1
+          fi
+          if [[ "${VERSION}" == v* ]]; then
+            echo "::error::Do not use a v-prefix on release branches (got release/${VERSION}; use release/4.0.0 not release/v4.0.0)"
+            exit 1
+          fi
+          if [[ ! "${VERSION}" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?([.-].*)?$ ]]; then
+            echo "::error::Version '${VERSION}' from branch '${BRANCH}' does not look like a semver (e.g. 4.0.0)"
+            exit 1
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Building wasctl version=${VERSION} (branch=${BRANCH})"
+
+      - name: Fetch Helm chart dependencies
+        run: helm dependency update charts/wolfram-application-server
+
+      - name: Generate embedded assets
+        run: make generate
+
+      - name: Cross-compile binaries
+        env:
+          BIN_VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          LDFLAGS="-s -w -X github.com/WolframResearch/WAS-Kubernetes/internal/version.Version=${BIN_VERSION}"
+          mkdir -p dist
+          GOOS=darwin  GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags="${LDFLAGS}" -o dist/wasctl-darwin-amd64       ./cmd/wasctl
+          GOOS=darwin  GOARCH=arm64 CGO_ENABLED=0 go build -trimpath -ldflags="${LDFLAGS}" -o dist/wasctl-darwin-arm64       ./cmd/wasctl
+          GOOS=linux   GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags="${LDFLAGS}" -o dist/wasctl-linux-amd64        ./cmd/wasctl
+          GOOS=linux   GOARCH=arm64 CGO_ENABLED=0 go build -trimpath -ldflags="${LDFLAGS}" -o dist/wasctl-linux-arm64        ./cmd/wasctl
+          GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags="${LDFLAGS}" -o dist/wasctl-windows-amd64.exe  ./cmd/wasctl
+          GOOS=windows GOARCH=arm64 CGO_ENABLED=0 go build -trimpath -ldflags="${LDFLAGS}" -o dist/wasctl-windows-arm64.exe  ./cmd/wasctl
+          (cd dist && sha256sum wasctl-* > SHA256SUMS)
+          ls -la dist/
+
+      - name: Upload binary artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: wasctl-${{ steps.ver.outputs.version }}
+          path: |
+            dist/wasctl-darwin-amd64
+            dist/wasctl-darwin-arm64
+            dist/wasctl-linux-amd64
+            dist/wasctl-linux-arm64
+            dist/wasctl-windows-amd64.exe
+            dist/wasctl-windows-arm64.exe
+            dist/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.ver.outputs.version }}
+          name: wasctl ${{ steps.ver.outputs.version }}
+          files: |
+            dist/wasctl-darwin-amd64
+            dist/wasctl-darwin-arm64
+            dist/wasctl-linux-amd64
+            dist/wasctl-linux-arm64
+            dist/wasctl-windows-amd64.exe
+            dist/wasctl-windows-arm64.exe
+            dist/SHA256SUMS
+          generate_release_notes: true

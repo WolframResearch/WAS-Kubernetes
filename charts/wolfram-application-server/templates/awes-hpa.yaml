@@ -1,0 +1,68 @@
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: active-web-elements-server-hpa
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    app.kubernetes.io/component: active-web-elements-server
+    {{- include "was.labels" . | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: active-web-elements-server-deployment
+  minReplicas: {{ .Values.awes.replicaCount }}
+  maxReplicas: 10
+  metrics:
+  - type: Object
+    object:
+      metric:
+        name: MSP_RecentMaxKernelPercentageUse
+      describedObject:
+        kind: Service
+        name: active-web-elements-server
+      target:
+        type: AverageValue
+        averageValue: 90
+  - type: Object
+    object:
+      metric:
+        name: MSP_QueueSize
+      describedObject:
+        kind: Service
+        name: active-web-elements-server
+      target:
+        type: AverageValue
+        averageValue: 2
+  - type: Object
+    object:
+      metric:
+        name: Public_RecentMaxKernelPercentageUse
+      describedObject:
+        kind: Service
+        name: active-web-elements-server
+      target:
+        type: AverageValue
+        averageValue: 90
+  - type: Object
+    object:
+      metric:
+        name: Public_QueueSize
+      describedObject:
+        kind: Service
+        name: active-web-elements-server
+      target:
+        type: AverageValue
+        averageValue: 2
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 85
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 90

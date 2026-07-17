@@ -1,0 +1,41 @@
+{{define "title"}}About — Wolfram Application Server{{end}}
+
+{{define "content"}}
+<div class="about-header">
+  <div class="brand-marker">\[WasCtl]</div>
+  <p class="about-header__name">Wolfram Application Server — Cluster Operator</p>
+  <p class="about-header__version">wasctl {{.Version}}</p>
+</div>
+
+<p class="section-title">Build information</p>
+<div class="kv-table">
+  <div class="kv-table__row">
+    <span class="kv-table__key">Version</span>
+    <span class="kv-table__val">{{.Version}}</span>
+  </div>
+  <div class="kv-table__row">
+    <span class="kv-table__key">Go version</span>
+    <span class="kv-table__val">{{.GoVersion}}</span>
+  </div>
+  <div class="kv-table__row">
+    <span class="kv-table__key">Commit</span>
+    <span class="kv-table__val">{{.Commit}}</span>
+  </div>
+  <div class="kv-table__row">
+    <span class="kv-table__key">Built at</span>
+    <span class="kv-table__val">{{.BuildDate}}</span>
+  </div>
+</div>
+
+<p class="section-title">Server</p>
+<div class="kv-table">
+  <div class="kv-table__row">
+    <span class="kv-table__key">Listen address</span>
+    <span class="kv-table__val">{{.ListenAddr}}</span>
+  </div>
+  <div class="kv-table__row">
+    <span class="kv-table__key">Health check</span>
+    <span class="kv-table__val"><a href="/healthz">/healthz</a></span>
+  </div>
+</div>
+{{end}}

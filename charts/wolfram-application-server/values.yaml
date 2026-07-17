@@ -1,0 +1,438 @@
+# =============================================================================
+# Wolfram Application Server — Helm Chart Values
+# =============================================================================
+#
+# REQUIRED fields (chart will fail without them):
+#   ingress.host                              — your public DNS hostname
+#   objectStorage.resourceBucket              — S3 bucket / Azure container name
+#   objectStorage.nodefileBucket              — S3 bucket / Azure container name
+#
+# CONDITIONALLY REQUIRED (depends on cloud / auth mode):
+#   objectStorage.region                      — REQUIRED on AWS  (irsa or static)
+#   objectStorage.azure.accountName           — REQUIRED on Azure (workloadIdentity or static)
+#   resourceManager.serviceAccount.roleArn    — REQUIRED on AWS  when auth.mode=irsa
+#   resourceManager.serviceAccount.azureClientId — REQUIRED on Azure when auth.mode=workloadIdentity
+#   objectStorage.auth.accessKey              — REQUIRED when auth.mode=static (AWS)
+#   objectStorage.auth.secretKey              — REQUIRED when auth.mode=static (both clouds)
+#   kafka.bootstrapServers                    — REQUIRED when kafka.mode=external
+#
+# RECOMMENDED: always use a cloud-specific override file alongside this file:
+#   -f values-aws.yaml   (sets cloud, storage class, S3 endpoint pattern, IRSA mode)
+#   -f values-azure.yaml (sets cloud, storage class, Blob endpoint pattern, WI mode)
+# =============================================================================
+
+nameOverride: ""   # OPTIONAL — overrides the chart name in resource labels
+fullnameOverride: "" # OPTIONAL — overrides the full release-name prefix entirely
+
+# =====================================================================
+# Optional bundled dependencies
+# =====================================================================
+# OPTIONAL — every toggle defaults to false.
+# The chart assumes you have provisioned cluster-side prerequisites yourself
+# (see chart README). Use wasctl install addons for the usual path.
+#
+# Enable any subset below if you want this chart to install them as
+# subcharts. Each toggle is independent — enable only what you need.
+# Run `helm dependency update charts/wolfram-application-server` once
+# before `helm install` whenever any toggle is set to true.
+#
+# WARNING: do NOT enable a dependency that is already installed in your
+# cluster. You will get conflicts. Run `kubectl get deploy -A` to check first.
+#
+# WARNING: CSI drivers, operators (Strimzi, cert-manager), and cluster-wide
+# components create CRDs and live in namespaces outside `was`. Uninstalling
+# the WAS chart will remove those cluster-wide resources too. For shared
+# clusters, install these out-of-band instead.
+
+ingress-nginx:
+  # OPTIONAL — set to true only if ingress-nginx is NOT already in your cluster.
+  enabled: false
+  # Subchart values pass through under this key when enabled. Common overrides:
+  # controller:
+  #   service:
+  #     externalTrafficPolicy: Local
+  #   ingressClassResource:
+  #     name: nginx
+  #     default: true
+
+strimzi-kafka-operator:
+  # OPTIONAL — set to true only if the Strimzi operator is NOT already installed.
+  # When false, install the operator yourself before running helm install
+  # (see chart README).
+  enabled: false
+  # watchNamespaces: ["was", "kafka"]
+
+kube-prometheus-stack:
+  # OPTIONAL — needed only for AWES custom-metrics HPAs (kernel pool scaling).
+  # When false, install Prometheus yourself or the AWES HPA custom metrics will
+  # be non-functional (CPU/memory HPAs still work via metrics-server).
+  enabled: false
+
+prometheus-adapter:
+  # OPTIONAL — required alongside kube-prometheus-stack for custom-metrics HPAs.
+  # Must be installed after Prometheus is ready; configure its URL to match.
+  enabled: false
+  # prometheus:
+  #   url: http://kube-prometheus-stack-prometheus.monitoring.svc
+  #   port: 9090
+
+metrics-server:
+  # OPTIONAL — but practically required: EKS and AKS do NOT ship metrics-server
+  # by default. Without it, CPU/memory-based HPAs will not work.
+  enabled: false
+
+aws-efs-csi-driver:
+  # OPTIONAL — AWS only. Enable if the EFS CSI driver is not already installed
+  # in kube-system. Leave disabled on Azure.
+  enabled: false
+  # When enabled, provide the IRSA role ARN for the CSI controller SA:
+  # controller:
+  #   serviceAccount:
+  #     annotations:
+  #       eks.amazonaws.com/role-arn: <efs-csi-role-arn>   # provisioned by Terraform
+
+azurefile-csi-driver:
+  # OPTIONAL — Azure only. AKS ships the Azure Files CSI driver by default;
+  # leave disabled unless you specifically need a newer version.
+  enabled: false
+
+cert-manager:
+  # OPTIONAL — only needed if you want HTTPS via Let's Encrypt or another ACME
+  # issuer. HTTP-only deployments skip this.
+  # Enabling this also turns on ingress.tls for the WAS Ingress resources.
+  # wasctl's cert-manager addon creates ClusterIssuer letsencrypt-cluster-issuer
+  # automatically (do not create one by hand).
+  enabled: false
+  crds:
+    enabled: true  # OPTIONAL — keeps CRDs in sync on upgrade; prefer over installCRDs
+
+# =====================================================================
+
+# =============================================================================
+# Cloud target
+# =============================================================================
+
+# OPTIONAL — defaults to "aws". Always override via values-aws.yaml or
+# values-azure.yaml rather than editing here directly. Accepted: "aws" | "azure".
+# Controls: resource-manager env var block, ServiceAccount annotation key.
+cloud: aws
+
+# =============================================================================
+# Namespace
+# =============================================================================
+namespace:
+  # OPTIONAL — default: true. Set to false if the namespace is managed externally
+  # (e.g. by a cluster admin or another Helm release).
+  create: false
+
+  # OPTIONAL — default: "was". Change only if you need a different namespace name;
+  # note the application init-container readiness checks reference "was" by name.
+  name: was
+
+# =============================================================================
+# Ingress
+# =============================================================================
+ingress:
+  # REQUIRED — public DNS hostname for the WAS deployment (e.g. "was.example.com").
+  # All applicationserver.* env vars inside AWES are set to http://<host>/.
+  # Create a DNS record pointing this hostname to your ingress-nginx load-balancer
+  # before installing the chart (see chart README).
+  host: ""
+
+  # OPTIONAL — default: "ImplementationSpecific" (AWS). Set to "Prefix" on Azure.
+  # Already set correctly in values-azure.yaml — no need to change here unless
+  # you use a custom nginx build that requires a different pathType.
+  pathType: ImplementationSpecific
+
+  # OPTIONAL — default: "nginx". Change only if your cluster uses a custom
+  # IngressClass name for ingress-nginx.
+  className: nginx
+
+  tls:
+    # OPTIONAL — default: false. Set true (or enable the cert-manager subchart)
+    # to attach a TLS block to every WAS Ingress. wasctl app stage sets this
+    # automatically when the cert-manager addon is not skipped.
+    enabled: false
+
+    # OPTIONAL — TLS secret name written by cert-manager (or provided manually).
+    # Written by cert-manager (or provided manually). Default matches the
+    # Certificate examples in the chart README.
+    secretName: was-tls-secret
+
+    # OPTIONAL — ClusterIssuer name referenced by the was-certificate Certificate.
+    # wasctl addons creates letsencrypt-cluster-issuer; the app stage sets this
+    # automatically when cert-manager is not skipped.
+    clusterIssuer: "letsencrypt-cluster-issuer"
+
+# =============================================================================
+# Object Storage
+# =============================================================================
+objectStorage:
+  # REQUIRED — name of the S3 bucket (AWS) or Blob container (Azure) for
+  # resource info files. The bucket/container must already exist before install.
+  resourceBucket: ""
+
+  # REQUIRED — name of the S3 bucket (AWS) or Blob container (Azure) for
+  # node files. The bucket/container must already exist before install.
+  nodefileBucket: ""
+
+  # REQUIRED on AWS — AWS region where the S3 buckets live (e.g. "us-east-1").
+  # Used for the S3 endpoint URL and the RESOURCE.BUCKET.REGION /
+  # NODEFILES.BUCKET.REGION env vars in resource-manager.
+  # Not used on Azure; leave empty when cloud=azure.
+  region: ""
+
+  # OPTIONAL — full object-storage endpoint URL. Leave empty to let the chart
+  # derive it automatically (AWS: from region; Azure: from azure.accountName).
+  # Set explicitly only for custom/private S3-compatible endpoints.
+  # AWS auto-derived:   https://s3.<region>.amazonaws.com
+  # Azure auto-derived: https://<accountName>.blob.core.windows.net/
+  endpoint: ""
+
+  auth:
+    # OPTIONAL — default: "irsa" (already set per-cloud in values-aws.yaml /
+    # values-azure.yaml). Accepted values:
+    #   irsa             — AWS: pod gets IAM permissions via IRSA; no key env vars rendered.
+    #                      Requires resourceManager.serviceAccount.roleArn.
+    #   workloadIdentity — Azure: pod gets AAD identity via workload identity; no key env vars.
+    #                      Requires resourceManager.serviceAccount.azureClientId.
+    #   static           — Both clouds: access/secret keys injected as env vars.
+    #                      DEPRECATED — prefer irsa or workloadIdentity.
+    mode: irsa
+
+    # REQUIRED when auth.mode=static (AWS only) — AWS access key ID.
+    # Leave empty for irsa or workloadIdentity modes.
+    accessKey: ""
+
+    # REQUIRED when auth.mode=static — AWS secret access key (AWS) or Azure
+    # storage account key (Azure). Leave empty for irsa or workloadIdentity modes.
+    secretKey: ""
+
+  azure:
+    # REQUIRED on Azure — Azure storage account name that hosts the Blob containers.
+    # Used to derive the endpoint URL (https://<accountName>.blob.core.windows.net/).
+    # Not used on AWS; leave empty when cloud=aws.
+    accountName: ""
+
+# =============================================================================
+# Storage (PersistentVolumeClaims)
+# =============================================================================
+storage:
+  # REQUIRED — StorageClass for the three WAS log PVCs (awes-logs, resources-logs,
+  # endpoint-logs). Set automatically by the cloud values files:
+  #   values-aws.yaml   → "was-efs"      (EFS access-point provisioner)
+  #   values-azure.yaml → "was-azurefile" (Azure Files provisioner)
+  # The StorageClass itself must already exist in the cluster before install
+  # (created by the EFS/Azure Files CSI driver setup — see chart README).
+  className: ""
+
+  # OPTIONAL — default: 10Gi. Size of each of the three log PVCs.
+  # All three PVCs share the same size; they cannot be set individually.
+  logsSize: 10Gi
+
+# =============================================================================
+# Kafka (Strimzi Kafka CR)
+# =============================================================================
+kafka:
+  # OPTIONAL — default: "builtin". Accepted values:
+  #   builtin  — chart creates a Strimzi Kafka CR in kafka.namespace.
+  #              Requires the Strimzi operator to be installed first.
+  #   external — use an existing Kafka cluster; set kafka.bootstrapServers below.
+  #              The chart will not create Kafka / KafkaBridge / KafkaTopic CRs.
+  mode: builtin
+
+  # REQUIRED when kafka.mode=external — bootstrap address of your Kafka cluster.
+  # Format: "host:port"  e.g. "my-kafka.example.com:9092"
+  # Ignored when mode=builtin.
+  bootstrapServers: ""
+
+  # OPTIONAL — default: "kafka-persistent". Name of the Strimzi Kafka CR.
+  # The bootstrap address in builtin mode is derived as:
+  #   <clusterName>-kafka-bootstrap.<kafka.namespace>.svc.cluster.local:9092
+  # Ignored when mode=external.
+  clusterName: kafka-persistent
+
+  # OPTIONAL — default: "kafka". Namespace where the Strimzi Kafka CR is deployed.
+  # Ignored when mode=external.
+  namespace: kafka
+
+  # OPTIONAL — default: "4.3.0". Kafka version string passed to the Strimzi CR.
+  # Must be a version supported by the installed Strimzi operator version (e.g. 4.3.0).
+  version: "4.3.0"
+
+  # OPTIONAL — default: "4.3". Used for metadataVersion in KRaft mode.
+  # Must be the two-part major.minor form (NOT major.minor.patch).
+  protocolVersion: "4.3"
+
+  # OPTIONAL — default: 3. Number of Kafka broker replicas.
+  replicas: 3
+
+  # OPTIONAL — resource requests/limits for each Kafka broker container.
+  resources:
+    requests:
+      cpu: 500m
+      memory: 500Mi
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+
+  storage:
+    # OPTIONAL — default: 10Gi. Persistent volume size per Kafka broker.
+    size: 10Gi
+
+    # OPTIONAL — default: "" (uses cluster default StorageClass).
+    # AWS (values-aws.yaml): was-kafka-gp3 (EBS CSI). Never use legacy "gp2"
+    # (in-tree kubernetes.io/aws-ebs is removed on modern EKS).
+    # Azure (values-azure.yaml): kafka-standardssd-xfs.
+    class: ""
+
+# =============================================================================
+# Kafka Bridge (Strimzi KafkaBridge CR)
+# =============================================================================
+kafkaBridge:
+  # OPTIONAL — default: 1. Number of KafkaBridge replicas.
+  replicas: 1
+
+  http:
+    # OPTIONAL — default: 9092. HTTP port exposed by the KafkaBridge service.
+    # Used by AWES init containers to poll topic availability before starting.
+    port: 9092
+
+# =============================================================================
+# Resource Manager
+# =============================================================================
+resourceManager:
+  image:
+    # OPTIONAL — default image. Change only to use a private registry mirror
+    # or a patched build.
+    repository: wolframapplicationserver/resource-manager
+    # OPTIONAL — default: "1.3.0". Pin to a specific release tag.
+    tag: "1.3.0"
+    # OPTIONAL — default: IfNotPresent.
+    pullPolicy: IfNotPresent
+
+  # OPTIONAL — default: 1. Increase for redundancy; resource-manager is stateless.
+  replicaCount: 1
+
+  # OPTIONAL — adjust to match your node instance type.
+  resources:
+    limits:
+      cpu: "1000m"
+      memory: 4Gi
+    requests:
+      cpu: "500m"
+      memory: 2000Mi
+
+  serviceAccount:
+    # OPTIONAL — default: true. Set to false to use an existing ServiceAccount;
+    # provide its name in serviceAccount.name below.
+    create: true
+
+    # OPTIONAL — default: "<release>-resource-manager". Name of the ServiceAccount.
+    # Leave empty to use the auto-generated name.
+    name: ""
+
+    # OPTIONAL — arbitrary extra annotations for the ServiceAccount.
+    # Use this for IRSA if you prefer the explicit annotation form over roleArn below.
+    # Example: { "eks.amazonaws.com/role-arn": "arn:aws:iam::123:role/x" }
+    annotations: {}
+
+    # REQUIRED on AWS when auth.mode=irsa — IAM role ARN that grants the
+    # resource-manager pod access to the S3 buckets. When set and cloud=aws,
+    # the eks.amazonaws.com/role-arn annotation is injected automatically.
+    # Provisioned by Terraform (Step 2 of the refactor); see chart README.
+    roleArn: ""
+
+    # REQUIRED on Azure when auth.mode=workloadIdentity — Client ID of the
+    # Azure User-assigned Managed Identity with Storage Blob Data Contributor
+    # access on the storage account. When set and cloud=azure + mode=workloadIdentity,
+    # the azure.workload.identity/client-id annotation and pod label are injected.
+    # Provisioned by Terraform (Step 2 of the refactor); see chart README.
+    azureClientId: ""
+
+  # OPTIONAL — readiness/liveness probe timings. Defaults are tuned for AWS.
+  # values-azure.yaml overrides these to account for longer blob-storage
+  # connection times on Azure (readiness: 10/30s, liveness: 30/20s).
+  probes:
+    readiness:
+      initialDelaySeconds: 5
+      periodSeconds: 10
+    liveness:
+      initialDelaySeconds: 15
+      periodSeconds: 20
+
+# =============================================================================
+# Endpoint Manager
+# =============================================================================
+endpointManager:
+  image:
+    # OPTIONAL — default image. Change only for a private registry or patched build.
+    repository: wolframapplicationserver/endpoint-manager
+    # OPTIONAL — default: "1.4.0".
+    tag: "1.4.0"
+    # OPTIONAL — default: IfNotPresent.
+    pullPolicy: IfNotPresent
+
+  # OPTIONAL — default: 1.
+  replicaCount: 1
+
+  # OPTIONAL — adjust to match your node instance type.
+  resources:
+    limits:
+      cpu: "1000m"
+      memory: 1Gi
+    requests:
+      cpu: "500m"
+      memory: 500Mi
+
+# =============================================================================
+# Active Web Elements Server (AWES)
+# =============================================================================
+awes:
+  image:
+    # OPTIONAL — default image. Change only for a private registry or patched build.
+    repository: wolframapplicationserver/active-web-elements-server
+    # OPTIONAL — default: "4.3.0".
+    tag: "4.3.0"
+    # OPTIONAL — default: IfNotPresent.
+    pullPolicy: IfNotPresent
+
+  # OPTIONAL — default: 1. The AWES HPA will scale this up automatically.
+  replicaCount: 1
+
+  # OPTIONAL — adjust to match your node instance type. AWES is memory-heavy
+  # due to Wolfram kernel processes; do not set memory below 6Gi.
+  resources:
+    limits:
+      cpu: "3"
+      memory: 6Gi
+    requests:
+      cpu: "2"
+      memory: 6Gi
+
+  # OPTIONAL — kernel pool definitions. Each entry becomes a set of
+  # poolconfiguration_kernelpool_<index>__* env vars inside the AWES container.
+  # The default two pools (MSP and Public) match the original deployment manifest.
+  # Add or remove pools here; each pool gets its own HPA custom metric.
+  kernelPools:
+    - name: MSP
+      count: 2
+      jlinkEnabled: true
+    - name: Public
+      count: 2
+      jlinkEnabled: false
+
+# =============================================================================
+# Basic Auth (nginx authentication on the kernel-restart endpoint)
+# =============================================================================
+basicAuth:
+  # OPTIONAL — default: "basic-auth". Name of the Kubernetes Secret that holds
+  # the htpasswd file. Only change if you need to share an existing Secret.
+  secretName: basic-auth
+
+  # OPTIONAL but STRONGLY RECOMMENDED to override in production — htpasswd
+  # content for the /.applicationserver/kernel/restart endpoint.
+  # Default ships a known hash (user: applicationserver); replace before go-live.
+  # Generate a new entry with: htpasswd -nb <username> <password>
+  credentials: |
+    applicationserver:$apr1$cZHZL4fI$UBXojMmcUXwDpAU3J5smo1

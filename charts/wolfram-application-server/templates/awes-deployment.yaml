@@ -1,0 +1,118 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: active-web-elements-server-deployment
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    app: active-web-elements-server
+    app.kubernetes.io/component: active-web-elements-server
+    {{- include "was.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      app: active-web-elements-server
+  minReadySeconds: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 50%
+      maxUnavailable: 50%
+  template:
+    metadata:
+      labels:
+        app: active-web-elements-server
+    spec:
+      restartPolicy: Always
+      containers:
+      - name: active-web-elements-server
+        image: {{ .Values.awes.image.repository }}:{{ .Values.awes.image.tag }}
+        imagePullPolicy: {{ .Values.awes.image.pullPolicy }}
+        ports:
+        - containerPort: 8080
+        - containerPort: 8181
+        resources:
+          {{- toYaml .Values.awes.resources | nindent 10 }}
+        startupProbe:
+          httpGet:
+            path: /.applicationserver/kernel/readiness
+            port: 8080
+          initialDelaySeconds: 15
+          periodSeconds: 10
+          failureThreshold: 100
+        livenessProbe:
+          httpGet:
+            path: '/.applicationserver/kernel/stats?require-running-kernels=true'
+            port: 8080
+          initialDelaySeconds: 20
+          periodSeconds: 20
+          failureThreshold: 3
+          successThreshold: 1
+          timeoutSeconds: 1
+        env:
+        - name: SPRING_PROFILES_ACTIVE
+          value: docker
+        - name: LOG_LOCATION
+          value: /opt/app/logs
+        - name: APPLICATIONSERVER_CACHEDIRECTORY
+          value: /tmp/.wolframcache
+        - name: KAFKA.BOOTSTRAP-SERVERS
+          value: {{ include "was.kafkaBootstrap" . | quote }}
+        - name: API_REQUEST_TOPIC
+          value: "api-request"
+        - name: RESOURCE_INFO_TOPIC
+          value: "resource-info"
+        - name: NODEFILE_INFO_TOPIC
+          value: "nodefile-info"
+        - name: ENDPOINT_INFO_TOPIC
+          value: "endpoint-info"
+        - name: API_RESPONSE_TOPIC
+          value: "api-response"
+        - name: applicationserver.nodefiles.cachedirectory
+          value: /opt/.wolframcache/nodefiles/
+        - name: applicationserver.kernelinitializationfile.name
+          value: init.m
+        {{/* Kernel pool env vars — one index per entry in .Values.awes.kernelPools */}}
+        {{- range $i, $pool := .Values.awes.kernelPools }}
+        - name: poolconfiguration_kernelpool_{{ $i }}__KernelNumber
+          value: {{ $pool.count | quote }}
+        - name: poolconfiguration_kernelpool_{{ $i }}__KernelPoolName
+          value: {{ $pool.name }}
+        - name: poolconfiguration_kernelpool_{{ $i }}__JLinkEnabled
+          value: {{ $pool.jlinkEnabled | quote }}
+        {{- end }}
+        - name: applicationserver.servername
+          value: "{{ include "was.publicScheme" . }}://{{ .Values.ingress.host }}/"
+        - name: applicationserver.resourcemanager.url
+          value: "{{ include "was.publicScheme" . }}://{{ .Values.ingress.host }}/resources/"
+        - name: applicationserver.nodefilesmanager.url
+          value: "{{ include "was.publicScheme" . }}://{{ .Values.ingress.host }}/nodefiles/"
+        - name: applicationserver.endpointmanager.url
+          value: "{{ include "was.publicScheme" . }}://{{ .Values.ingress.host }}/endpoints/"
+        - name: applicationserver.restart.url
+          value: "{{ include "was.publicScheme" . }}://{{ .Values.ingress.host }}/.applicationserver/kernel/restart"
+        volumeMounts:
+        - mountPath: "/opt/app/logs"
+          name: awes-logs-storage
+      initContainers:
+      - name: init-resource-manager
+        image: bash
+        command:
+        - bash
+        - -c
+        - |
+          for i in $(seq 1 3000); do
+            nc -zvw1 resource-manager 9090 && exit 0 || sleep 3
+          done; exit 1
+      - name: init-endpoint-manager
+        image: bash
+        command:
+        - bash
+        - -c
+        - |
+          for i in $(seq 1 3000); do
+            nc -zvw1 endpoint-manager 8085 && exit 0 || sleep 3
+          done; exit 1
+      volumes:
+      - name: awes-logs-storage
+        persistentVolumeClaim:
+          claimName: awes-logs

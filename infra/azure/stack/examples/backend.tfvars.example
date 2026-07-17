@@ -1,0 +1,22 @@
+# Copy this file to:
+#   infra/azure/stack/backend.tfvars
+# or (multi-env):
+#   infra/azure/stack/examples/backend-<ENV>.tfvars
+#
+# Fill in values from:
+#   terraform -chdir=infra/azure/bootstrap output backend_config_hint
+#
+# Do not commit backend.tfvars — it points at your state storage account.
+#
+# Manual Terraform: use Azure AD auth (use_azuread_auth = true). Grant the
+# caller Storage Blob Data Contributor on the state storage account — see
+# infra/azure/bootstrap/README.md.
+#
+# Note: wasctl may write access_key instead when automating; both are valid
+# azurerm backend configs. Prefer AAD for interactive/CI with federated creds.
+
+resource_group_name  = "wolfram-was-tfstate-rg"
+storage_account_name = "wolframwastfstateXXXXXXXX"
+container_name       = "tfstate"
+key                  = "stack/terraform.tfstate"
+use_azuread_auth     = true

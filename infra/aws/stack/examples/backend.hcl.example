@@ -1,0 +1,19 @@
+# Copy this file to:
+#   infra/aws/stack/backend.hcl
+# or (Makefile / multi-env):
+#   infra/aws/stack/examples/backend-<ENV>.hcl
+#
+# Fill in values from:
+#   terraform -chdir=infra/aws/bootstrap output backend_hcl_hint
+#
+# Do not commit backend.hcl / backend-*.hcl — they point at your state bucket.
+#
+# Requires Terraform >= 1.10 (S3 native state locking via use_lockfile).
+# DynamoDB lock tables from older bootstraps are unused by this config;
+# prefer use_lockfile (matches wasctl).
+
+bucket       = "wolfram-was-tfstate-prod-123456789012"
+key          = "stack/terraform.tfstate"
+region       = "us-east-1"
+use_lockfile = true
+encrypt      = true

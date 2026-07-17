@@ -1,0 +1,186 @@
+{{define "title"}}Clusters — Wolfram Application Server{{end}}
+
+{{define "content"}}
+<div class="page-heading page-heading--with-action">
+  <h1 class="page-heading__title">Clusters</h1>
+  <div class="page-heading__actions">
+    <a href="/chart-only" class="btn btn--secondary btn--sm">Install chart on existing cluster</a>
+    <a href="/install?cloud={{.ActiveCloud}}" class="btn btn--primary btn--sm">Install new cluster</a>
+  </div>
+</div>
+
+{{template "_cloud_tabs" .}}
+
+<div id="cluster-tab-body" class="content-region">
+  {{template "_clusters_content_wrapper" .Tab}}
+</div>
+{{end}}
+
+{{/* ── Content wrapper partial ─────────────────────────────────────────────────
+     Rendered on full page load and on tab switches (as the primary HTMX swap
+     target inside #cluster-tab-body).  Owns the 10-second background polling
+     trigger so the cluster list refreshes without flickering the tab bar. */}}
+{{define "_clusters_content_wrapper"}}
+<div id="clusters-content"
+     hx-trigger="load, every 10s"
+     hx-get="/clusters/data?cloud={{.Cloud}}"
+     hx-target="#clusters-content"
+     hx-swap="innerHTML"
+     hx-indicator="#clusters-refresh-indicator">
+  {{template "_cluster_tab_body" .}}
+</div>
+<span id="clusters-refresh-indicator"
+      class="htmx-indicator refresh-indicator"
+      aria-hidden="true">
+  <span class="refresh-spinner"></span>
+</span>
+<span id="clusters-last-updated" class="refresh-age"></span>
+{{end}}
+
+{{/* ── Cloud tab bar partial ─────────────────────────────────────────────────
+     Rendered on full page load (OOB=false) and returned as an OOB fragment
+     on HTMX tab-switch requests (OOB=true) so the active indicator updates.
+     Tab buttons are disabled (no HTMX attrs) when the CLI is not installed. */}}
+{{define "_cloud_tabs"}}
+<div class="cloud-tabs"
+     id="cloud-tabs"
+     role="tablist"
+     aria-label="Cloud provider"{{if .OOB}} hx-swap-oob="true"{{end}}>
+
+  {{if .AWSAvail.CLIInstalled}}
+  <button class="cloud-tab__link{{if eq .ActiveCloud "aws"}} cloud-tab__link--active{{end}}"
+          role="tab"
+          aria-selected="{{if eq .ActiveCloud "aws"}}true{{else}}false{{end}}"
+          hx-get="/clusters?cloud=aws"
+          hx-target="#cluster-tab-body"
+          hx-swap="innerHTML"
+          hx-push-url="true"
+          hx-indicator="#cluster-tab-body">
+    AWS
+    {{if ge .AWSCount 0}}<span class="cloud-tab__count">{{.AWSCount}}</span>{{end}}
+  </button>
+  {{else}}
+  <button class="cloud-tab__link cloud-tab--disabled"
+          role="tab"
+          aria-selected="false"
+          aria-disabled="true"
+          disabled
+          title="AWS CLI not installed">
+    AWS
+  </button>
+  {{end}}
+
+  {{if .AzureAvail.CLIInstalled}}
+  <button class="cloud-tab__link{{if eq .ActiveCloud "azure"}} cloud-tab__link--active{{end}}"
+          role="tab"
+          aria-selected="{{if eq .ActiveCloud "azure"}}true{{else}}false{{end}}"
+          hx-get="/clusters?cloud=azure"
+          hx-target="#cluster-tab-body"
+          hx-swap="innerHTML"
+          hx-push-url="true"
+          hx-indicator="#cluster-tab-body">
+    Azure
+    {{if ge .AzureCount 0}}<span class="cloud-tab__count">{{.AzureCount}}</span>{{end}}
+  </button>
+  {{else}}
+  <button class="cloud-tab__link cloud-tab--disabled"
+          role="tab"
+          aria-selected="false"
+          aria-disabled="true"
+          disabled
+          title="Azure CLI not installed">
+    Azure
+  </button>
+  {{end}}
+
+</div>
+{{end}}
+
+{{/* ── Tab body partial — rendered inline and swapped on background refresh */}}
+{{define "_cluster_tab_body"}}
+
+{{if eq .State "not_configured"}}
+
+{{if not .Avail.CLIInstalled}}
+<div class="cloud-notice cloud-notice--cli-missing">
+  <p class="cloud-notice__title">
+    {{if eq .Cloud "azure"}}Azure CLI{{else}}AWS CLI{{end}} not installed
+  </p>
+  <p class="cloud-notice__sub">
+    Install it: <code>{{.ConfigCmd}}</code>
+  </p>
+</div>
+{{else}}
+<div class="cloud-notice cloud-notice--warning">
+  <p class="cloud-notice__title">
+    {{if eq .Cloud "azure"}}Azure{{else}}AWS{{end}} credentials not configured
+  </p>
+  <p class="cloud-notice__sub">
+    Run <code>{{.ConfigCmd}}</code> then reload this page.
+  </p>
+</div>
+{{end}}
+
+{{else if eq .State "ok"}}
+
+{{if .Subscriptions}}
+<div class="subscription-selector">
+  <label for="azure-sub-selector" class="subscription-selector__label">Subscription</label>
+  <select id="azure-sub-selector"
+          name="subscription"
+          class="subscription-selector__select"
+          hx-get="/clusters?cloud=azure"
+          hx-trigger="change"
+          hx-target="#cluster-tab-body"
+          hx-swap="innerHTML"
+          hx-include="this">
+    {{range .Subscriptions}}
+    <option value="{{.ID}}"{{if eq $.ActiveSubscription .ID}} selected{{end}}>{{.Name}}</option>
+    {{end}}
+  </select>
+</div>
+{{end}}
+
+<div class="cluster-list">
+  <div class="cluster-list__head">
+    <span>Cluster</span>
+    <span>Region</span>
+    <span>Status</span>
+    <span>Last modified</span>
+    <span></span>
+  </div>
+  {{range .Clusters}}
+  <div class="cluster-list__row">
+    <span class="cluster-list__name">{{.Name}}</span>
+    <span class="cluster-list__region">{{.Region}}</span>
+    <span><span class="badge badge--{{.StatusClass}}">{{.Status}}</span></span>
+    <span class="cluster-list__time">{{.LastModified}}</span>
+    <span class="cluster-list__action">
+      <a href="/clusters/{{.Name}}" class="btn btn--secondary btn--sm">View</a>
+    </span>
+  </div>
+  {{end}}
+</div>
+
+{{else if eq .State "no_clusters"}}
+<div class="empty-state">
+  <div class="brand-marker">\[NoClustersYet]</div>
+  <p class="empty-state__title">
+    No {{if eq .Cloud "azure"}}Azure{{else}}AWS{{end}} clusters installed from this account
+  </p>
+  <p class="empty-state__sub">
+    Use the wizard to provision your first WAS cluster on
+    {{if eq .Cloud "azure"}}Azure AKS{{else}}AWS EKS{{end}}.
+  </p>
+  <a href="/install?cloud={{.Cloud}}" class="btn btn--primary">Install your first cluster</a>
+</div>
+
+{{else}}
+<div class="error-state">
+  <div class="brand-marker">\[MetaStoreError]</div>
+  <p class="error-state__title">Could not load clusters</p>
+  <p class="error-state__detail">{{.Error}}</p>
+</div>
+{{end}}
+
+{{end}}

@@ -1,0 +1,776 @@
+{
+  "version": "1",
+  "groups": [
+    "General",
+    "Optional bundled dependencies",
+    "Cloud",
+    "Namespace",
+    "Ingress",
+    "Object Storage",
+    "Storage",
+    "Kafka",
+    "Kafka Bridge",
+    "Resource Manager",
+    "Endpoint Manager",
+    "AWES",
+    "Basic Auth"
+  ],
+  "fields": [
+    {
+      "path": "nameOverride",
+      "label": "Name Override",
+      "type": "string",
+      "required": false,
+      "group": "General"
+    },
+    {
+      "path": "fullnameOverride",
+      "label": "Full Name Override",
+      "type": "string",
+      "required": false,
+      "group": "General"
+    },
+    {
+      "path": "ingress-nginx.enabled",
+      "label": "Ingress Nginx Enabled",
+      "type": "bool",
+      "required": false,
+      "description": "set to true only if ingress-nginx is NOT already in your cluster.",
+      "default": "false",
+      "group": "Optional bundled dependencies"
+    },
+    {
+      "path": "strimzi-kafka-operator.enabled",
+      "label": "Strimzi Kafka Operator Enabled",
+      "type": "bool",
+      "required": false,
+      "description": "set to true only if the Strimzi operator is NOT already installed. (see chart README).",
+      "default": "false",
+      "group": "Optional bundled dependencies"
+    },
+    {
+      "path": "kube-prometheus-stack.enabled",
+      "label": "Kube Prometheus Stack Enabled",
+      "type": "bool",
+      "required": false,
+      "description": "needed only for AWES custom-metrics HPAs (kernel pool scaling). be non-functional (CPU/memory HPAs still work via metrics-server).",
+      "default": "false",
+      "group": "Optional bundled dependencies"
+    },
+    {
+      "path": "prometheus-adapter.enabled",
+      "label": "Prometheus Adapter Enabled",
+      "type": "bool",
+      "required": false,
+      "description": "required alongside kube-prometheus-stack for custom-metrics HPAs. Must be installed after Prometheus is ready; configure its URL to match.",
+      "default": "false",
+      "group": "Optional bundled dependencies"
+    },
+    {
+      "path": "metrics-server.enabled",
+      "label": "Metrics Server Enabled",
+      "type": "bool",
+      "required": false,
+      "description": "but practically required: EKS and AKS do NOT ship metrics-server by default. Without it, CPU/memory-based HPAs will not work.",
+      "default": "false",
+      "group": "Optional bundled dependencies"
+    },
+    {
+      "path": "aws-efs-csi-driver.enabled",
+      "label": "Aws Efs Csi Driver Enabled",
+      "type": "bool",
+      "required": false,
+      "description": "AWS only. Enable if the EFS CSI driver is not already installed in kube-system. Leave disabled on Azure.",
+      "default": "false",
+      "group": "Optional bundled dependencies"
+    },
+    {
+      "path": "azurefile-csi-driver.enabled",
+      "label": "Azurefile Csi Driver Enabled",
+      "type": "bool",
+      "required": false,
+      "description": "Azure only. AKS ships the Azure Files CSI driver by default; leave disabled unless you specifically need a newer version.",
+      "default": "false",
+      "group": "Optional bundled dependencies"
+    },
+    {
+      "path": "cert-manager.enabled",
+      "label": "Cert Manager Enabled",
+      "type": "bool",
+      "required": false,
+      "description": "only needed if you want HTTPS via Let's Encrypt or another ACME issuer. HTTP-only deployments skip this. Enabling this also turns on ingress.tls for the WAS Ingress resources. w...",
+      "default": "false",
+      "group": "Optional bundled dependencies"
+    },
+    {
+      "path": "cert-manager.crds.enabled",
+      "label": "Crds Enabled",
+      "type": "bool",
+      "required": false,
+      "default": "true",
+      "group": "Optional bundled dependencies"
+    },
+    {
+      "path": "cloud",
+      "label": "Cloud",
+      "type": "string",
+      "required": false,
+      "description": "defaults to \"aws\". Always override via values-aws.yaml or values-azure.yaml rather than editing here directly. Accepted: \"aws\" | \"azure\". Controls: resource-manager env var bloc...",
+      "default": "aws",
+      "enum": [
+        "aws",
+        "azure"
+      ],
+      "group": "Cloud"
+    },
+    {
+      "path": "namespace.create",
+      "label": "Namespace Create",
+      "type": "bool",
+      "required": false,
+      "description": "default: true. Set to false if the namespace is managed externally (e.g. by a cluster admin or another Helm release).",
+      "default": "false",
+      "group": "Namespace"
+    },
+    {
+      "path": "namespace.name",
+      "label": "Namespace Name",
+      "type": "string",
+      "required": false,
+      "description": "default: \"was\". Change only if you need a different namespace name; note the application init-container readiness checks reference \"was\" by name.",
+      "default": "was",
+      "group": "Namespace"
+    },
+    {
+      "path": "ingress.host",
+      "label": "Host",
+      "type": "hostname",
+      "required": true,
+      "description": "public DNS hostname for the WAS deployment (e.g. \"was.example.com\"). All applicationserver.* env vars inside AWES are set to http://\u003chost\u003e/. Create a DNS record pointing this ho...",
+      "group": "Ingress"
+    },
+    {
+      "path": "ingress.pathType",
+      "label": "Path Type",
+      "type": "string",
+      "required": false,
+      "description": "default: \"ImplementationSpecific\" (AWS). Set to \"Prefix\" on Azure. you use a custom nginx build that requires a different pathType.",
+      "default": "ImplementationSpecific",
+      "enum": [
+        "ImplementationSpecific",
+        "Prefix",
+        "Exact"
+      ],
+      "group": "Ingress"
+    },
+    {
+      "path": "ingress.className",
+      "label": "Storage Class",
+      "type": "string",
+      "required": false,
+      "description": "default: \"nginx\". Change only if your cluster uses a custom IngressClass name for ingress-nginx.",
+      "default": "nginx",
+      "group": "Ingress"
+    },
+    {
+      "path": "ingress.tls.enabled",
+      "label": "Tls Enabled",
+      "type": "bool",
+      "required": false,
+      "description": "default: false. Set true (or enable the cert-manager subchart) to attach a TLS block to every WAS Ingress. wasctl app stage sets this automatically when the cert-manager addon i...",
+      "default": "false",
+      "group": "Ingress"
+    },
+    {
+      "path": "ingress.tls.secretName",
+      "label": "Secret Name",
+      "type": "string",
+      "required": false,
+      "description": "TLS secret name written by cert-manager (or provided manually). Written by cert-manager (or provided manually). Default matches the Certificate examples in the chart README.",
+      "default": "was-tls-secret",
+      "group": "Ingress"
+    },
+    {
+      "path": "ingress.tls.clusterIssuer",
+      "label": "Cluster Issuer",
+      "type": "string",
+      "required": false,
+      "description": "ClusterIssuer name referenced by the was-certificate Certificate. wasctl addons creates letsencrypt-cluster-issuer; the app stage sets this automatically when cert-manager is no...",
+      "default": "letsencrypt-cluster-issuer",
+      "group": "Ingress"
+    },
+    {
+      "path": "objectStorage.resourceBucket",
+      "label": "Resource Bucket",
+      "type": "string",
+      "required": true,
+      "description": "name of the S3 bucket (AWS) or Blob container (Azure) for resource info files. The bucket/container must already exist before install.",
+      "group": "Object Storage"
+    },
+    {
+      "path": "objectStorage.nodefileBucket",
+      "label": "Nodefile Bucket",
+      "type": "string",
+      "required": true,
+      "description": "name of the S3 bucket (AWS) or Blob container (Azure) for node files. The bucket/container must already exist before install.",
+      "group": "Object Storage"
+    },
+    {
+      "path": "objectStorage.region",
+      "label": "Region",
+      "type": "string",
+      "required": true,
+      "description": "on AWS — AWS region where the S3 buckets live (e.g. \"us-east-1\"). Used for the S3 endpoint URL and the RESOURCE.BUCKET.REGION / NODEFILES.BUCKET.REGION env vars in resource-ma...",
+      "group": "Object Storage"
+    },
+    {
+      "path": "objectStorage.endpoint",
+      "label": "Endpoint",
+      "type": "string",
+      "required": false,
+      "description": "full object-storage endpoint URL. Leave empty to let the chart derive it automatically (AWS: from region; Azure: from azure.accountName). Set explicitly only for custom/private ...",
+      "group": "Object Storage"
+    },
+    {
+      "path": "objectStorage.auth.mode",
+      "label": "Auth Mode",
+      "type": "string",
+      "required": false,
+      "description": "default: \"irsa\" (already set per-cloud in values-aws.yaml / values-azure.yaml). Accepted values: irsa             — AWS: pod gets IAM permissions via IRSA; no key env vars ren...",
+      "default": "irsa",
+      "enum": [
+        "irsa",
+        "workloadIdentity",
+        "static"
+      ],
+      "group": "Object Storage"
+    },
+    {
+      "path": "objectStorage.auth.accessKey",
+      "label": "Access Key",
+      "type": "string",
+      "required": true,
+      "description": "when auth.mode=static (AWS only) — AWS access key ID. Leave empty for irsa or workloadIdentity modes.",
+      "group": "Object Storage"
+    },
+    {
+      "path": "objectStorage.auth.secretKey",
+      "label": "Secret Key",
+      "type": "string",
+      "required": true,
+      "description": "when auth.mode=static — AWS secret access key (AWS) or Azure storage account key (Azure). Leave empty for irsa or workloadIdentity modes.",
+      "group": "Object Storage"
+    },
+    {
+      "path": "objectStorage.azure.accountName",
+      "label": "Account Name",
+      "type": "string",
+      "required": true,
+      "description": "on Azure — Azure storage account name that hosts the Blob containers. Used to derive the endpoint URL (https://\u003caccountName\u003e.blob.core.windows.net/). Not used on AWS; leave em...",
+      "group": "Object Storage"
+    },
+    {
+      "path": "storage.className",
+      "label": "Storage Class",
+      "type": "string",
+      "required": true,
+      "description": "StorageClass for the three WAS log PVCs (awes-logs, resources-logs, endpoint-logs). Set automatically by the cloud values files: values-aws.yaml   → \"was-efs\"      (EFS access...",
+      "group": "Storage"
+    },
+    {
+      "path": "storage.logsSize",
+      "label": "Logs Volume Size",
+      "type": "string",
+      "required": false,
+      "description": "default: 10Gi. Size of each of the three log PVCs. All three PVCs share the same size; they cannot be set individually.",
+      "default": "10Gi",
+      "group": "Storage"
+    },
+    {
+      "path": "kafka.mode",
+      "label": "Kafka Mode",
+      "type": "string",
+      "required": false,
+      "description": "default: \"builtin\". Accepted values: builtin  — chart creates a Strimzi Kafka CR in kafka.namespace. Requires the Strimzi operator to be installed first. external — use an e...",
+      "default": "builtin",
+      "enum": [
+        "builtin",
+        "external"
+      ],
+      "group": "Kafka"
+    },
+    {
+      "path": "kafka.bootstrapServers",
+      "label": "Bootstrap Servers",
+      "type": "string",
+      "required": true,
+      "description": "when kafka.mode=external — bootstrap address of your Kafka cluster. Format: \"host:port\"  e.g. \"my-kafka.example.com:9092\" Ignored when mode=builtin.",
+      "group": "Kafka"
+    },
+    {
+      "path": "kafka.clusterName",
+      "label": "Cluster Name",
+      "type": "string",
+      "required": false,
+      "description": "default: \"kafka-persistent\". Name of the Strimzi Kafka CR. The bootstrap address in builtin mode is derived as: \u003cclusterName\u003e-kafka-bootstrap.\u003ckafka.namespace\u003e.svc.cluster.local...",
+      "default": "kafka-persistent",
+      "group": "Kafka"
+    },
+    {
+      "path": "kafka.namespace",
+      "label": "Namespace",
+      "type": "string",
+      "required": false,
+      "description": "default: \"kafka\". Namespace where the Strimzi Kafka CR is deployed. Ignored when mode=external.",
+      "default": "kafka",
+      "group": "Kafka"
+    },
+    {
+      "path": "kafka.version",
+      "label": "Kafka Version",
+      "type": "string",
+      "required": false,
+      "description": "default: \"4.3.0\". Kafka version string passed to the Strimzi CR. Must be a version supported by the installed Strimzi operator version (e.g. 4.3.0).",
+      "default": "4.3.0",
+      "group": "Kafka"
+    },
+    {
+      "path": "kafka.protocolVersion",
+      "label": "Protocol Version",
+      "type": "string",
+      "required": false,
+      "description": "default: \"4.3\". Used for metadataVersion in KRaft mode. Must be the two-part major.minor form (NOT major.minor.patch).",
+      "default": "4.3",
+      "group": "Kafka"
+    },
+    {
+      "path": "kafka.replicas",
+      "label": "Replicas",
+      "type": "int",
+      "required": false,
+      "description": "default: 3. Number of Kafka broker replicas.",
+      "default": "3",
+      "group": "Kafka"
+    },
+    {
+      "path": "kafka.resources.requests.cpu",
+      "label": "Cpu",
+      "type": "string",
+      "required": false,
+      "default": "500m",
+      "group": "Kafka",
+      "hidden": true
+    },
+    {
+      "path": "kafka.resources.requests.memory",
+      "label": "Memory",
+      "type": "string",
+      "required": false,
+      "default": "500Mi",
+      "group": "Kafka",
+      "hidden": true
+    },
+    {
+      "path": "kafka.resources.limits.cpu",
+      "label": "Cpu",
+      "type": "string",
+      "required": false,
+      "default": "1000m",
+      "group": "Kafka",
+      "hidden": true
+    },
+    {
+      "path": "kafka.resources.limits.memory",
+      "label": "Memory",
+      "type": "string",
+      "required": false,
+      "default": "2Gi",
+      "group": "Kafka",
+      "hidden": true
+    },
+    {
+      "path": "kafka.storage.size",
+      "label": "Storage Size",
+      "type": "string",
+      "required": false,
+      "description": "default: 10Gi. Persistent volume size per Kafka broker.",
+      "default": "10Gi",
+      "group": "Kafka"
+    },
+    {
+      "path": "kafka.storage.class",
+      "label": "Storage Class",
+      "type": "string",
+      "required": false,
+      "description": "default: \"\" (uses cluster default StorageClass). AWS (values-aws.yaml): was-kafka-gp3 (EBS CSI). Never use legacy \"gp2\" (in-tree kubernetes.io/aws-ebs is removed on modern EKS)....",
+      "group": "Kafka"
+    },
+    {
+      "path": "kafkaBridge.replicas",
+      "label": "Replicas",
+      "type": "int",
+      "required": false,
+      "description": "default: 1. Number of KafkaBridge replicas.",
+      "default": "1",
+      "group": "Kafka Bridge"
+    },
+    {
+      "path": "kafkaBridge.http.port",
+      "label": "Http Port",
+      "type": "int",
+      "required": false,
+      "description": "default: 9092. HTTP port exposed by the KafkaBridge service. Used by AWES init containers to poll topic availability before starting.",
+      "default": "9092",
+      "group": "Kafka Bridge"
+    },
+    {
+      "path": "resourceManager.image.repository",
+      "label": "Repository",
+      "type": "string",
+      "required": false,
+      "description": "default image. Change only to use a private registry mirror or a patched build.",
+      "default": "wolframapplicationserver/resource-manager",
+      "group": "Resource Manager"
+    },
+    {
+      "path": "resourceManager.image.tag",
+      "label": "Tag",
+      "type": "string",
+      "required": false,
+      "description": "default: \"1.3.0\". Pin to a specific release tag.",
+      "default": "1.3.0",
+      "group": "Resource Manager"
+    },
+    {
+      "path": "resourceManager.image.pullPolicy",
+      "label": "Pull Policy",
+      "type": "string",
+      "required": false,
+      "description": "default: IfNotPresent.",
+      "default": "IfNotPresent",
+      "enum": [
+        "IfNotPresent",
+        "Always",
+        "Never"
+      ],
+      "group": "Resource Manager"
+    },
+    {
+      "path": "resourceManager.replicaCount",
+      "label": "Replica Count",
+      "type": "int",
+      "required": false,
+      "description": "default: 1. Increase for redundancy; resource-manager is stateless.",
+      "default": "1",
+      "group": "Resource Manager"
+    },
+    {
+      "path": "resourceManager.resources.limits.cpu",
+      "label": "Cpu",
+      "type": "string",
+      "required": false,
+      "default": "1000m",
+      "group": "Resource Manager",
+      "hidden": true
+    },
+    {
+      "path": "resourceManager.resources.limits.memory",
+      "label": "Memory",
+      "type": "string",
+      "required": false,
+      "default": "4Gi",
+      "group": "Resource Manager",
+      "hidden": true
+    },
+    {
+      "path": "resourceManager.resources.requests.cpu",
+      "label": "Cpu",
+      "type": "string",
+      "required": false,
+      "default": "500m",
+      "group": "Resource Manager",
+      "hidden": true
+    },
+    {
+      "path": "resourceManager.resources.requests.memory",
+      "label": "Memory",
+      "type": "string",
+      "required": false,
+      "default": "2000Mi",
+      "group": "Resource Manager",
+      "hidden": true
+    },
+    {
+      "path": "resourceManager.serviceAccount.create",
+      "label": "Service Account Create",
+      "type": "bool",
+      "required": false,
+      "description": "default: true. Set to false to use an existing ServiceAccount; provide its name in serviceAccount.name below.",
+      "default": "true",
+      "group": "Resource Manager"
+    },
+    {
+      "path": "resourceManager.serviceAccount.name",
+      "label": "Service Account Name",
+      "type": "string",
+      "required": false,
+      "description": "default: \"\u003crelease\u003e-resource-manager\". Name of the ServiceAccount. Leave empty to use the auto-generated name.",
+      "group": "Resource Manager"
+    },
+    {
+      "path": "resourceManager.serviceAccount.roleArn",
+      "label": "IAM Role ARN",
+      "type": "string",
+      "required": true,
+      "description": "on AWS when auth.mode=irsa — IAM role ARN that grants the resource-manager pod access to the S3 buckets. When set and cloud=aws, the eks.amazonaws.com/role-arn annotation is i...",
+      "group": "Resource Manager"
+    },
+    {
+      "path": "resourceManager.serviceAccount.azureClientId",
+      "label": "Azure Client ID",
+      "type": "string",
+      "required": true,
+      "description": "on Azure when auth.mode=workloadIdentity — Client ID of the Azure User-assigned Managed Identity with Storage Blob Data Contributor access on the storage account. When set and...",
+      "group": "Resource Manager"
+    },
+    {
+      "path": "resourceManager.probes.readiness.initialDelaySeconds",
+      "label": "Initial Delay (s)",
+      "type": "int",
+      "required": false,
+      "default": "5",
+      "group": "Resource Manager",
+      "hidden": true
+    },
+    {
+      "path": "resourceManager.probes.readiness.periodSeconds",
+      "label": "Period (s)",
+      "type": "int",
+      "required": false,
+      "default": "10",
+      "group": "Resource Manager",
+      "hidden": true
+    },
+    {
+      "path": "resourceManager.probes.liveness.initialDelaySeconds",
+      "label": "Initial Delay (s)",
+      "type": "int",
+      "required": false,
+      "default": "15",
+      "group": "Resource Manager",
+      "hidden": true
+    },
+    {
+      "path": "resourceManager.probes.liveness.periodSeconds",
+      "label": "Period (s)",
+      "type": "int",
+      "required": false,
+      "default": "20",
+      "group": "Resource Manager",
+      "hidden": true
+    },
+    {
+      "path": "endpointManager.image.repository",
+      "label": "Repository",
+      "type": "string",
+      "required": false,
+      "description": "default image. Change only for a private registry or patched build.",
+      "default": "wolframapplicationserver/endpoint-manager",
+      "group": "Endpoint Manager"
+    },
+    {
+      "path": "endpointManager.image.tag",
+      "label": "Tag",
+      "type": "string",
+      "required": false,
+      "description": "default: \"1.4.0\".",
+      "default": "1.4.0",
+      "group": "Endpoint Manager"
+    },
+    {
+      "path": "endpointManager.image.pullPolicy",
+      "label": "Pull Policy",
+      "type": "string",
+      "required": false,
+      "description": "default: IfNotPresent.",
+      "default": "IfNotPresent",
+      "enum": [
+        "IfNotPresent",
+        "Always",
+        "Never"
+      ],
+      "group": "Endpoint Manager"
+    },
+    {
+      "path": "endpointManager.replicaCount",
+      "label": "Replica Count",
+      "type": "int",
+      "required": false,
+      "description": "default: 1.",
+      "default": "1",
+      "group": "Endpoint Manager"
+    },
+    {
+      "path": "endpointManager.resources.limits.cpu",
+      "label": "Cpu",
+      "type": "string",
+      "required": false,
+      "default": "1000m",
+      "group": "Endpoint Manager",
+      "hidden": true
+    },
+    {
+      "path": "endpointManager.resources.limits.memory",
+      "label": "Memory",
+      "type": "string",
+      "required": false,
+      "default": "1Gi",
+      "group": "Endpoint Manager",
+      "hidden": true
+    },
+    {
+      "path": "endpointManager.resources.requests.cpu",
+      "label": "Cpu",
+      "type": "string",
+      "required": false,
+      "default": "500m",
+      "group": "Endpoint Manager",
+      "hidden": true
+    },
+    {
+      "path": "endpointManager.resources.requests.memory",
+      "label": "Memory",
+      "type": "string",
+      "required": false,
+      "default": "500Mi",
+      "group": "Endpoint Manager",
+      "hidden": true
+    },
+    {
+      "path": "awes.image.repository",
+      "label": "Repository",
+      "type": "string",
+      "required": false,
+      "description": "default image. Change only for a private registry or patched build.",
+      "default": "wolframapplicationserver/active-web-elements-server",
+      "group": "AWES"
+    },
+    {
+      "path": "awes.image.tag",
+      "label": "Tag",
+      "type": "string",
+      "required": false,
+      "description": "default: \"4.3.0\".",
+      "default": "4.3.0",
+      "group": "AWES"
+    },
+    {
+      "path": "awes.image.pullPolicy",
+      "label": "Pull Policy",
+      "type": "string",
+      "required": false,
+      "description": "default: IfNotPresent.",
+      "default": "IfNotPresent",
+      "enum": [
+        "IfNotPresent",
+        "Always",
+        "Never"
+      ],
+      "group": "AWES"
+    },
+    {
+      "path": "awes.replicaCount",
+      "label": "Replica Count",
+      "type": "int",
+      "required": false,
+      "description": "default: 1. The AWES HPA will scale this up automatically.",
+      "default": "1",
+      "group": "AWES"
+    },
+    {
+      "path": "awes.resources.limits.cpu",
+      "label": "Cpu",
+      "type": "int",
+      "required": false,
+      "default": "3",
+      "group": "AWES",
+      "hidden": true
+    },
+    {
+      "path": "awes.resources.limits.memory",
+      "label": "Memory",
+      "type": "string",
+      "required": false,
+      "default": "6Gi",
+      "group": "AWES",
+      "hidden": true
+    },
+    {
+      "path": "awes.resources.requests.cpu",
+      "label": "Cpu",
+      "type": "int",
+      "required": false,
+      "default": "2",
+      "group": "AWES",
+      "hidden": true
+    },
+    {
+      "path": "awes.resources.requests.memory",
+      "label": "Memory",
+      "type": "string",
+      "required": false,
+      "default": "6Gi",
+      "group": "AWES",
+      "hidden": true
+    },
+    {
+      "path": "awes.kernelPools.count",
+      "label": "Count",
+      "type": "int",
+      "required": false,
+      "default": "2",
+      "group": "AWES"
+    },
+    {
+      "path": "awes.kernelPools.jlinkEnabled",
+      "label": "Jlink Enabled",
+      "type": "bool",
+      "required": false,
+      "default": "true",
+      "group": "AWES"
+    },
+    {
+      "path": "awes.kernelPools.count",
+      "label": "Count",
+      "type": "int",
+      "required": false,
+      "default": "2",
+      "group": "AWES"
+    },
+    {
+      "path": "awes.kernelPools.jlinkEnabled",
+      "label": "Jlink Enabled",
+      "type": "bool",
+      "required": false,
+      "default": "false",
+      "group": "AWES"
+    },
+    {
+      "path": "basicAuth.secretName",
+      "label": "Secret Name",
+      "type": "string",
+      "required": false,
+      "description": "default: \"basic-auth\". Name of the Kubernetes Secret that holds the htpasswd file. Only change if you need to share an existing Secret.",
+      "default": "basic-auth",
+      "group": "Basic Auth"
+    },
+    {
+      "path": "basicAuth.credentials",
+      "label": "Basic Auth Credentials",
+      "type": "text",
+      "required": false,
+      "description": "but STRONGLY RECOMMENDED to override in production — htpasswd content for the /.applicationserver/kernel/restart endpoint. Default ships a known hash (user: applicationserver)...",
+      "group": "Basic Auth"
+    }
+  ]
+}

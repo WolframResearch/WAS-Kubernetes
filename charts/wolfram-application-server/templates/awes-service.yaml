@@ -1,0 +1,44 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: active-web-elements-server
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    app: active-web-elements-server
+    app.kubernetes.io/component: active-web-elements-server
+    {{- include "was.labels" . | nindent 4 }}
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/path: /metrics
+    prometheus.io/port: "8181"
+spec:
+  selector:
+    app: active-web-elements-server
+  ports:
+  - name: "8080"
+    port: 8080
+    targetPort: 8080
+  - name: "8181"
+    port: 8181
+    targetPort: 8181
+---
+# Separate service used for the /.applicationserver/info and /kernel/stats
+# endpoints — publishNotReadyAddresses allows health-check traffic even when
+# pods are not yet Ready.
+apiVersion: v1
+kind: Service
+metadata:
+  name: active-web-elements-server-info
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    app: active-web-elements-server
+    app.kubernetes.io/component: active-web-elements-server
+    {{- include "was.labels" . | nindent 4 }}
+spec:
+  selector:
+    app: active-web-elements-server
+  publishNotReadyAddresses: true
+  ports:
+  - name: "8082"
+    port: 8082
+    targetPort: 8080

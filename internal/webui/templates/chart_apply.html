@@ -1,0 +1,79 @@
+{{define "title"}}Applying {{.Release}} — Wolfram Application Server{{end}}
+
+{{define "content"}}
+<div class="stream-page" id="stream-root">
+
+  <div class="stream-header">
+    <div>
+      <h1 class="page-heading__title">
+        Applying <span class="text-mono">{{.Release}}</span>
+      </h1>
+      <p class="text-muted text-sm">Do not close this tab. Helm continues running even if the browser disconnects.</p>
+    </div>
+    <div class="stream-elapsed">
+      Elapsed: <span id="elapsed-counter" class="text-mono">0:00</span>
+    </div>
+  </div>
+
+  <div class="stream-log-wrap">
+    <div class="stream-log-head">
+      <span class="section-block__title">helm upgrade --install</span>
+    </div>
+    <div class="stream-log" id="log-pane"></div>
+  </div>
+
+  <div id="stream-outcome" style="display:none"></div>
+
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  var sessionID = "{{.SessionID}}";
+  var releaseName = "{{.Release}}";
+
+  var logPane = document.getElementById('log-pane');
+  window.wasctl.initLogPane(logPane);
+
+  var src = new EventSource('/chart-only/sse/' + sessionID);
+
+  src.addEventListener('log', function(e) {
+    var d = JSON.parse(e.data);
+    window.wasctl.appendLog(d.line);
+  });
+
+  src.addEventListener('tick', function(e) {
+    var d = JSON.parse(e.data);
+    document.getElementById('elapsed-counter').textContent = d.totalElapsed;
+  });
+
+  src.addEventListener('install-complete', function(e) {
+    var d = JSON.parse(e.data);
+    src.close();
+    var out = document.getElementById('stream-outcome');
+    out.style.display = '';
+    if (d.error) {
+      out.innerHTML =
+        '<div class="error-state">' +
+        '<div class="brand-marker">\\[HelmFailed]</div>' +
+        '<p class="error-state__title">Helm apply failed</p>' +
+        '<p class="error-state__detail">' + d.error + '</p>' +
+        '<div style="margin-top:20px"><a href="/chart-only" class="btn btn--secondary">Try again</a></div>' +
+        '</div>';
+    } else {
+      out.innerHTML =
+        '<div class="empty-state">' +
+        '<div class="brand-marker">\\[HelmComplete]</div>' +
+        '<p class="empty-state__title">Chart applied successfully</p>' +
+        '<p class="empty-state__sub">Release <code>' + releaseName + '</code> is running.</p>' +
+        '<a href="/" class="btn btn--primary">← Back to clusters</a>' +
+        '</div>';
+    }
+  });
+
+  src.onerror = function() {
+    window.wasctl.appendLog('[connection lost — helm continues server-side; reload to reconnect]');
+    src.close();
+  };
+});
+</script>
+{{end}}

@@ -1,0 +1,20 @@
+{{- /* Explicit Certificate — matches EnvironmentSetup/General/ssl/certificate.yaml.
+     Prefer this over ingress-shim so one Certificate owns was-tls-secret for all
+     WAS Ingresses (shim would create one Certificate per Ingress). */ -}}
+{{- if and (eq (include "was.ingressTLSEnabled" .) "true") .Values.ingress.host .Values.ingress.tls.clusterIssuer }}
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: was-certificate
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    app.kubernetes.io/component: tls
+    {{- include "was.labels" . | nindent 4 }}
+spec:
+  secretName: {{ .Values.ingress.tls.secretName | default "was-tls-secret" | quote }}
+  dnsNames:
+    - {{ .Values.ingress.host | quote }}
+  issuerRef:
+    name: {{ .Values.ingress.tls.clusterIssuer | quote }}
+    kind: ClusterIssuer
+{{- end }}

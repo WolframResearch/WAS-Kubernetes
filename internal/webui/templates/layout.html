@@ -1,0 +1,53 @@
+{{define "layout"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{block "title" .}}Wolfram Application Server{{end}}</title>
+<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+<link rel="stylesheet" href="/static/wasctl.css">
+<script src="/static/htmx.min.js" defer></script>
+<script src="/static/alpine.min.js" defer></script>
+<script src="/static/wasctl.js" defer></script>
+<script src="/static/stream.js" defer></script>
+</head>
+<body>
+<div id="page-progress"></div>
+{{if devMode}}<div class="dev-banner" role="status">DEVELOPMENT MODE — using local assets from <code>{{devModeRepo}}</code></div>{{end}}
+
+<div class="desktop-guard">
+  <div class="brand-marker">\[DesktopRequired]</div>
+  <p>This interface requires a desktop browser (minimum 1024&thinsp;px wide).</p>
+</div>
+
+<header class="site-header">
+  <img class="site-header__logo" src="/static/logo.svg" alt="Wolfram Application Server">
+  <span class="site-header__product">Wolfram Application Server</span>
+  <span class="site-header__sep">|</span>
+  <span class="site-header__context">Cluster Operator</span>
+  <nav class="site-header__nav" aria-label="Top-level navigation">
+    <a href="/" class="site-header__nav-link">Clusters</a>
+    <a href="/operations" class="site-header__nav-link">Operations</a>
+  </nav>
+</header>
+
+<main class="site-main">
+  <div class="site-main__inner">
+    {{block "content" .}}{{end}}
+  </div>
+</main>
+
+<footer class="site-footer">
+  <span class="site-footer__left">wasctl {{.Version}}</span>
+  <nav class="site-footer__right">
+    <a href="/about">About</a>
+    <a href="https://reference.wolfram.com/language/" target="_blank" rel="noopener">Documentation</a>
+    <a href="https://github.com/WolframResearch/WAS-Kubernetes" target="_blank" rel="noopener">GitHub</a>
+  </nav>
+</footer>
+
+{{template "_help_overlay" .}}
+</body>
+</html>
+{{end}}

@@ -1,0 +1,162 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: resource-manager-deployment
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    app: resource-manager
+    app.kubernetes.io/component: resource-manager
+    {{- include "was.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      app: resource-manager
+  minReadySeconds: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 50%
+      maxUnavailable: 50%
+  template:
+    metadata:
+      labels:
+        app: resource-manager
+        {{- if and (eq .Values.cloud "azure") (eq .Values.objectStorage.auth.mode "workloadIdentity") }}
+        azure.workload.identity/use: "true"
+        {{- end }}
+    spec:
+      serviceAccountName: {{ include "was.resourceManagerSAName" . }}
+      restartPolicy: Always
+      containers:
+      - name: resource-manager
+        image: {{ .Values.resourceManager.image.repository }}:{{ .Values.resourceManager.image.tag }}
+        imagePullPolicy: {{ .Values.resourceManager.image.pullPolicy }}
+        ports:
+        - containerPort: 9090
+        resources:
+          {{- toYaml .Values.resourceManager.resources | nindent 10 }}
+        readinessProbe:
+          tcpSocket:
+            port: 9090
+          initialDelaySeconds: {{ .Values.resourceManager.probes.readiness.initialDelaySeconds }}
+          periodSeconds: {{ .Values.resourceManager.probes.readiness.periodSeconds }}
+        livenessProbe:
+          tcpSocket:
+            port: 9090
+          initialDelaySeconds: {{ .Values.resourceManager.probes.liveness.initialDelaySeconds }}
+          periodSeconds: {{ .Values.resourceManager.probes.liveness.periodSeconds }}
+        env:
+        - name: JAVA_OPTS
+          value: "-Xms1024m -Xmx2048m"
+        - name: SPRING_PROFILES_ACTIVE
+          value: docker
+        - name: LOG_LOCATION
+          value: /opt/app/logs
+        - name: RESOURCE_INFO_TOPIC
+          value: "resource-info"
+        - name: NODEFILE_INFO_TOPIC
+          value: "nodefile-info"
+        - name: KAFKA.BOOTSTRAP-SERVERS
+          value: {{ include "was.kafkaBootstrap" . | quote }}
+        {{/* ── Cloud-specific object storage env vars ─────────────────── */}}
+        {{- if eq .Values.cloud "aws" }}
+        - name: STORAGE_PROVIDER
+          value: "s3"
+        - name: SPRING_CLOUD_AWS_S3_ENABLED
+          value: "true"
+        - name: SPRING_CLOUD_AWS_S3_ENDPOINT
+          value: {{ include "was.storageEndpoint" . | quote }}
+        - name: SPRING_CLOUD_AWS_S3_REGION
+          value: {{ .Values.objectStorage.region | quote }}
+        {{- if eq .Values.objectStorage.auth.mode "static" }}
+        - name: SPRING_CLOUD_AWS_CREDENTIALS_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "was.objectStorageSecretName" . }}
+              key: accessKey
+        - name: SPRING_CLOUD_AWS_CREDENTIALS_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "was.objectStorageSecretName" . }}
+              key: secretKey
+        {{- end }}
+        - name: RESOURCE.BUCKET.REGION
+          value: {{ .Values.objectStorage.region | quote }}
+        - name: NODEFILES.BUCKET.REGION
+          value: {{ .Values.objectStorage.region | quote }}
+        {{- else if eq .Values.cloud "azure" }}
+        - name: STORAGE_PROVIDER
+          value: "azure"
+        - name: SPRING_CLOUD_AZURE_STORAGE_BLOB_ENABLED
+          value: "true"
+        - name: SPRING_CLOUD_AZURE_STORAGE_BLOB_ACCOUNT_NAME
+          value: {{ .Values.objectStorage.azure.accountName | quote }}
+        {{- if eq .Values.objectStorage.auth.mode "static" }}
+        - name: SPRING_CLOUD_AZURE_STORAGE_BLOB_ACCOUNT_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "was.objectStorageSecretName" . }}
+              key: secretKey
+        {{- end }}
+        - name: SPRING_CLOUD_AZURE_STORAGE_BLOB_ENDPOINT
+          value: {{ include "was.storageEndpoint" . | quote }}
+        {{- end }}
+        {{/* ── Shared bucket names ─────────────────────────────────────── */}}
+        - name: RESOURCEINFO.BUCKET
+          value: {{ .Values.objectStorage.resourceBucket | quote }}
+        - name: NODEFILES.BUCKET
+          value: {{ .Values.objectStorage.nodefileBucket | quote }}
+        volumeMounts:
+        - mountPath: "/opt/app/logs"
+          name: resources-logs-storage
+      initContainers:
+      - name: init-kafka
+        image: bash
+        command:
+        - bash
+        - -c
+        - |
+          ADDR="{{ include "was.kafkaBootstrap" . }}"
+          HOST="${ADDR%:*}"; PORT="${ADDR##*:}"
+          for i in $(seq 1 3000); do
+            nc -zvw1 "$HOST" "$PORT" && exit 0 || sleep 3
+          done; exit 1
+      {{- if eq .Values.kafka.mode "builtin" }}
+      - name: init-kafka-resources-topic
+        image: bash
+        command:
+        - bash
+        - -c
+        - |
+          apk --update add curl; set -x
+          while true; do
+            response=$(curl -s {{ include "was.kafkaBridgeService" . }}/topics)
+            if [[ ${response} =~ .*\"resource-info\".* ]]; then break; else sleep 5; fi
+          done
+      - name: init-kafka-endpoints-topic
+        image: bash
+        command:
+        - bash
+        - -c
+        - |
+          apk --update add curl; set -x
+          while true; do
+            response=$(curl -s {{ include "was.kafkaBridgeService" . }}/topics)
+            if [[ ${response} =~ .*\"endpoint-info\".* ]]; then break; else sleep 5; fi
+          done
+      - name: init-kafka-nodefiles-topic
+        image: bash
+        command:
+        - bash
+        - -c
+        - |
+          apk --update add curl; set -x
+          while true; do
+            response=$(curl -s {{ include "was.kafkaBridgeService" . }}/topics)
+            if [[ ${response} =~ .*\"nodefile-info\".* ]]; then break; else sleep 5; fi
+          done
+      {{- end }}
+      volumes:
+      - name: resources-logs-storage
+        persistentVolumeClaim:
+          claimName: resources-logs

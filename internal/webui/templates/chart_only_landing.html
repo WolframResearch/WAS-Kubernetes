@@ -1,0 +1,149 @@
+{{define "title"}}Install Chart on Existing Cluster — Wolfram Application Server{{end}}
+
+{{define "content"}}
+<div class="page-heading page-heading--with-action">
+  <h1 class="page-heading__title">Install Chart on Existing Cluster</h1>
+  <a href="/" class="btn btn--secondary btn--sm">← Back to clusters</a>
+</div>
+
+<div class="chart-landing-wrap">
+
+  <div class="chart-landing__intro">
+    <p>Use this flow if you already have a Kubernetes cluster and want to install
+       or upgrade the WAS Helm chart on it directly, without wasctl managing
+       Terraform provisioning.</p>
+  </div>
+
+  {{/* ── Prereq checklist ── */}}
+  <div class="section-block" style="margin-bottom:20px">
+    <div class="section-block__head">
+      <span class="section-block__title">Prerequisites</span>
+    </div>
+    <div class="section-block__body">
+      <div class="prereq-list">
+        <label class="prereq-item">
+          <input type="checkbox" id="prereq-helm" required>
+          <span>Helm 3.10+ is installed and in your PATH</span>
+        </label>
+        <label class="prereq-item">
+          <input type="checkbox" id="prereq-strimzi">
+          <span>Strimzi cluster operator is already installed (or I will enable the bundled subchart)</span>
+        </label>
+        <label class="prereq-label prereq-item">
+          <input type="checkbox" id="prereq-sc">
+          <span>A suitable StorageClass exists for the log PVCs</span>
+        </label>
+        <label class="prereq-item">
+          <input type="checkbox" id="prereq-ingress">
+          <span>ingress-nginx is installed (or I will enable the bundled subchart)</span>
+        </label>
+      </div>
+    </div>
+  </div>
+
+  {{/* ── Kubeconfig input ── */}}
+  <div class="section-block" style="margin-bottom:20px">
+    <div class="section-block__head">
+      <span class="section-block__title">Cluster credentials</span>
+    </div>
+    <div class="section-block__body">
+      <p class="text-muted text-sm" style="margin-bottom:12px">
+        Your kubeconfig is used only to validate the cluster and run helm commands.
+        It is never stored on disk beyond the lifetime of each request.
+      </p>
+
+      <div x-data="{ dragging: false }" class="kubeconfig-drop"
+           @dragover.prevent="dragging=true"
+           @dragleave.prevent="dragging=false"
+           @drop.prevent="
+             dragging=false;
+             const file = $event.dataTransfer.files[0];
+             if (file) {
+               const r = new FileReader();
+               r.onload = e => { document.getElementById('kube-textarea').value = e.target.result; };
+               r.readAsText(file);
+             }
+           "
+           :class="dragging ? 'kubeconfig-drop--active' : ''">
+        <p class="text-muted text-sm" style="margin-bottom:6px">
+          Drag &amp; drop a kubeconfig file here, or paste below.
+          <label for="kube-upload" class="link-btn">Browse…</label>
+          <input id="kube-upload" type="file" style="display:none" accept=".yaml,.yml,.json"
+                 @change="
+                   const file = $el.files[0];
+                   if (file) {
+                     const r = new FileReader();
+                     r.onload = e => { document.getElementById('kube-textarea').value = e.target.result; };
+                     r.readAsText(file);
+                   }
+                 ">
+        </p>
+      </div>
+
+      <form hx-post="/chart-only/validate"
+            hx-target="#validate-result"
+            hx-swap="innerHTML"
+            hx-indicator="#validate-btn"
+            hx-disabled-elt="#validate-btn">
+        <textarea id="kube-textarea" name="kubeconfig" rows="8"
+                  class="form-field__input kubeconfig-textarea"
+                  placeholder="apiVersion: v1&#10;clusters:&#10;  - cluster:&#10;      server: https://...&#10;kind: Config&#10;..."
+                  spellcheck="false"></textarea>
+
+        <div class="wizard-step__footer" style="margin-top:12px">
+          <button id="validate-btn" type="submit" class="btn btn--primary">
+            <span class="btn__label">Validate cluster</span>
+            <span class="btn__spinner" aria-hidden="true"></span>
+            <span class="sr-only htmx-indicator">Loading…</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  {{/* ── Validation result ── */}}
+  <div id="validate-result"></div>
+
+</div>
+{{end}}
+
+{{/* ── _validate_result fragment ── returned by POST /chart-only/validate ── */}}
+{{define "_validate_result"}}
+{{if .Error}}
+<div class="error-state" style="margin-bottom:20px">
+  <div class="brand-marker">\[ClusterValidationError]</div>
+  <p class="error-state__title">Could not connect to cluster</p>
+  <p class="error-state__detail">{{.Error}}</p>
+</div>
+{{else}}
+<div class="section-block">
+  <div class="section-block__head">
+    <span class="section-block__title">Cluster confirmed</span>
+  </div>
+  <div class="section-block__body">
+    <pre class="cluster-info-pre">{{.ClusterInfo}}</pre>
+
+    <form method="POST" action="/chart-only/configure" style="margin-top:16px">
+      <input type="hidden" name="kubeconfig_b64" value="{{.KubeconfigB64}}">
+      <div class="form-field" style="max-width:280px">
+        <label class="form-field__label" for="release-name">Helm release name</label>
+        <input class="form-field__input" type="text" id="release-name" name="release"
+               value="was" autocomplete="off" required>
+        <span class="form-field__hint">The helm release name used for all resources.</span>
+      </div>
+      <div class="form-field" style="max-width:280px">
+        <label class="form-field__label" for="values-file">Values file</label>
+        <select class="form-field__select" id="values-file" name="values_file">
+          <option value="values-aws.yaml">values-aws.yaml (AWS / EKS)</option>
+          <option value="values-azure.yaml">values-azure.yaml (Azure / AKS)</option>
+        </select>
+        <span class="form-field__hint">Select the cloud-specific defaults to pre-load.</span>
+      </div>
+      <button type="submit" class="btn btn--primary">
+        Open values editor →
+      </button>
+    </form>
+  </div>
+</div>
+{{end}}
+{{end}}

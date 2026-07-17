@@ -1,0 +1,73 @@
+{{define "_cluster_storage"}}
+<div class="section-block content-region"
+     id="section-storage">
+  <div class="content-region__loading" aria-hidden="true"></div>
+  <div class="section-block__head">
+    <span class="section-block__title">Storage</span>
+    <button class="btn btn--secondary btn--sm"
+            hx-get="/clusters/{{.ClusterName}}/sections/storage?refresh=true"
+            hx-target="#section-storage"
+            hx-swap="outerHTML"
+            hx-indicator="closest .content-region">Refresh</button>
+  </div>
+
+  {{if .Report}}
+  <div class="kv-table">
+    {{if eq .Report.Storage.Cloud "azure"}}
+    <div class="kv-table__row">
+      <span class="kv-table__key">Azure Files (was-azurefile)</span>
+      <span class="kv-table__val">{{if .Report.Storage.FilesStatus}}{{.Report.Storage.FilesStatus}}{{else}}—{{end}}</span>
+    </div>
+    {{else}}
+    <div class="kv-table__row">
+      <span class="kv-table__key">EFS (was-efs)</span>
+      <span class="kv-table__val">{{if .Report.Storage.FilesStatus}}{{.Report.Storage.FilesStatus}}{{else}}—{{end}}</span>
+    </div>
+    <div class="kv-table__row">
+      <span class="kv-table__key">EFS used</span>
+      <span class="kv-table__val">{{if .Report.Storage.EFSUsedBytes}}{{formatBytes .Report.Storage.EFSUsedBytes}}{{else}}<span class="text-muted">Not available</span>{{end}}</span>
+    </div>
+    {{end}}
+    <div class="kv-table__row">
+      <span class="kv-table__key">PVCs</span>
+      <span class="kv-table__val">{{.Report.Storage.PVCBound}} / {{.Report.Storage.PVCTotal}} bound</span>
+    </div>
+  </div>
+
+  <div class="section-sub-title">{{if eq .Report.Storage.Cloud "azure"}}Blob containers{{else}}S3 buckets{{end}}</div>
+  <div class="cluster-list">
+    <div class="cluster-list__head" style="grid-template-columns: 1fr 80px 120px">
+      <span>{{if eq .Report.Storage.Cloud "azure"}}Container{{else}}Bucket{{end}}</span>
+      <span>Objects</span>
+      <span>Size</span>
+    </div>
+    {{with .Report.Storage.ResourceBucket}}
+    {{if .Name}}
+    <div class="cluster-list__row" style="grid-template-columns: 1fr 80px 120px">
+      <span class="cluster-list__name">{{.Name}}</span>
+      <span class="text-muted">{{.Objects}}</span>
+      <span class="cluster-list__time">{{formatBytes .Bytes}}</span>
+    </div>
+    {{end}}
+    {{end}}
+    {{with .Report.Storage.NodefileBucket}}
+    {{if .Name}}
+    <div class="cluster-list__row" style="grid-template-columns: 1fr 80px 120px">
+      <span class="cluster-list__name">{{.Name}}</span>
+      <span class="text-muted">{{.Objects}}</span>
+      <span class="cluster-list__time">{{formatBytes .Bytes}}</span>
+    </div>
+    {{end}}
+    {{end}}
+  </div>
+
+  {{sectionErrors .Report "storage"}}
+
+  {{else}}
+  <div class="section-unavailable">
+    <span class="brand-marker text-sm">\[SectionUnavailable]</span>
+    <p class="text-muted text-sm">{{if .SectionError}}{{.SectionError}}{{else}}Storage data unavailable{{end}}</p>
+  </div>
+  {{end}}
+</div>
+{{end}}
