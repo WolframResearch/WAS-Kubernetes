@@ -1,0 +1,61 @@
+# Copy this file to terraform.tfvars and adjust values for your environment.
+# Do not commit terraform.tfvars — it is environment-specific.
+#
+# Variable defaults live in variables.tf; this file documents the knobs
+# wasctl / manual apply commonly set.
+
+subscription_id = "00000000-0000-0000-0000-000000000000"
+tenant_id       = "00000000-0000-0000-0000-000000000000"
+location        = "eastus"
+cluster_name    = "was-prod"
+
+# Kubernetes version — verify before apply (AKS retires minors faster than EKS):
+#   az aks get-versions --location eastus -o table
+# Default in variables.tf is 1.36.
+cluster_version = "1.36"
+
+# Optional API server allow-list (empty = unrestricted).
+# api_server_authorized_ip_ranges = ["203.0.113.0/24"]
+
+# Networking — defaults are fine unless they conflict with an existing VNet
+# in your subscription. pod_cidr is Azure CNI Overlay (independent of VNet).
+vnet_cidr       = "10.20.0.0/16"
+aks_subnet_cidr = "10.20.0.0/20"
+pod_cidr        = "192.168.0.0/16"
+
+# Worker nodes
+node_vm_size       = "Standard_D4s_v5"
+node_disk_size_gb  = 50
+node_min_count     = 2
+node_desired_count = 2
+node_max_count     = 10
+
+# Storage account names — leave unset (null) to auto-generate.
+# filesystem_storage_account_name = "mywasfiles"
+# blob_storage_account_name       = "mywasblob"
+
+filesystem_quota_gb   = 100
+filesystem_tier       = "Premium" # or "Standard"
+blob_replication_type = "LRS"     # or "GRS"
+
+# Blob container names → Helm objectStorage.resourceBucket / nodefileBucket
+# resource_container_name = "resources"
+# nodefile_container_name = "nodefiles"
+
+# Resource-manager ServiceAccount — must match Helm chart values.
+resource_manager_service_account_name      = "was-resource-manager"
+resource_manager_service_account_namespace = "was"
+
+# Optional: Azure DNS A record in your own zone after ingress-nginx is up.
+# Most deployments skip this and use the free *.cloudapp.azure.com DNS label.
+# create_dns_record       = true
+# dns_zone_name           = "example.com"
+# dns_zone_resource_group = "my-dns-rg"
+# dns_record_name         = "was.example.com"
+# ingress_ip              = "<ingress-nginx-load-balancer-ip>"
+
+# Tags applied to all resources
+tags = {
+  Environment = "prod"
+  Team        = "platform"
+}

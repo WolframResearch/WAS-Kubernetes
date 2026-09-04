@@ -1,0 +1,98 @@
+{{define "title"}}{{.ClusterName}} — Support Bundle — Wolfram Application Server{{end}}
+
+{{define "content"}}
+<div class="breadcrumb">
+  <a href="/">Clusters</a>
+  <span class="breadcrumb__sep">/</span>
+  <a href="/clusters/{{.ClusterName}}">{{.ClusterName}}</a>
+  <span class="breadcrumb__sep">/</span>
+  <span>Operations</span>
+</div>
+
+<div class="ops-page">
+  {{template "_operations_nav" .}}
+
+  <div class="ops-content">
+    {{if .SessionID}}
+    {{/* Bundle generation in progress — show SSE stream */}}
+    <div class="stream-page"
+         x-data="bundleStream('/clusters/{{.ClusterName}}/operations/bundle/sse/{{.SessionID}}')">
+
+      <div class="stream-header">
+        <div class="stream-header__title">
+          <span class="pulse">●</span> Generating support bundle for <strong>{{.ClusterName}}</strong>
+        </div>
+      </div>
+
+      <div class="stream-log">
+        <template x-for="line in logs" :key="line">
+          <div class="stream-log__line" x-text="line"></div>
+        </template>
+      </div>
+
+      <div class="stream-complete" x-show="complete" x-cloak>
+        <p class="stream-complete__msg" x-text="completeMsg"></p>
+        <a class="btn btn--primary" :href="downloadURL" x-show="downloadURL">Download bundle</a>
+      </div>
+    </div>
+
+    <script>
+    function bundleStream(sseURL) {
+      return {
+        logs: [],
+        complete: false,
+        completeMsg: '',
+        downloadURL: '',
+        _es: null,
+        init() {
+          this._es = new EventSource(sseURL);
+          this._es.addEventListener('log', e => {
+            const d = JSON.parse(e.data);
+            if (d.line) this.logs.push(d.line);
+          });
+          this._es.addEventListener('bundle-complete', e => {
+            const d = JSON.parse(e.data);
+            this.complete = true;
+            this.downloadURL = d.downloadURL || '';
+            this.completeMsg = 'Bundle ready. Download link expires in 10 minutes.';
+            this._es.close();
+          });
+          this._es.addEventListener('bundle-error', e => {
+            const d = JSON.parse(e.data);
+            this.complete = true;
+            this.completeMsg = 'Bundle generation failed: ' + (d.error || 'unknown error');
+            this._es.close();
+          });
+          this._es.addEventListener('ping', () => { this._es.close(); });
+          this._es.onerror = () => { this._es.close(); };
+        },
+        destroy() { if (this._es) this._es.close(); }
+      };
+    }
+    </script>
+
+    {{else}}
+    {{/* Bundle form */}}
+    <div class="ops-section">
+      <h2 class="ops-section__title">Generate Support Bundle</h2>
+      <p class="text-body ops-section__desc">
+        Creates a compressed archive of cluster diagnostic data for support.
+        The bundle contains logs, configuration, and diagnostic check results.
+        Sensitive values are automatically redacted.
+      </p>
+
+      <form method="POST" action="/clusters/{{.ClusterName}}/operations/bundle" class="bundle-form">
+        <div class="bundle-form__actions">
+          <button class="btn btn--primary" type="submit">Generate bundle</button>
+          <span class="text-muted bundle-form__note">Takes 1–3 minutes depending on cluster size.</span>
+        </div>
+        <p class="text-muted bundle-form__note" style="margin-top:8px">
+          Sensitive values are redacted. Review before sending; use encrypted
+          email or your support ticket system for transit.
+        </p>
+      </form>
+    </div>
+    {{end}}
+  </div>
+</div>
+{{end}}

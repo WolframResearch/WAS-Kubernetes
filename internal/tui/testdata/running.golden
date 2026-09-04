@@ -1,0 +1,14 @@
+wasctl  vdev                                                                0:00
+────────────────────────────────────────────────────────────────────────────────
+  ✓ Preflight
+  ✓ Bootstrap
+  ⠋ Backend  Terraform apply
+  ○ Infrastructure
+  ○ Kubeconfig
+  ○ Add-ons
+  ○ App deployment
+────────────────────────────────────────────────────────────────────────────────
+  -> terraform apply -auto-approve
+  Plan: 3 to add, 0 to change, 0 to destroy.
+────────────────────────────────────────────────────────────────────────────────
+  q quit  ctrl+c abort                                                          

@@ -1,0 +1,332 @@
+{{/* Install wizard — full page + all step fragments */}}
+
+{{define "title"}}Install Cluster — Wolfram Application Server{{end}}
+
+{{define "content"}}
+<div class="page-heading">
+  <h1 class="page-heading__title">Install New Cluster</h1>
+</div>
+
+<div class="wizard-wrap">
+  <div id="wizard-body">
+    {{template "_install_step1" .}}
+  </div>
+</div>
+{{end}}
+
+{{/* ── Step 1: Cluster basics ──────────────────────────────────────────────── */}}
+{{define "_install_step1"}}
+<form hx-post="/install/step2"
+      hx-target="#wizard-body"
+      hx-swap="innerHTML"
+      hx-indicator="#s1-btn"
+      hx-disabled-elt="#s1-btn">
+
+  <div class="wizard-step" x-data="{cloud: '{{if .Form.Cloud}}{{.Form.Cloud}}{{else}}aws{{end}}'}">
+    <div class="wizard-step__head">
+      <span class="wizard-step__num">1</span>
+      <span class="wizard-step__label">Cluster basics</span>
+      <span class="wizard-step__total">of 4</span>
+    </div>
+
+    {{/* Cloud selector — hidden when opened from a tab */}}
+    {{if .FromTab}}
+    <div class="form-field">
+      <div class="cloud-locked">
+        <span class="cloud-locked__label">Cloud provider</span>
+        <span class="cloud-locked__name">{{if eq .Form.Cloud "azure"}}Azure (AKS){{else}}AWS (EKS){{end}}</span>
+        <a href="/install" class="cloud-locked__change">Change cloud</a>
+      </div>
+      <input type="hidden" name="cloud" value="{{.Form.Cloud}}">
+      <input type="hidden" name="from_tab" value="1">
+    </div>
+    {{else}}
+    <div class="form-field">
+      <label class="form-field__label">Cloud provider</label>
+      <div class="radio-group">
+        <label class="radio-option" :class="cloud==='aws' ? 'radio-option--selected' : ''">
+          <input type="radio" name="cloud" value="aws"
+                 x-model="cloud" {{if ne .Form.Cloud "azure"}}checked{{end}}>
+          <span class="radio-option__label">AWS</span>
+          <span class="radio-option__sub">Amazon EKS</span>
+        </label>
+        <label class="radio-option" :class="cloud==='azure' ? 'radio-option--selected' : ''">
+          <input type="radio" name="cloud" value="azure"
+                 x-model="cloud" {{if eq .Form.Cloud "azure"}}checked{{end}}>
+          <span class="radio-option__label">Azure</span>
+          <span class="radio-option__sub">Azure AKS</span>
+        </label>
+      </div>
+    </div>
+    {{end}}
+
+    <div class="form-field {{if .Form.Errors.cluster_name}}form-field--error{{end}}">
+      <label class="form-field__label" for="cluster_name">Cluster name</label>
+      <input class="form-field__input" type="text" id="cluster_name" name="cluster_name"
+             value="{{.Form.ClusterName}}" placeholder="was-prod" autocomplete="off" required
+             pattern="^[a-zA-Z][a-zA-Z0-9\-]{0,98}[a-zA-Z0-9]$|^[a-zA-Z]$">
+      {{if .Form.Errors.cluster_name}}
+      <span class="form-field__error">{{.Form.Errors.cluster_name}}</span>
+      {{else}}
+      <span class="form-field__hint">Letters, digits, hyphens; must start with a letter.</span>
+      {{end}}
+    </div>
+
+    {{/* AWS: region selector */}}
+    <div class="form-field {{if .Form.Errors.region}}form-field--error{{end}}"
+         x-show="cloud === 'aws'">
+      <label class="form-field__label" for="region">AWS region</label>
+      <select class="form-field__select" id="region" name="region"
+              x-bind:required="cloud==='aws'"
+              x-bind:disabled="cloud!=='aws'">
+        {{range .EKSRegions}}
+        <option value="{{.}}" {{if eq . $.Form.Region}}selected{{end}}>{{.}}</option>
+        {{end}}
+      </select>
+      {{if .Form.Errors.region}}<span class="form-field__error">{{.Form.Errors.region}}</span>{{end}}
+    </div>
+
+    {{/* Azure: location selector */}}
+    <div class="form-field {{if .Form.Errors.region}}form-field--error{{end}}"
+         x-show="cloud === 'azure'">
+      <label class="form-field__label" for="azure_location">Azure location</label>
+      <select class="form-field__select" id="azure_location" name="region"
+              x-bind:required="cloud==='azure'"
+              x-bind:disabled="cloud!=='azure'">
+        {{range .AzureLocations}}
+        <option value="{{.}}" {{if eq . $.Form.Region}}selected{{end}}>{{.}}</option>
+        {{end}}
+      </select>
+      {{if .Form.Errors.region}}<span class="form-field__error">{{.Form.Errors.region}}</span>{{end}}
+    </div>
+
+    <div class="form-field">
+      <label class="form-field__label" for="k8s_version">Kubernetes version</label>
+      <select class="form-field__select" id="k8s_version" name="k8s_version">
+        {{range .K8sVersions}}
+        <option value="{{.}}" {{if eq . $.Form.K8sVersion}}selected{{end}}>{{.}}</option>
+        {{end}}
+      </select>
+    </div>
+
+    <div class="wizard-step__footer">
+      <button id="s1-btn" type="submit" class="btn btn--primary">
+        <span class="btn__label">Next — Networking</span>
+        <span class="btn__spinner" aria-hidden="true"></span>
+        <span class="sr-only htmx-indicator">Loading…</span>
+      </button>
+    </div>
+  </div>
+</form>
+{{end}}
+
+{{/* ── Step 2: Networking ───────────────────────────────────────────────────── */}}
+{{define "_install_step2"}}
+<form hx-post="/install/step3"
+      hx-target="#wizard-body"
+      hx-swap="innerHTML"
+      hx-indicator="#s2-btn"
+      hx-disabled-elt="#s2-btn">
+
+  {{template "_hidden_step1" .}}
+
+  <div class="wizard-step">
+    <div class="wizard-step__head">
+      <span class="wizard-step__num">2</span>
+      <span class="wizard-step__label">Networking</span>
+      <span class="wizard-step__total">of 4</span>
+    </div>
+
+    <div class="form-field {{if .Form.Errors.ingress_host}}form-field--error{{end}}">
+      <label class="form-field__label" for="ingress_host">Ingress hostname <span class="form-field__optional">(optional)</span></label>
+      <input class="form-field__input" type="text" id="ingress_host" name="ingress_host"
+             value="{{.Form.IngressHost}}" placeholder="was.example.com" autocomplete="off">
+      {{if .Form.Errors.ingress_host}}
+      <span class="form-field__error">{{.Form.Errors.ingress_host}}</span>
+      {{else}}
+      <span class="form-field__hint">{{if eq .Form.Cloud "azure"}}Public DNS name for the WAS ingress. Leave blank to use the load-balancer hostname (*.cloudapp.azure.com).{{else}}Public DNS name for the WAS ingress. Leave blank to use the ELB hostname directly.{{end}}</span>
+      {{end}}
+    </div>
+
+    <div class="wizard-step__footer">
+      <button id="s2-btn" type="submit" class="btn btn--primary">
+        <span class="btn__label">Next — Capacity</span>
+        <span class="btn__spinner" aria-hidden="true"></span>
+        <span class="sr-only htmx-indicator">Loading…</span>
+      </button>
+    </div>
+  </div>
+</form>
+{{end}}
+
+{{/* ── Step 3: Capacity ────────────────────────────────────────────────────── */}}
+{{define "_install_step3"}}
+<form hx-post="/install/step4"
+      hx-target="#wizard-body"
+      hx-swap="innerHTML"
+      hx-indicator="#s3-btn"
+      hx-disabled-elt="#s3-btn">
+
+  {{template "_hidden_step1" .}}
+  {{template "_hidden_step2" .}}
+
+  <div class="wizard-step">
+    <div class="wizard-step__head">
+      <span class="wizard-step__num">3</span>
+      <span class="wizard-step__label">Capacity</span>
+      <span class="wizard-step__total">of 4</span>
+    </div>
+
+    {{if eq .Form.Cloud "azure"}}
+    <div class="form-field">
+      <label class="form-field__label" for="node_type">VM size</label>
+      <select class="form-field__select" id="node_type" name="node_type">
+        {{range .AzureVMSizes}}
+        <option value="{{.}}" {{if eq . $.Form.NodeType}}selected{{end}}>{{.}}</option>
+        {{end}}
+      </select>
+    </div>
+    {{else}}
+    <div class="form-field">
+      <label class="form-field__label" for="node_type">Instance type</label>
+      <select class="form-field__select" id="node_type" name="node_type">
+        {{range .NodeTypes}}
+        <option value="{{.}}" {{if eq . $.Form.NodeType}}selected{{end}}>{{.}}</option>
+        {{end}}
+      </select>
+    </div>
+    {{end}}
+
+    <div class="form-row">
+      <div class="form-field {{if .Form.Errors.node_min}}form-field--error{{end}}">
+        <label class="form-field__label" for="node_min">Min nodes</label>
+        <input class="form-field__input form-field__input--narrow" type="number" id="node_min"
+               name="node_min" value="{{.Form.NodeMin}}" min="1" max="100">
+        {{if .Form.Errors.node_min}}<span class="form-field__error">{{.Form.Errors.node_min}}</span>{{end}}
+      </div>
+      <div class="form-field {{if .Form.Errors.node_desired}}form-field--error{{end}}">
+        <label class="form-field__label" for="node_desired">Desired</label>
+        <input class="form-field__input form-field__input--narrow" type="number" id="node_desired"
+               name="node_desired" value="{{.Form.NodeDesired}}" min="1" max="100">
+        {{if .Form.Errors.node_desired}}<span class="form-field__error">{{.Form.Errors.node_desired}}</span>{{end}}
+      </div>
+      <div class="form-field {{if .Form.Errors.node_max}}form-field--error{{end}}">
+        <label class="form-field__label" for="node_max">Max</label>
+        <input class="form-field__input form-field__input--narrow" type="number" id="node_max"
+               name="node_max" value="{{.Form.NodeMax}}" min="1" max="1000">
+        {{if .Form.Errors.node_max}}<span class="form-field__error">{{.Form.Errors.node_max}}</span>{{end}}
+      </div>
+    </div>
+
+    <div class="wizard-step__footer">
+      <button id="s3-btn" type="submit" class="btn btn--primary">
+        <span class="btn__label">Next — Chart config</span>
+        <span class="btn__spinner" aria-hidden="true"></span>
+        <span class="sr-only htmx-indicator">Loading…</span>
+      </button>
+    </div>
+  </div>
+</form>
+{{end}}
+
+{{/* ── Step 4: Chart configuration ─────────────────────────────────────────── */}}
+{{define "_install_step4"}}
+<form method="POST" action="/install/preview">
+
+  {{template "_hidden_step1" .}}
+  {{template "_hidden_step2" .}}
+  {{template "_hidden_step3" .}}
+
+  <div class="wizard-step">
+    <div class="wizard-step__head">
+      <span class="wizard-step__num">4</span>
+      <span class="wizard-step__label">Chart & Add-ons configuration</span>
+      <span class="wizard-step__total">of 4</span>
+    </div>
+
+    <input type="hidden" name="step4_submitted" value="1">
+
+    <p class="form-section-label">Replicas</p>
+
+    <div class="form-row">
+      <div class="form-field">
+        <label class="form-field__label" for="awes_replicas">AWES</label>
+        <input class="form-field__input form-field__input--narrow" type="number"
+               id="awes_replicas" name="awes_replicas" value="{{.Form.AWESReplicas}}" min="1" max="20">
+      </div>
+      <div class="form-field">
+        <label class="form-field__label" for="rm_replicas">Resource Manager</label>
+        <input class="form-field__input form-field__input--narrow" type="number"
+               id="rm_replicas" name="rm_replicas" value="{{.Form.RMReplicas}}" min="1" max="20">
+      </div>
+      <div class="form-field">
+        <label class="form-field__label" for="em_replicas">Endpoint Manager</label>
+        <input class="form-field__input form-field__input--narrow" type="number"
+               id="em_replicas" name="em_replicas" value="{{.Form.EMReplicas}}" min="1" max="20">
+      </div>
+    </div>
+
+    <p class="form-section-label" style="margin-top: 25px;">Cluster Add-ons</p>
+    <div class="checkbox-group" x-data="{ kafkaEnabled: {{if eq .Form.Kafka "0"}}false{{else}}true{{end}} }" style="display: flex; flex-direction: column; gap: 10px;">
+      <label class="checkbox-option" style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+        <input type="checkbox" name="cert_manager" value="1" {{if ne .Form.CertManager "0"}}checked{{end}} style="cursor: pointer;">
+        <span class="checkbox-option__label" style="font-size: 13px; font-weight: 500; color: var(--text);">Install Cert Manager (TLS via Let's Encrypt — Azure default OK; AWS needs a custom DNS name, not the ELB hostname)</span>
+      </label>
+      <label class="checkbox-option" style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+        <input type="checkbox" name="prometheus" value="1" {{if ne .Form.Prometheus "0"}}checked{{end}} style="cursor: pointer;">
+        <span class="checkbox-option__label" style="font-size: 13px; font-weight: 500; color: var(--text);">Install Prometheus Monitoring (metrics scraping & alerts)</span>
+      </label>
+      <label class="checkbox-option" style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+        <input type="checkbox" name="metrics_server" value="1" {{if ne .Form.MetricsServer "0"}}checked{{end}} style="cursor: pointer;">
+        <span class="checkbox-option__label" style="font-size: 13px; font-weight: 500; color: var(--text);">Install Metrics Server (resource utilization API)</span>
+      </label>
+      <label class="checkbox-option" style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+        <input type="checkbox" name="kafka" value="1" x-model="kafkaEnabled" style="cursor: pointer;">
+        <span class="checkbox-option__label" style="font-size: 13px; font-weight: 500; color: var(--text);">Install Strimzi Kafka Operator & Cluster (recommended)</span>
+      </label>
+
+      <div class="external-kafka-fields" x-show="!kafkaEnabled" x-transition style="margin-top: 15px; border-left: 2px solid var(--accent); padding-left: 15px;">
+        <p class="form-section-sublabel" style="font-size: 13px; font-weight: 500; margin-bottom: 10px; color: var(--text-heading);">External Kafka Bootstrap Connection</p>
+        <div class="form-row">
+          <div class="form-field {{if .Form.Errors.kafka_host}}form-field--error{{end}}" style="flex: 2">
+            <label class="form-field__label" for="kafka_host">Bootstrap host</label>
+            <input class="form-field__input" type="text" id="kafka_host" name="kafka_host" value="{{.Form.KafkaHost}}" placeholder="my-kafka.example.com">
+            {{if .Form.Errors.kafka_host}}<span class="form-field__error">{{.Form.Errors.kafka_host}}</span>{{end}}
+          </div>
+          <div class="form-field {{if .Form.Errors.kafka_port}}form-field--error{{end}}" style="flex: 1">
+            <label class="form-field__label" for="kafka_port">Port</label>
+            <input class="form-field__input" type="number" id="kafka_port" name="kafka_port" value="{{.Form.KafkaPort}}" placeholder="9092">
+            {{if .Form.Errors.kafka_port}}<span class="form-field__error">{{.Form.Errors.kafka_port}}</span>{{end}}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <p class="form-hint-block" style="margin-top: 25px;">All other chart values stay at defaults. Edit <code>values.yaml</code> directly for advanced configuration.</p>
+
+    <div class="wizard-step__footer">
+      <button type="submit" class="btn btn--primary">Review →</button>
+    </div>
+  </div>
+</form>
+{{end}}
+
+{{/* ── Hidden input groups ──────────────────────────────────────────────────── */}}
+{{define "_hidden_step1"}}
+<input type="hidden" name="cloud"        value="{{.Form.Cloud}}">
+<input type="hidden" name="cluster_name" value="{{.Form.ClusterName}}">
+<input type="hidden" name="region"       value="{{.Form.Region}}">
+<input type="hidden" name="k8s_version"  value="{{.Form.K8sVersion}}">
+{{if .Form.FromTab}}<input type="hidden" name="from_tab" value="1">{{end}}
+{{end}}
+
+{{define "_hidden_step2"}}
+<input type="hidden" name="ingress_host" value="{{.Form.IngressHost}}">
+{{end}}
+
+{{define "_hidden_step3"}}
+<input type="hidden" name="node_type"    value="{{.Form.NodeType}}">
+<input type="hidden" name="node_min"     value="{{.Form.NodeMin}}">
+<input type="hidden" name="node_desired" value="{{.Form.NodeDesired}}">
+<input type="hidden" name="node_max"     value="{{.Form.NodeMax}}">
+{{end}}

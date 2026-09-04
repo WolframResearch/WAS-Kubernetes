@@ -1,0 +1,56 @@
+# Copy this file to terraform.tfvars (stack root or -var-file=...) and adjust.
+# Do not commit terraform.tfvars — it is environment-specific.
+#
+# Variable defaults live in variables.tf; this file documents the knobs
+# wasctl / manual apply commonly set.
+
+aws_region   = "us-east-1"
+cluster_name = "was-prod" # max 22 characters (IAM name_prefix limit)
+
+# Kubernetes version — must be supported by EKS in aws_region.
+# Check: https://docs.aws.amazon.com/eks/latest/userguide/kubernetes-versions.html
+# Default in variables.tf is 1.36.
+cluster_version = "1.36"
+
+# EKS access — defaults match wasctl / variables.tf.
+# authentication_mode                       = "API"
+# enable_cluster_creator_admin_permissions = true
+
+# Networking — defaults match the original bash setup; change only if they
+# conflict with existing VPCs in your account.
+vpc_cidr             = "10.168.0.0/16"
+public_subnet_cidrs  = ["10.168.0.0/18", "10.168.64.0/18"]
+private_subnet_cidrs = ["10.168.128.0/18", "10.168.192.0/18"]
+single_nat_gateway   = true # set to false for production HA (one NAT per AZ)
+
+# Worker nodes
+node_instance_types = ["c5.2xlarge"]
+node_disk_size_gb   = 50
+node_min_size       = 2
+node_desired_size   = 2
+node_max_size       = 10
+
+# S3 bucket names — leave null/unset to auto-generate, or provide explicit names.
+# resource_bucket_name = "my-was-resources"
+# nodefile_bucket_name = "my-was-nodefiles"
+
+# Resource-manager ServiceAccount — must match Helm chart values
+# (resourceManager.serviceAccount.name / namespace.name).
+resource_manager_service_account_name      = "was-resource-manager"
+resource_manager_service_account_namespace = "was"
+
+# EFS + EBS CSI IRSA roles are created automatically by the stack (no tfvars).
+# wasctl addons install the drivers using terraform outputs:
+#   efs_csi_driver_role_arn / ebs_csi_driver_role_arn
+
+# Optional: create a Route53 DNS record after ingress-nginx is up.
+# create_dns_record = true
+# hosted_zone_id   = "Z1234567890ABCDEF"
+# dns_record_name  = "was.example.com"
+# elb_dns_name     = "<elb-hostname>.us-east-1.elb.amazonaws.com"
+
+# Tags applied to all resources (merged with Application / ManagedBy defaults)
+tags = {
+  Environment = "prod"
+  Team        = "platform"
+}

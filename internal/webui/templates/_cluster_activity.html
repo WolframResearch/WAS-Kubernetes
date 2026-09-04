@@ -1,0 +1,60 @@
+{{define "_cluster_activity"}}
+<div class="section-block content-region"
+     id="section-activity">
+  <div class="content-region__loading" aria-hidden="true"></div>
+  <div class="section-block__head">
+    <span class="section-block__title">Activity</span>
+    <button class="btn btn--secondary btn--sm"
+            hx-get="/clusters/{{.ClusterName}}/sections/activity?refresh=true"
+            hx-target="#section-activity"
+            hx-swap="outerHTML"
+            hx-indicator="closest .content-region">Refresh</button>
+  </div>
+
+  {{if .AuditEntries}}
+  <div style="margin-bottom:16px">
+    <p class="section-label">Operations history</p>
+    <div class="cluster-list">
+      <div class="cluster-list__head" style="grid-template-columns: 80px 80px 1fr">
+        <span>Age</span>
+        <span>Action</span>
+        <span>Result</span>
+      </div>
+      {{range .AuditEntries}}
+      <div class="cluster-list__row" style="grid-template-columns: 80px 80px 1fr">
+        <span class="cluster-list__time">{{auditAge .}}</span>
+        <span class="cluster-list__name" style="font-weight:500">{{.Action}}</span>
+        <span class="audit-result audit-result--{{auditResultClass .Result}}"
+              onclick="this.classList.toggle('audit-result--expanded')"
+              title="Click to expand">{{.Result}}</span>
+      </div>
+      {{end}}
+    </div>
+  </div>
+  {{end}}
+
+  {{if and .Report .Report.Activity}}
+  {{if .AuditEntries}}<p class="section-label">Kubernetes events</p>{{end}}
+  <div class="cluster-list">
+    <div class="cluster-list__head" style="grid-template-columns: 80px 1fr">
+      <span>Age</span>
+      <span>Event</span>
+    </div>
+    {{range .Report.Activity}}
+    <div class="cluster-list__row" style="grid-template-columns: 80px 1fr">
+      <span class="cluster-list__time">{{.Age}}</span>
+      <span class="cluster-list__name" style="font-weight:400;font-size:12px">{{.Summary}}</span>
+    </div>
+    {{end}}
+  </div>
+  {{else}}
+  {{if not .AuditEntries}}
+  <div class="empty-state" style="padding: 40px 24px 60px">
+    <div class="brand-marker brand-marker--small">\[NoActivity]</div>
+    <p class="empty-state__title">No recent activity</p>
+    <p class="empty-state__sub">Cluster operations and Kubernetes events appear here.</p>
+  </div>
+  {{end}}
+  {{end}}
+</div>
+{{end}}

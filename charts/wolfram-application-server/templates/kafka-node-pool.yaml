@@ -1,0 +1,31 @@
+{{- if eq .Values.kafka.mode "builtin" }}
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaNodePool
+metadata:
+  name: {{ .Values.kafka.clusterName }}-pool
+  namespace: {{ .Values.kafka.namespace }}
+  labels:
+    strimzi.io/cluster: {{ .Values.kafka.clusterName }}
+    app.kubernetes.io/component: kafka
+    {{- include "was.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.kafka.replicas }}
+  roles:
+    - controller
+    - broker
+  resources:
+    requests:
+      {{- toYaml .Values.kafka.resources.requests | nindent 6 }}
+    limits:
+      {{- toYaml .Values.kafka.resources.limits | nindent 6 }}
+  storage:
+    type: jbod
+    volumes:
+    - id: 0
+      type: persistent-claim
+      {{- if .Values.kafka.storage.class }}
+      class: {{ .Values.kafka.storage.class }}
+      {{- end }}
+      size: {{ .Values.kafka.storage.size }}
+      deleteClaim: false
+{{- end }}

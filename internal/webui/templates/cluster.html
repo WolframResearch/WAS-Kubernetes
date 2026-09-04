@@ -1,0 +1,127 @@
+{{define "title"}}{{.ClusterName}} — Wolfram Application Server{{end}}
+
+{{define "content"}}
+{{if .Error}}
+<div class="error-state">
+  <div class="brand-marker">\[ClusterUnreachable]</div>
+  <p class="error-state__title">Could not load cluster</p>
+  <p class="error-state__detail">{{.Error}}</p>
+</div>
+{{else}}
+
+<div class="breadcrumb">
+  <a href="/">Clusters</a>
+  <span class="breadcrumb__sep">/</span>
+  <span>{{.ClusterName}}</span>
+</div>
+
+<div class="cluster-header">
+  <div class="cluster-header__left">
+    <h1 class="cluster-header__name">{{.ClusterName}}</h1>
+    {{if .Meta}}
+    <p class="cluster-header__subtitle">
+      {{if eq .Meta.Cloud "azure"}}
+      Azure · {{.Meta.AzureLocation}}
+      {{else}}
+      AWS · {{.Meta.AWSRegion}}{{if .Meta.AWSAccountID}} · account {{maskAccount .Meta.AWSAccountID}}{{end}}
+      {{end}}
+    </p>
+    <div class="cluster-header__meta">
+      <span class="badge badge--{{statusClass .Meta.Status}}">{{.Meta.Status}}</span>
+    </div>
+    {{end}}
+  </div>
+  <div class="cluster-header__right">
+    <a href="/clusters/{{.ClusterName}}/destroy" class="btn btn--danger btn--sm">Destroy cluster</a>
+  </div>
+</div>
+
+<nav class="tab-bar" aria-label="Cluster sections">
+  <a href="#overview"  class="tab-bar__link">Overview</a>
+  <a href="#workloads" class="tab-bar__link">Workloads</a>
+  <a href="#kafka"     class="tab-bar__link">Kafka</a>
+  <a href="#storage"   class="tab-bar__link">Storage</a>
+  <a href="#addons"    class="tab-bar__link">Add-ons</a>
+  <a href="#stages"    class="tab-bar__link">Stages</a>
+  <a href="#activity"  class="tab-bar__link">Activity</a>
+  <a href="#config"    class="tab-bar__link">Configuration</a>
+  <a href="/clusters/{{.ClusterName}}/operations" class="tab-bar__link">Operations</a>
+</nav>
+
+<div class="tab-content">
+  <section id="overview" class="tab-panel"
+           hx-get="/clusters/{{.ClusterName}}/sections/overview"
+           hx-trigger="show once"
+           hx-swap="innerHTML">
+    <div class="tab-placeholder">
+      <span class="refresh-spinner"></span>
+      <span>Loading overview...</span>
+    </div>
+  </section>
+  <section id="workloads" class="tab-panel"
+           hx-get="/clusters/{{.ClusterName}}/sections/workloads"
+           hx-trigger="show once"
+           hx-swap="innerHTML">
+    <div class="tab-placeholder">
+      <span class="refresh-spinner"></span>
+      <span>Loading workloads...</span>
+    </div>
+  </section>
+  <section id="kafka" class="tab-panel"
+           hx-get="/clusters/{{.ClusterName}}/sections/kafka"
+           hx-trigger="show once"
+           hx-swap="innerHTML">
+    <div class="tab-placeholder">
+      <span class="refresh-spinner"></span>
+      <span>Loading Kafka status...</span>
+    </div>
+  </section>
+  <section id="storage" class="tab-panel"
+           hx-get="/clusters/{{.ClusterName}}/sections/storage"
+           hx-trigger="show once"
+           hx-swap="innerHTML">
+    <div class="tab-placeholder">
+      <span class="refresh-spinner"></span>
+      <span>Loading storage status...</span>
+    </div>
+  </section>
+  <section id="addons" class="tab-panel"
+           hx-get="/clusters/{{.ClusterName}}/sections/addons"
+           hx-trigger="show once"
+           hx-swap="innerHTML">
+    <div class="tab-placeholder">
+      <span class="refresh-spinner"></span>
+      <span>Loading add-ons...</span>
+    </div>
+  </section>
+  <section id="stages" class="tab-panel"
+           hx-get="/clusters/{{.ClusterName}}/sections/stages"
+           hx-trigger="show once"
+           hx-swap="innerHTML">
+    <div class="tab-placeholder">
+      <span class="refresh-spinner"></span>
+      <span>Loading stages...</span>
+    </div>
+  </section>
+  <section id="activity" class="tab-panel"
+           hx-get="/clusters/{{.ClusterName}}/sections/activity"
+           hx-trigger="show once"
+           hx-swap="innerHTML">
+    <div class="tab-placeholder">
+      <span class="refresh-spinner"></span>
+      <span>Loading activity log...</span>
+    </div>
+  </section>
+  <section id="config" class="tab-panel"
+           hx-get="/clusters/{{.ClusterName}}/sections/config"
+           hx-trigger="show once"
+           hx-swap="innerHTML">
+    <div class="tab-placeholder">
+      <span class="refresh-spinner"></span>
+      <span>Loading configuration...</span>
+    </div>
+  </section>
+</div>
+
+{{end}}
+{{end}}

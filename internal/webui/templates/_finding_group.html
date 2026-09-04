@@ -1,0 +1,8 @@
+{{define "_finding_group"}}
+<section class="finding-group">
+  <h3 class="finding-group__title">{{.Category}}</h3>
+  <div class="finding-group__list">
+    {{range .Findings}}{{template "_finding" .}}{{end}}
+  </div>
+</section>
+{{end}}

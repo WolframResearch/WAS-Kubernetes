@@ -1,0 +1,96 @@
+{{define "_cluster_overview"}}
+<div class="section-block content-region"
+     id="section-overview"
+     hx-get="/clusters/{{.ClusterName}}/sections/overview"
+     hx-trigger="none"
+     hx-target="#section-overview"
+     hx-swap="outerHTML"
+     hx-indicator="this">
+  <div class="content-region__loading" aria-hidden="true"></div>
+  <div class="section-block__head">
+    <span class="section-block__title">Overview</span>
+    <button class="btn btn--secondary btn--sm"
+            hx-get="/clusters/{{.ClusterName}}/sections/overview?refresh=true"
+            hx-target="#section-overview"
+            hx-swap="outerHTML"
+            hx-indicator="closest .content-region">Refresh</button>
+  </div>
+
+  {{if and .Report .Report.Cluster.Name}}
+  <div class="kv-table">
+    <div class="kv-table__row">
+      <span class="kv-table__key">Cluster name</span>
+      <span class="kv-table__val">{{.Report.Cluster.Name}}</span>
+    </div>
+    <div class="kv-table__row">
+      <span class="kv-table__key">{{if and .Meta (eq .Meta.Cloud "azure")}}Location{{else}}Region{{end}}</span>
+      <span class="kv-table__val">{{.Report.Cluster.Region}}</span>
+    </div>
+    {{if .Report.Cluster.ARN}}
+    <div class="kv-table__row">
+      <span class="kv-table__key">{{if and .Meta (eq .Meta.Cloud "azure")}}Resource ID{{else}}ARN{{end}}</span>
+      <span class="kv-table__val">{{.Report.Cluster.ARN}}</span>
+    </div>
+    {{end}}
+    {{if .Report.Cluster.Version}}
+    <div class="kv-table__row">
+      <span class="kv-table__key">Kubernetes version</span>
+      <span class="kv-table__val">{{.Report.Cluster.Version}}</span>
+    </div>
+    {{end}}
+    <div class="kv-table__row">
+      <span class="kv-table__key">Status</span>
+      <span class="kv-table__val">
+        <span class="badge badge--{{statusClass .Report.Cluster.Status}}">{{.Report.Cluster.Status}}</span>
+      </span>
+    </div>
+  </div>
+
+  <div class="section-sub-title">Nodes</div>
+  <div class="kv-table">
+    <div class="kv-table__row">
+      <span class="kv-table__key">Ready</span>
+      <span class="kv-table__val">{{.Report.Nodes.Ready}} / {{.Report.Nodes.Total}}</span>
+    </div>
+    {{if .Report.Nodes.Type}}
+    <div class="kv-table__row">
+      <span class="kv-table__key">Instance type</span>
+      <span class="kv-table__val">{{.Report.Nodes.Type}}</span>
+    </div>
+    {{end}}
+  </div>
+
+  {{if .Report.Ingress.URL}}
+  <div class="section-sub-title">Ingress</div>
+  <div class="kv-table">
+    <div class="kv-table__row">
+      <span class="kv-table__key">URL</span>
+      <span class="kv-table__val"><a href="{{.Report.Ingress.URL}}" target="_blank" rel="noopener">{{.Report.Ingress.URL}}</a></span>
+    </div>
+    <div class="kv-table__row">
+      <span class="kv-table__key">Load balancer</span>
+      <span class="kv-table__val">{{.Report.Ingress.ELB}}</span>
+    </div>
+    <div class="kv-table__row">
+      <span class="kv-table__key">DNS resolves</span>
+      <span class="kv-table__val">{{if .Report.Ingress.DNSok}}yes{{else}}no{{end}}</span>
+    </div>
+    {{if gt .Report.Ingress.TLSDays 0}}
+    <div class="kv-table__row">
+      <span class="kv-table__key">TLS expiry</span>
+      <span class="kv-table__val">{{.Report.Ingress.TLSDays}} days</span>
+    </div>
+    {{end}}
+  </div>
+  {{end}}
+
+  {{sectionErrors .Report "nodes"}}
+
+  {{else}}
+  <div class="section-unavailable">
+    <span class="brand-marker text-sm">\[SectionUnavailable]</span>
+    <p class="text-muted text-sm">{{if .SectionError}}{{.SectionError}}{{else}}Data unavailable{{end}}</p>
+  </div>
+  {{end}}
+</div>
+{{end}}

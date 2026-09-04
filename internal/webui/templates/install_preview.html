@@ -1,0 +1,170 @@
+{{define "title"}}Review Installation — Wolfram Application Server{{end}}
+
+{{define "content"}}
+<div class="page-heading">
+  <h1 class="page-heading__title">Review Installation</h1>
+</div>
+
+<div class="preview-wrap">
+
+  <p class="section-title">Cluster configuration</p>
+  <div class="kv-table">
+    <div class="kv-table__row">
+      <span class="kv-table__key">Cloud</span>
+      <span class="kv-table__val">
+        <span class="badge badge--cloud">{{if eq .Form.Cloud "azure"}}AZURE{{else}}AWS{{end}}</span>
+      </span>
+    </div>
+    <div class="kv-table__row">
+      <span class="kv-table__key">Cluster name</span>
+      <span class="kv-table__val">{{.Form.ClusterName}}</span>
+    </div>
+    <div class="kv-table__row">
+      <span class="kv-table__key">{{if eq .Form.Cloud "azure"}}Location{{else}}Region{{end}}</span>
+      <span class="kv-table__val">{{.Form.Region}}</span>
+    </div>
+    <div class="kv-table__row">
+      <span class="kv-table__key">Kubernetes version</span>
+      <span class="kv-table__val">{{.Form.K8sVersion}}</span>
+    </div>
+    {{if .Form.IngressHost}}
+    <div class="kv-table__row">
+      <span class="kv-table__key">Ingress hostname</span>
+      <span class="kv-table__val">{{.Form.IngressHost}}</span>
+    </div>
+    {{end}}
+    <div class="kv-table__row">
+      <span class="kv-table__key">{{if eq .Form.Cloud "azure"}}VM size{{else}}Instance type{{end}}</span>
+      <span class="kv-table__val">{{.Form.NodeType}}</span>
+    </div>
+    <div class="kv-table__row">
+      <span class="kv-table__key">Node group</span>
+      <span class="kv-table__val">{{.Form.NodeMin}} min / {{.Form.NodeDesired}} desired / {{.Form.NodeMax}} max</span>
+    </div>
+    <div class="kv-table__row">
+      <span class="kv-table__key">AWES replicas</span>
+      <span class="kv-table__val">{{.Form.AWESReplicas}}</span>
+    </div>
+    <div class="kv-table__row">
+      <span class="kv-table__key">Resource Manager replicas</span>
+      <span class="kv-table__val">{{.Form.RMReplicas}}</span>
+    </div>
+    <div class="kv-table__row">
+      <span class="kv-table__key">Endpoint Manager replicas</span>
+      <span class="kv-table__val">{{.Form.EMReplicas}}</span>
+    </div>
+    <div class="kv-table__row">
+      <span class="kv-table__key">Cert Manager</span>
+      <span class="kv-table__val">{{if eq .Form.CertManager "1"}}Yes{{else}}No (skip){{end}}</span>
+    </div>
+    <div class="kv-table__row">
+      <span class="kv-table__key">Prometheus</span>
+      <span class="kv-table__val">{{if eq .Form.Prometheus "1"}}Yes{{else}}No (skip){{end}}</span>
+    </div>
+    <div class="kv-table__row">
+      <span class="kv-table__key">Metrics Server</span>
+      <span class="kv-table__val">{{if eq .Form.MetricsServer "1"}}Yes{{else}}No (skip){{end}}</span>
+    </div>
+    <div class="kv-table__row">
+      <span class="kv-table__key">Kafka</span>
+      <span class="kv-table__val">
+        {{if eq .Form.Kafka "1"}}
+        Yes (install Strimzi operator & cluster)
+        {{else}}
+        External ({{.Form.KafkaHost}}:{{.Form.KafkaPort}})
+        {{end}}
+      </span>
+    </div>
+  </div>
+
+  <p class="section-title">Stages</p>
+  <div class="kv-table">
+    {{range .StageList}}
+    <div class="kv-table__row">
+      <span class="kv-table__key">{{.Num}}. {{.Label}}</span>
+      <span class="kv-table__val text-muted">{{.ETA}}</span>
+    </div>
+    {{end}}
+  </div>
+
+  <p class="section-title">Estimated cost</p>
+  <div class="preview-cost-box">
+    <span class="preview-cost__range">{{.CostLow}} – {{.CostHigh}}</span>
+    <span class="preview-cost__unit">per month at desired capacity</span>
+    <p class="preview-cost__note">Estimate only. Actual cost depends on traffic, storage, and data transfer.</p>
+  </div>
+
+  <p class="section-title">What will be created</p>
+  {{if eq .Form.Cloud "azure"}}
+  <ul class="preview-list">
+    <li>Resource group and virtual network</li>
+    <li>AKS cluster ({{.Form.ClusterName}}) and node pool</li>
+    <li>Azure Files Premium share for persistent storage</li>
+    <li>Storage account containers for resources and nodefiles</li>
+    <li>Managed identities with workload identity bindings</li>
+    {{if eq .Form.Kafka "1"}}
+    <li>Strimzi Kafka cluster + 5 topics</li>
+    {{else}}
+    <li>External Kafka connection ({{.Form.KafkaHost}}:{{.Form.KafkaPort}})</li>
+    {{end}}
+    <li>Kubernetes workloads: AWES, Resource Manager, Endpoint Manager</li>
+  </ul>
+  {{else}}
+  <ul class="preview-list">
+    <li>VPC with public and private subnets</li>
+    <li>EKS cluster ({{.Form.ClusterName}}) and managed node group</li>
+    <li>EFS filesystem for persistent storage</li>
+    <li>S3 buckets for resources and nodefiles</li>
+    <li>IAM roles with IRSA annotations</li>
+    {{if eq .Form.Kafka "1"}}
+    <li>Strimzi Kafka cluster + 5 topics</li>
+    {{else}}
+    <li>External Kafka connection ({{.Form.KafkaHost}}:{{.Form.KafkaPort}})</li>
+    {{end}}
+    <li>Kubernetes workloads: AWES, Resource Manager, Endpoint Manager</li>
+  </ul>
+  {{end}}
+
+  <p class="section-title">What cannot be undone without manual cleanup</p>
+  {{if eq .Form.Cloud "azure"}}
+  <ul class="preview-list preview-list--warn">
+    <li>The wasctl meta storage account (one per Azure subscription; <code>wasctl destroy</code> does not delete it)</li>
+    {{if .Form.IngressHost}}<li>DNS record for <code>{{.Form.IngressHost}}</code> (if managed externally)</li>{{end}}
+  </ul>
+  {{else}}
+  <ul class="preview-list preview-list--warn">
+    <li>The wasctl meta bucket (one per AWS account; <code>wasctl destroy</code> does not delete it)</li>
+    {{if .Form.IngressHost}}<li>DNS record for <code>{{.Form.IngressHost}}</code> (if created via Route 53)</li>{{end}}
+  </ul>
+  {{end}}
+
+  <div class="preview-confirm-bar">
+    <a href="/install" class="btn btn--secondary">← Edit configuration</a>
+
+    <form method="POST" action="/install/confirm" style="display:inline">
+      <input type="hidden" name="cloud"          value="{{.Form.Cloud}}">
+      <input type="hidden" name="cluster_name"   value="{{.Form.ClusterName}}">
+      <input type="hidden" name="region"         value="{{.Form.Region}}">
+      <input type="hidden" name="k8s_version"    value="{{.Form.K8sVersion}}">
+      <input type="hidden" name="ingress_host"   value="{{.Form.IngressHost}}">
+      <input type="hidden" name="node_type"      value="{{.Form.NodeType}}">
+      <input type="hidden" name="node_min"       value="{{.Form.NodeMin}}">
+      <input type="hidden" name="node_desired"   value="{{.Form.NodeDesired}}">
+      <input type="hidden" name="node_max"       value="{{.Form.NodeMax}}">
+      <input type="hidden" name="awes_replicas"  value="{{.Form.AWESReplicas}}">
+      <input type="hidden" name="rm_replicas"    value="{{.Form.RMReplicas}}">
+      <input type="hidden" name="em_replicas"    value="{{.Form.EMReplicas}}">
+      <input type="hidden" name="cert_manager"   value="{{.Form.CertManager}}">
+      <input type="hidden" name="prometheus"     value="{{.Form.Prometheus}}">
+      <input type="hidden" name="metrics_server" value="{{.Form.MetricsServer}}">
+      <input type="hidden" name="kafka"          value="{{.Form.Kafka}}">
+      <input type="hidden" name="kafka_host"     value="{{.Form.KafkaHost}}">
+      <input type="hidden" name="kafka_port"     value="{{.Form.KafkaPort}}">
+      <button type="submit" class="btn btn--primary btn--destructive">
+        Start installation of {{.Form.ClusterName}}
+      </button>
+    </form>
+  </div>
+
+</div>
+{{end}}

@@ -1,0 +1,36 @@
+{{define "_cluster_addons"}}
+<div class="section-block content-region"
+     id="section-addons">
+  <div class="content-region__loading" aria-hidden="true"></div>
+  <div class="section-block__head">
+    <span class="section-block__title">Add-ons</span>
+    <button class="btn btn--secondary btn--sm"
+            hx-get="/clusters/{{.ClusterName}}/sections/addons?refresh=true"
+            hx-target="#section-addons"
+            hx-swap="outerHTML"
+            hx-indicator="closest .content-region">Refresh</button>
+  </div>
+
+  {{if and .Report .Report.AddOns}}
+  <div class="cluster-list">
+    <div class="cluster-list__head" style="grid-template-columns: 1fr 120px 120px">
+      <span>Add-on</span>
+      <span>Version</span>
+      <span>Status</span>
+    </div>
+    {{range .Report.AddOns}}
+    <div class="cluster-list__row" style="grid-template-columns: 1fr 120px 120px">
+      <span class="cluster-list__name">{{.Name}}</span>
+      <span class="cluster-list__region">{{.Version}}</span>
+      <span><span class="badge badge--{{addonStatusClass .Status}}">{{.Status}}</span></span>
+    </div>
+    {{end}}
+  </div>
+  {{else}}
+  <div class="section-unavailable">
+    <span class="brand-marker text-sm">\[SectionUnavailable]</span>
+    <p class="text-muted text-sm">{{if .SectionError}}{{.SectionError}}{{else}}No add-ons detected{{end}}</p>
+  </div>
+  {{end}}
+</div>
+{{end}}

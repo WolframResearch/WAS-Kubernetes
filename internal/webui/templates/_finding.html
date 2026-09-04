@@ -1,0 +1,22 @@
+{{define "_finding"}}
+{{$f := .}}
+<div class="finding finding--{{findingClass $f.Status $f.Severity}}" x-data="{open: false}">
+  <div class="finding__header" @click="open = !open" role="button" tabindex="0"
+       @keydown.enter="open = !open" @keydown.space.prevent="open = !open">
+    <span class="finding__icon">{{findingIcon $f.Status $f.Severity}}</span>
+    <span class="finding__name">{{$f.CheckName}}</span>
+    <span class="finding__elapsed">{{fmtElapsed $f.Elapsed}}</span>
+    <span class="finding__chevron" :class="open ? 'finding__chevron--open' : ''">›</span>
+  </div>
+  <div class="finding__message">{{$f.Message}}</div>
+  <div class="finding__details" x-show="open" x-cloak>
+    {{if $f.Details}}<pre class="finding__pre">{{$f.Details}}</pre>{{end}}
+    {{if $f.Remediation}}
+    <div class="finding__remediation">
+      <span class="finding__remediation-label">Fix:</span>
+      {{$f.Remediation}}
+    </div>
+    {{end}}
+  </div>
+</div>
+{{end}}

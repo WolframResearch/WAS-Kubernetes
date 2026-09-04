@@ -1,0 +1,20 @@
+run:
+  timeout: 5m
+
+linters:
+  enable:
+    - errcheck
+    - govet
+    - staticcheck
+    - gosimple
+    - ineffassign
+    - revive
+    - goimports
+
+linters-settings:
+  goimports:
+    local-prefixes: github.com/WolframResearch/WAS-Kubernetes
+  revive:
+    rules:
+      - name: exported
+        disabled: true  # internal packages don't need exported-symbol doc comments

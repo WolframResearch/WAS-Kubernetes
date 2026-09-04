@@ -1,0 +1,75 @@
+{{define "title"}}Review — {{.Release}} — Wolfram Application Server{{end}}
+
+{{define "content"}}
+<div class="page-heading page-heading--with-action">
+  <h1 class="page-heading__title">Review helm apply</h1>
+  <a href="/chart-only" class="btn btn--secondary btn--sm">← Start over</a>
+</div>
+
+<div class="preview-wrap">
+
+  <p class="section-title">Target</p>
+  <div class="kv-table">
+    <div class="kv-table__row">
+      <span class="kv-table__key">Release name</span>
+      <span class="kv-table__val text-mono">{{.Release}}</span>
+    </div>
+    <div class="kv-table__row">
+      <span class="kv-table__key">Namespace</span>
+      <span class="kv-table__val text-mono">{{.Namespace}}</span>
+    </div>
+  </div>
+
+  <p class="section-title">Values summary</p>
+  <div class="kv-table">
+    {{range .Groups}}
+    {{$gValues := index $.FormValues}}
+    {{range .Fields}}
+    {{$v := index $.FormValues .Path}}
+    {{if $v}}
+    <div class="kv-table__row">
+      <span class="kv-table__key">{{.Label}}</span>
+      <span class="kv-table__val text-mono">{{$v}}</span>
+    </div>
+    {{end}}
+    {{end}}
+    {{end}}
+  </div>
+
+  <p class="section-title">What will happen</p>
+  <ul class="preview-list">
+    <li><code>helm upgrade --install {{.Release}} &lt;chart&gt; --namespace {{.Namespace}} --create-namespace --wait --timeout 10m</code></li>
+    <li>All Kubernetes resources in the chart will be created or updated.</li>
+    <li>Running the apply again is safe (idempotent helm upgrade).</li>
+  </ul>
+
+  <p class="section-title">Cannot be undone without manual cleanup</p>
+  <ul class="preview-list preview-list--warn">
+    <li>PersistentVolumeClaims created by this release are retained on <code>helm uninstall</code> by default.</li>
+    <li>Kafka topic data persists in PVCs until the PVCs are deleted manually.</li>
+  </ul>
+
+  <div class="preview-confirm-bar">
+    <a href="javascript:history.back()" class="btn btn--secondary">← Edit values</a>
+
+    <form method="POST" action="/chart-only/apply">
+      <input type="hidden" name="kubeconfig_b64" value="{{.Kubeconfig}}">
+      <input type="hidden" name="release"        value="{{.Release}}">
+      <input type="hidden" name="namespace"      value="{{.Namespace}}">
+      <input type="hidden" name="chart_dir"      value="{{.ChartDir}}">
+      {{range .Groups}}
+      {{range .Fields}}
+      {{$v := index $.FormValues .Path}}
+      {{if $v}}
+      <input type="hidden" name="{{.Path}}" value="{{$v}}">
+      {{end}}
+      {{end}}
+      {{end}}
+      <button type="submit" class="btn btn--primary btn--destructive">
+        Apply chart to {{.Release}}
+      </button>
+    </form>
+  </div>
+
+</div>
+{{end}}

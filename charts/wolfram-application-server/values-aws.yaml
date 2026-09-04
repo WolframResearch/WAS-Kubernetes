@@ -1,0 +1,28 @@
+# AWS-specific overrides for the Wolfram Application Server Helm chart.
+# Usage: helm install was . -f values-aws.yaml --set ingress.host=<host> ...
+
+cloud: aws
+
+ingress:
+  pathType: ImplementationSpecific
+
+objectStorage:
+  auth:
+    mode: irsa
+  # REQUIRED: set to the AWS region where your S3 buckets live.
+  # When using wasctl, this is set automatically from --region.
+  # For plain helm install: --set objectStorage.region=us-east-1
+  region: ""
+  # endpoint is constructed at install time from objectStorage.region:
+  #   https://s3.<region>.amazonaws.com
+  # Set explicitly if you need a custom S3-compatible endpoint.
+  endpoint: ""
+
+storage:
+  className: was-efs
+
+kafka:
+  storage:
+    # EBS CSI gp3 (was-kafka-gp3). Do not use "gp2" — that StorageClass still
+    # points at the removed in-tree kubernetes.io/aws-ebs provisioner on modern EKS.
+    class: was-kafka-gp3

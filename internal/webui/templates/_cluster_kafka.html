@@ -1,0 +1,42 @@
+{{define "_cluster_kafka"}}
+<div class="section-block content-region"
+     id="section-kafka">
+  <div class="content-region__loading" aria-hidden="true"></div>
+  <div class="section-block__head">
+    <span class="section-block__title">Kafka</span>
+    <button class="btn btn--secondary btn--sm"
+            hx-get="/clusters/{{.ClusterName}}/sections/kafka?refresh=true"
+            hx-target="#section-kafka"
+            hx-swap="outerHTML"
+            hx-indicator="closest .content-region">Refresh</button>
+  </div>
+
+  {{if and .Report .Report.Kafka.ClusterName}}
+  <div class="kv-table">
+    <div class="kv-table__row">
+      <span class="kv-table__key">Cluster name</span>
+      <span class="kv-table__val">{{.Report.Kafka.ClusterName}}</span>
+    </div>
+    <div class="kv-table__row">
+      <span class="kv-table__key">Brokers</span>
+      <span class="kv-table__val">{{.Report.Kafka.BrokersReady}} / {{.Report.Kafka.BrokersTotal}} ready</span>
+    </div>
+    <div class="kv-table__row">
+      <span class="kv-table__key">Topics</span>
+      <span class="kv-table__val">{{.Report.Kafka.TopicsReady}} / {{.Report.Kafka.TopicsTotal}} created</span>
+    </div>
+    {{if gt .Report.Kafka.ZKTotal 0}}
+    <div class="kv-table__row">
+      <span class="kv-table__key">ZooKeeper</span>
+      <span class="kv-table__val">{{.Report.Kafka.ZKReady}} / {{.Report.Kafka.ZKTotal}} ready</span>
+    </div>
+    {{end}}
+  </div>
+  {{else}}
+  <div class="section-unavailable">
+    <span class="brand-marker text-sm">\[SectionUnavailable]</span>
+    <p class="text-muted text-sm">{{if .SectionError}}{{.SectionError}}{{else}}Kafka cluster not found{{end}}</p>
+  </div>
+  {{end}}
+</div>
+{{end}}

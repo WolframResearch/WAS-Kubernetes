@@ -1,0 +1,32 @@
+{{define "_help_overlay"}}
+<div id="help-overlay" class="help-overlay" hidden aria-modal="true" role="dialog" aria-label="Keyboard shortcuts">
+  <div class="help-overlay__backdrop" onclick="window.wasctl.closeHelp()"></div>
+  <div class="help-overlay__panel">
+    <div class="help-overlay__header">
+      <span class="help-overlay__title">Keyboard shortcuts</span>
+      <button class="help-overlay__close" onclick="window.wasctl.closeHelp()" aria-label="Close">✕</button>
+    </div>
+    <table class="help-overlay__table">
+      <tbody>
+        <tr>
+          <td class="help-overlay__keys"><kbd>g</kbd> <kbd>h</kbd></td>
+          <td class="help-overlay__desc">Go to home</td>
+        </tr>
+        <tr>
+          <td class="help-overlay__keys"><kbd>g</kbd> <kbd>c</kbd></td>
+          <td class="help-overlay__desc">Go to last-visited cluster</td>
+        </tr>
+        <tr>
+          <td class="help-overlay__keys"><kbd>?</kbd></td>
+          <td class="help-overlay__desc">Toggle keyboard shortcuts</td>
+        </tr>
+        <tr>
+          <td class="help-overlay__keys"><kbd>Esc</kbd></td>
+          <td class="help-overlay__desc">Close overlay</td>
+        </tr>
+      </tbody>
+    </table>
+    <p class="help-overlay__hint">Press <kbd>?</kbd> or <kbd>Esc</kbd> to close</p>
+  </div>
+</div>
+{{end}}

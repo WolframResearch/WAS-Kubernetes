@@ -1,0 +1,70 @@
+{{define "title"}}{{.ClusterName}} — Diagnostics — Wolfram Application Server{{end}}
+
+{{define "content"}}
+<div class="breadcrumb">
+  <a href="/">Clusters</a>
+  <span class="breadcrumb__sep">/</span>
+  <a href="/clusters/{{.ClusterName}}">{{.ClusterName}}</a>
+  <span class="breadcrumb__sep">/</span>
+  <span>Operations</span>
+</div>
+
+<div class="ops-page">
+  {{template "_operations_nav" .}}
+
+  <div class="ops-content">
+    {{if .ReportError}}
+    <div class="error-state">
+      <div class="brand-marker">\[ReportUnavailable]</div>
+      <p class="error-state__title">Could not load report</p>
+      <p class="error-state__detail">{{.ReportError}}</p>
+    </div>
+
+    {{else if not .Report}}
+    <div class="ops-empty">
+      <div class="brand-marker">\[NoDiagnostics]</div>
+      <p class="ops-empty__title">No diagnostic reports yet</p>
+      <p class="ops-empty__body">Run diagnostics to check the health of this cluster.</p>
+      <form method="POST" action="/clusters/{{.ClusterName}}/operations/doctor/run">
+        <button class="btn btn--primary" type="submit">Run diagnostics</button>
+      </form>
+    </div>
+
+    {{else}}
+    {{$r := .Report}}
+    <div class="ops-report-header">
+      <div class="ops-report-header__left">
+        {{if eq $r.Summary.Fail 0}}
+        <span class="ops-status-badge ops-status-badge--healthy">Healthy</span>
+        {{else}}
+        <span class="ops-status-badge ops-status-badge--problems">{{$r.Summary.Fail}} problems</span>
+        {{end}}
+        <span class="ops-report-header__meta text-muted">
+          {{$r.GeneratedAt.Format "2006-01-02 15:04 UTC"}}
+          {{if .IsHistory}}· historical report{{end}}
+        </span>
+      </div>
+      <div class="ops-report-header__right">
+        <span class="ops-summary-pill ops-summary-pill--pass">{{$r.Summary.Pass}} pass</span>
+        {{if $r.Summary.Fail}}
+        <span class="ops-summary-pill ops-summary-pill--fail">{{$r.Summary.Fail}} fail</span>
+        {{end}}
+        {{if $r.Summary.Skip}}
+        <span class="ops-summary-pill ops-summary-pill--skip">{{$r.Summary.Skip}} skip</span>
+        {{end}}
+        <form method="POST" action="/clusters/{{.ClusterName}}/operations/doctor/run"
+              style="display:inline; margin-left:12px">
+          <button class="btn btn--secondary btn--sm" type="submit">Run again</button>
+        </form>
+      </div>
+    </div>
+
+    {{if .Groups}}
+    <div class="finding-groups">
+      {{range .Groups}}{{template "_finding_group" .}}{{end}}
+    </div>
+    {{end}}
+    {{end}}
+  </div>
+</div>
+{{end}}

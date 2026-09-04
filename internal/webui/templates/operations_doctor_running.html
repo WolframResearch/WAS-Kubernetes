@@ -1,0 +1,111 @@
+{{define "title"}}Running diagnostics — {{.ClusterName}} — Wolfram Application Server{{end}}
+
+{{define "content"}}
+<div class="breadcrumb">
+  <a href="/">Clusters</a>
+  <span class="breadcrumb__sep">/</span>
+  <a href="/clusters/{{.ClusterName}}">{{.ClusterName}}</a>
+  <span class="breadcrumb__sep">/</span>
+  <a href="/clusters/{{.ClusterName}}/operations">Operations</a>
+  <span class="breadcrumb__sep">/</span>
+  <span>Running diagnostics</span>
+</div>
+
+<div class="stream-page" id="stream-root"
+     x-data="doctorStream('/clusters/{{.ClusterName}}/operations/doctor/sse/{{.SessionID}}', '/clusters/{{.ClusterName}}/operations')">
+
+  <div class="stream-header">
+    <div class="stream-header__title">
+      <span class="pulse">●</span> Running diagnostics on <strong>{{.ClusterName}}</strong>
+    </div>
+    <div class="stream-header__elapsed" x-text="'Elapsed: ' + elapsedStr"></div>
+  </div>
+
+  <div class="stream-checks" id="checks-list">
+    <template x-for="item in checks" :key="item.id">
+      <div class="stream-check" :class="'stream-check--' + item.status">
+        <span class="stream-check__icon" x-html="item.icon"></span>
+        <span class="stream-check__name" x-text="item.name"></span>
+        <span class="stream-check__elapsed text-muted" x-text="item.elapsed"></span>
+      </div>
+    </template>
+  </div>
+
+  <div class="stream-log" x-show="logs.length > 0">
+    <template x-for="line in logs" :key="line">
+      <div class="stream-log__line" x-text="line"></div>
+    </template>
+  </div>
+
+  <div class="stream-complete" x-show="complete" x-cloak>
+    <p class="stream-complete__msg" x-text="completeMsg"></p>
+    <a class="btn btn--primary" :href="reportURL">View report</a>
+  </div>
+</div>
+
+<script>
+function doctorStream(sseURL, reportBaseURL) {
+  return {
+    checks: [],
+    logs: [],
+    complete: false,
+    completeMsg: '',
+    reportURL: reportBaseURL,
+    elapsedStr: '0:00',
+    _startedAt: Date.now(),
+    _timer: null,
+    _es: null,
+
+    init() {
+      this._timer = setInterval(() => {
+        const s = Math.floor((Date.now() - this._startedAt) / 1000);
+        this.elapsedStr = Math.floor(s/60) + ':' + String(s%60).padStart(2,'0');
+      }, 1000);
+
+      this._es = new EventSource(sseURL);
+
+      this._es.addEventListener('check-start', e => {
+        const d = JSON.parse(e.data);
+        this.checks.push({id: d.id, name: d.name, status: 'running', icon: '◌', elapsed: ''});
+      });
+
+      this._es.addEventListener('check-done', e => {
+        const d = JSON.parse(e.data);
+        const f = d.finding;
+        const item = this.checks.find(c => c.id === d.id);
+        const status = f.status === 0 ? 'pass' : f.status === 1 ? 'fail' : f.status === 2 ? 'skip' : 'error';
+        const icon = status === 'pass' ? '[✓]' : status === 'fail' ? '[!]' : status === 'skip' ? '[–]' : '[?]';
+        const elapsed = f.elapsed < 1000 ? f.elapsed + 'ms' : (f.elapsed/1000).toFixed(1) + 's';
+        if (item) {
+          item.status = status;
+          item.icon = icon;
+          item.elapsed = elapsed;
+        } else {
+          this.checks.push({id: d.id, name: f.checkName, status, icon, elapsed});
+        }
+      });
+
+      this._es.addEventListener('run-complete', e => {
+        const d = JSON.parse(e.data);
+        this.complete = true;
+        this.reportURL = d.clusterURL || reportBaseURL;
+        const s = d.summary || {};
+        const fail = s.fail || 0;
+        this.completeMsg = fail === 0 ? 'All checks passed.' : fail + ' issue(s) found.';
+        clearInterval(this._timer);
+        this._es.close();
+        setTimeout(() => { location.href = this.reportURL; }, 2000);
+      });
+
+      this._es.addEventListener('ping', () => { this._es.close(); });
+      this._es.onerror = () => { this._es.close(); };
+    },
+
+    destroy() {
+      clearInterval(this._timer);
+      if (this._es) this._es.close();
+    }
+  };
+}
+</script>
+{{end}}

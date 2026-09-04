@@ -1,0 +1,51 @@
+# Patterns ignored when packaging / embedding this chart.
+# Helm does not support gitignore double-star (**). Patterns without a slash
+# match that basename anywhere; trailing "/" matches directories only.
+#
+# Do NOT ignore the charts/ directory itself — unpacked dependency charts are
+# required by Chart.yaml ("found in Chart.yaml, but missing in charts/").
+
+# ── VCS / editor / packaging noise ──────────────────────────────────────────
+.DS_Store
+.git/
+.gitignore
+.helmignore
+.idea/
+.vscode/
+*.swp
+*~
+*.bak
+*.tmp
+*.orig
+
+# ── Duplicate dependency archives ───────────────────────────────────────────
+# helm dependency update leaves charts/*.tgz alongside unpacked charts/<name>/.
+# Keep the unpacked trees; omit the tarballs from the package.
+*.tgz
+
+# ── Dependency chart non-runtime files ──────────────────────────────────────
+# Subchart docs / CI / unit tests are unused by helm install|template and add
+# hundreds of KB (ingress-nginx/changelog alone). Root README.md is kept for
+# `helm show readme`.
+charts/*/README.md
+charts/*/README.md.gotmpl
+charts/*/CHANGELOG.md
+charts/*/RELEASE.md
+charts/*/OWNERS
+charts/*/CODEOWNERS
+charts/*/CONTRIBUTING.md
+charts/*/MAINTAINERS
+charts/*/.helmignore
+charts/*/.gitignore
+charts/*/charts/*/README.md
+charts/*/charts/*/CHANGELOG.md
+charts/*/charts/*/.helmignore
+charts/*/charts/*/.gitignore
+
+# Directory basenames anywhere under the chart (subcharts + nested subcharts)
+changelog/
+ci/
+tests/
+hack/
+docs/
+*.gotmpl

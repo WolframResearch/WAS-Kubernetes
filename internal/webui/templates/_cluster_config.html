@@ -1,0 +1,107 @@
+{{define "_cluster_config"}}
+<div class="section-block"
+     id="section-config">
+  <div class="section-block__head">
+    <span class="section-block__title">Configuration</span>
+  </div>
+
+  {{if .Meta}}
+  <div class="kv-table">
+    <div class="kv-table__row">
+      <span class="kv-table__key">Cluster name</span>
+      <span class="kv-table__val">{{.Meta.ClusterName}}</span>
+    </div>
+    {{if or (eq .Meta.Cloud "azure") .Meta.AzureLocation}}
+    <div class="kv-table__row">
+      <span class="kv-table__key">Subscription</span>
+      <span class="kv-table__val">{{.Meta.AzureSubscriptionID}}</span>
+    </div>
+    <div class="kv-table__row">
+      <span class="kv-table__key">Resource group</span>
+      <span class="kv-table__val">{{.Meta.AzureResourceGroup}}</span>
+    </div>
+    <div class="kv-table__row">
+      <span class="kv-table__key">Location</span>
+      <span class="kv-table__val">{{.Meta.AzureLocation}}</span>
+    </div>
+    <div class="kv-table__row">
+      <span class="kv-table__key">Status</span>
+      <span class="kv-table__val">{{.Meta.Status}}</span>
+    </div>
+    {{if .Meta.AzureStateStorageAccount}}
+    <div class="kv-table__row">
+      <span class="kv-table__key">State storage account</span>
+      <span class="kv-table__val">{{.Meta.AzureStateStorageAccount}}</span>
+    </div>
+    {{end}}
+    {{if .Meta.AzureStateResourceGroup}}
+    <div class="kv-table__row">
+      <span class="kv-table__key">State resource group</span>
+      <span class="kv-table__val">{{.Meta.AzureStateResourceGroup}}</span>
+    </div>
+    {{end}}
+    {{else}}
+    <div class="kv-table__row">
+      <span class="kv-table__key">AWS account</span>
+      <span class="kv-table__val">{{.Meta.AWSAccountID}}</span>
+    </div>
+    <div class="kv-table__row">
+      <span class="kv-table__key">Region</span>
+      <span class="kv-table__val">{{.Meta.AWSRegion}}</span>
+    </div>
+    <div class="kv-table__row">
+      <span class="kv-table__key">Status</span>
+      <span class="kv-table__val">{{.Meta.Status}}</span>
+    </div>
+    <div class="kv-table__row">
+      <span class="kv-table__key">State bucket</span>
+      <span class="kv-table__val">{{.Meta.StateBucket}}</span>
+    </div>
+    <div class="kv-table__row">
+      <span class="kv-table__key">Lock table</span>
+      <span class="kv-table__val">{{.Meta.LockTable}}</span>
+    </div>
+    {{end}}
+    {{if .Meta.IngressHost}}
+    <div class="kv-table__row">
+      <span class="kv-table__key">Ingress host</span>
+      <span class="kv-table__val">{{.Meta.IngressHost}}</span>
+    </div>
+    {{end}}
+    <div class="kv-table__row">
+      <span class="kv-table__key">Created</span>
+      <span class="kv-table__val">{{.Meta.CreatedAt.Format "2006-01-02 15:04 UTC"}}</span>
+    </div>
+    <div class="kv-table__row">
+      <span class="kv-table__key">Created by</span>
+      <span class="kv-table__val">{{.Meta.CreatedBy}}</span>
+    </div>
+    <div class="kv-table__row">
+      <span class="kv-table__key">Last modified</span>
+      <span class="kv-table__val">{{.Meta.LastModifiedAt.Format "2006-01-02 15:04 UTC"}}</span>
+    </div>
+    <div class="kv-table__row">
+      <span class="kv-table__key">Modified by</span>
+      <span class="kv-table__val">{{.Meta.LastModifiedBy}}</span>
+    </div>
+    {{if .Meta.ClusterUID}}
+    <div class="kv-table__row">
+      <span class="kv-table__key">Cluster UID</span>
+      <span class="kv-table__val">{{.Meta.ClusterUID}}</span>
+    </div>
+    {{end}}
+    {{if .Meta.ClusterARN}}
+    <div class="kv-table__row">
+      <span class="kv-table__key">{{if or (eq .Meta.Cloud "azure") .Meta.AzureLocation}}Resource ID{{else}}ARN{{end}}</span>
+      <span class="kv-table__val">{{.Meta.ClusterARN}}</span>
+    </div>
+    {{end}}
+  </div>
+  {{else}}
+  <div class="section-unavailable">
+    <span class="brand-marker text-sm">\[SectionUnavailable]</span>
+    <p class="text-muted text-sm">{{if .SectionError}}{{.SectionError}}{{else}}Workspace metadata not available{{end}}</p>
+  </div>
+  {{end}}
+</div>
+{{end}}

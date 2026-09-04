@@ -1,0 +1,6 @@
+apiVersion: v2
+name: wolfram-application-server
+description: Deploys the Wolfram Application Server
+type: application
+version: 1.0.0
+appVersion: "4.3.0"

@@ -1,0 +1,20 @@
+{
+  "apiVersion": "apps/v1",
+  "kind": "Deployment",
+  "metadata": {
+    "name": "strimzi-cluster-operator",
+    "namespace": "kafka"
+  },
+  "spec": {
+    "template": {
+      "spec": {
+        "containers": [
+          {
+            "name": "strimzi-cluster-operator",
+            "image": "quay.io/strimzi/operator:0.43.0"
+          }
+        ]
+      }
+    }
+  }
+}

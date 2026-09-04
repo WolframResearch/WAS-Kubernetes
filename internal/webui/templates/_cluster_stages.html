@@ -1,0 +1,172 @@
+{{define "_cluster_stages"}}
+<div class="section-block" id="section-stages"
+     x-data="{
+       mode: 'selected',
+       selected: { {{range .Stages}}{{if .DefaultChecked}}'{{.Name}}': true, {{end}}{{end}} },
+       fromStage: 'addons',
+       addons: { {{range .Addons}}{{if .DefaultChecked}}'{{.Name}}': true, {{end}}{{end}} },
+       stageOrder: [{{range .Stages}}'{{.Name}}',{{end}}],
+       count() {
+         if (this.mode === 'from') {
+           const i = this.stageOrder.indexOf(this.fromStage);
+           return i < 0 ? 0 : this.stageOrder.length - i;
+         }
+         return Object.values(this.selected).filter(Boolean).length;
+       },
+       includesAddons() {
+         if (this.mode === 'selected') return !!this.selected.addons;
+         const ai = this.stageOrder.indexOf('addons');
+         const fi = this.stageOrder.indexOf(this.fromStage);
+         return fi >= 0 && ai >= 0 && fi <= ai;
+       },
+       addonCount() {
+         return Object.values(this.addons).filter(Boolean).length;
+       },
+       selectRepair() {
+         this.mode = 'selected';
+         this.selected = { addons: true, app: true };
+       },
+       selectAppOnly() {
+         this.mode = 'selected';
+         this.selected = { app: true };
+       },
+       selectFromAddons() {
+         this.mode = 'from';
+         this.fromStage = 'addons';
+       },
+       clearAll() {
+         this.selected = {};
+       },
+       selectRequiredAddons() {
+         this.addons = {
+           {{range .Addons}}{{if not .Optional}}'{{.Name}}': true, {{end}}{{end}}
+         };
+       },
+       selectAllAddons() {
+         this.addons = { {{range .Addons}}'{{.Name}}': true, {{end}} };
+       }
+     }">
+
+  <div class="section-block__head">
+    <span class="section-block__title">Stages</span>
+  </div>
+
+  {{if .Error}}
+  <p class="text-muted text-sm" style="padding: 12px 16px;">{{.Error}}</p>
+  {{end}}
+
+  <div class="stages-tab" style="padding: 16px;">
+    <p class="text-muted text-sm" style="margin: 0 0 16px;">
+      Re-run install stages on this cluster without destroying it. Stages are
+      idempotent — pick one stage, several stages, or everything from a starting
+      point onward.
+    </p>
+
+    <div class="stages-presets" style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px;">
+      <button type="button" class="btn btn--sm btn--secondary" @click="selectRepair()">Add-ons + App</button>
+      <button type="button" class="btn btn--sm btn--secondary" @click="selectAppOnly()">App only</button>
+      <button type="button" class="btn btn--sm btn--secondary" @click="selectFromAddons()">From add-ons onward</button>
+      <button type="button" class="btn btn--sm btn--secondary" @click="clearAll()" x-show="mode === 'selected'">Clear</button>
+    </div>
+
+    <form method="POST" action="/clusters/{{.ClusterName}}/stages/run" class="stages-form"
+          @submit="if (count() === 0) { $event.preventDefault(); }">
+
+      <fieldset class="stages-mode" style="border: none; padding: 0; margin: 0 0 16px;">
+        <legend class="text-sm" style="font-weight: 600; margin-bottom: 8px;">How to run</legend>
+        <label class="stages-mode__option" style="display: flex; gap: 8px; align-items: flex-start; margin-bottom: 8px; cursor: pointer;">
+          <input type="radio" name="mode" value="selected" x-model="mode" style="margin-top: 3px;">
+          <span>
+            <strong>Only selected stages</strong>
+            <span class="text-muted text-sm" style="display: block;">Run the checked stages in install order, then stop.</span>
+          </span>
+        </label>
+        <label class="stages-mode__option" style="display: flex; gap: 8px; align-items: flex-start; cursor: pointer;">
+          <input type="radio" name="mode" value="from" x-model="mode" style="margin-top: 3px;">
+          <span>
+            <strong>From a stage onward</strong>
+            <span class="text-muted text-sm" style="display: block;">Start at the chosen stage and continue through App.</span>
+          </span>
+        </label>
+      </fieldset>
+
+      <div class="stages-picker" x-show="mode === 'selected'" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px;">
+        {{range .Stages}}
+        <label class="stages-picker__row"
+               style="display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: start; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius); cursor: pointer; background: var(--surface);">
+          <input type="checkbox" name="stage" value="{{.Name}}"
+                 {{if .DefaultChecked}}checked{{end}}
+                 :disabled="mode !== 'selected'"
+                 :checked="!!selected['{{.Name}}']"
+                 @change="selected['{{.Name}}'] = $event.target.checked"
+                 style="margin-top: 3px;">
+          <span>
+            <span style="font-weight: 600;">{{.Num}}. {{.Label}}</span>
+            <span class="text-muted text-sm" style="display: block;">{{.Description}}</span>
+            {{if .Risk}}
+            <span class="text-sm" style="display: block; color: var(--warning, #b45309); margin-top: 4px;">{{.Risk}}</span>
+            {{end}}
+          </span>
+          <span class="text-muted text-sm text-mono">{{.ETA}}</span>
+        </label>
+        {{end}}
+      </div>
+
+      <div class="stages-from" x-show="mode === 'from'" style="margin-bottom: 16px;">
+        <label class="form-field__label" for="from_stage">Start at</label>
+        <select class="form-field__input" id="from_stage" name="from_stage" x-model="fromStage"
+                :disabled="mode !== 'from'" style="max-width: 360px;">
+          {{range .Stages}}
+          <option value="{{.Name}}">{{.Num}}. {{.Label}} ({{.ETA}})</option>
+          {{end}}
+        </select>
+        <p class="text-muted text-sm" style="margin-top: 8px;">
+          Will run <span class="text-mono" x-text="count()"></span> stage(s) from
+          <span class="text-mono" x-text="fromStage"></span> through app.
+        </p>
+      </div>
+
+      <div class="addons-picker" x-show="includesAddons()" x-cloak
+           style="margin: 0 0 16px; padding: 14px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg, #fafafa);">
+        <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px;">
+          <strong class="text-sm">Add-ons to install</strong>
+          <span class="text-muted text-sm">(<span x-text="addonCount()"></span> selected)</span>
+          <span style="flex: 1;"></span>
+          <button type="button" class="btn btn--sm btn--secondary" @click="selectRequiredAddons()">Required only</button>
+          <button type="button" class="btn btn--sm btn--secondary" @click="selectAllAddons()">All</button>
+        </div>
+        <p class="text-muted text-sm" style="margin: 0 0 10px;">
+          Uncheck add-ons you want to skip for this run. Core items stay checked by default;
+          optional ones (metrics, Prometheus, cert-manager) can be left off.
+        </p>
+        <div style="display: flex; flex-direction: column; gap: 6px;">
+          {{range .Addons}}
+          <label style="display: flex; gap: 8px; align-items: flex-start; cursor: pointer;">
+            <input type="checkbox" name="addon" value="{{.Name}}"
+                   {{if .DefaultChecked}}checked{{end}}
+                   :disabled="!includesAddons()"
+                   :checked="!!addons['{{.Name}}']"
+                   @change="addons['{{.Name}}'] = $event.target.checked"
+                   style="margin-top: 3px;">
+            <span>
+              <span style="font-weight: 500;">{{.Label}}</span>
+              {{if .Optional}}<span class="text-muted text-sm"> · optional</span>{{end}}
+              {{if .Hint}}<span class="text-muted text-sm" style="display: block;">{{.Hint}}</span>{{end}}
+            </span>
+          </label>
+          {{end}}
+        </div>
+      </div>
+
+      <div class="stages-actions" style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center;">
+        <button type="submit" class="btn btn--primary"
+                :disabled="count() === 0"
+                :aria-disabled="count() === 0">
+          Run <span x-text="count()"></span> stage<span x-show="count() !== 1">s</span>
+        </button>
+        <span class="text-muted text-sm">Opens a live progress page (same as install).</span>
+      </div>
+    </form>
+  </div>
+</div>
+{{end}}

@@ -1,0 +1,103 @@
+# Azure-specific overrides for the Wolfram Application Server Helm chart.
+#
+# Usage (default — static storage account key; Contributor-only Azure IAM):
+#   helm install was . -f values-azure.yaml \
+#     --set ingress.host=<host> \
+#     --set objectStorage.azure.accountName=<storage-account> \
+#     --set objectStorage.resourceBucket=<resources-container> \
+#     --set objectStorage.nodefileBucket=<nodefiles-container> \
+#     --set objectStorage.auth.mode=static \
+#     --set objectStorage.auth.secretKey=<from terraform output -raw resource_storage_account_key>
+#
+# Optional Workload Identity (requires Owner/UAA or an out-of-band
+# Storage Blob Data Contributor assignment on the UAMI):
+#   --set objectStorage.auth.mode=workloadIdentity \
+#   --set resourceManager.serviceAccount.azureClientId=<managed-identity-client-id>
+#
+# The --set values above come straight out of infra/azure/stack's
+# Terraform outputs — see the "From Terraform" comment on each field below,
+# or just run:
+#   terraform -chdir=infra/azure/stack output helm_install_command_hint
+
+cloud: azure
+
+ingress:
+  # Azure's ingress-nginx build requires Prefix for the chart's regex-style
+  # paths (AWS's build accepts ImplementationSpecific). This is a behavior
+  # of the nginx controller, not the underlying cloud — keep as Prefix on
+  # Azure regardless of which cloud's nginx image you're running.
+  pathType: Prefix
+
+objectStorage:
+  auth:
+    # DEFAULT for Azure: static storage account key. Contributor can listKeys;
+    # no Microsoft.Authorization/roleAssignments/write is required.
+    #
+    # Optional: set mode to workloadIdentity and supply
+    # resourceManager.serviceAccount.azureClientId after assigning
+    # Storage Blob Data Contributor to the UAMI (needs Owner/UAA, or an
+    # out-of-band role assignment). Do not use deprecated aadpodidbinding.
+    mode: static
+
+  # endpoint is auto-derived from objectStorage.azure.accountName as
+  # https://<accountName>.blob.core.windows.net/ (see templates/_helpers.tpl
+  # was.storageEndpoint). Leave blank unless you're pointing at a
+  # non-standard endpoint (e.g. Azure Government, a custom DNS zone).
+  endpoint: ""
+
+  azure:
+    # REQUIRED — Azure storage account name hosting both blob containers.
+    # From Terraform: terraform -chdir=infra/azure/stack output -raw resource_storage_account_name
+    # Example: wasprodbs3f2a9c1d
+    # Not set here (left blank) — supply via --set or wasctl, same pattern
+    # as objectStorage.resourceBucket / nodefileBucket below.
+    accountName: ""
+
+  # REQUIRED (inherited from values.yaml, not overridden here) — set via
+  # --set objectStorage.resourceBucket=<value>.
+  # From Terraform: terraform -chdir=infra/azure/stack output -raw resource_container_name
+  # Example: resources
+
+  # REQUIRED (inherited from values.yaml, not overridden here) — set via
+  # --set objectStorage.nodefileBucket=<value>.
+  # From Terraform: terraform -chdir=infra/azure/stack output -raw nodefile_container_name
+  # Example: nodefiles
+
+storage:
+  # was-azurefile is the StorageClass name the chart's three log PVCs
+  # (awes-logs, resources-logs, endpoint-logs) request. wasctl's addons
+  # stage wires it to the Terraform Azure Files account (filesystem.tf)
+  # via file.csi.azure.com + an account-key Secret — see chart README.
+  className: was-azurefile
+
+  # Premium Azure Files (default filesystem_tier) requires ≥100Gi per share.
+  # Standard tier can keep the global 10Gi default.
+  logsSize: 100Gi
+
+kafka:
+  storage:
+    # AKS's managed-disk CSI StorageClass for Kafka broker volumes (RWO —
+    # each broker gets its own disk, unlike the RWX log PVCs above).
+    # Created by wasctl addons (or manually) for Kafka broker RWO volumes;
+    # see chart README. Distinct from the RWX was-azurefile class above.
+    class: kafka-standardssd-xfs
+
+# Azure resource-manager typically needs longer probe grace than AWS against
+# S3. Keep these Azure-native timings; do not lower them to AWS's 5/10 + 15/20
+# on this cloud.
+resourceManager:
+  probes:
+    readiness:
+      initialDelaySeconds: 10
+      periodSeconds: 30
+    liveness:
+      initialDelaySeconds: 30
+      periodSeconds: 20
+
+  serviceAccount:
+    # OPTIONAL — only when objectStorage.auth.mode=workloadIdentity.
+    # Client ID of the user-assigned managed identity created for the
+    # resource-manager pod. Default installs use static account-key auth
+    # and leave this empty.
+    # From Terraform: terraform -chdir=infra/azure/stack output -raw resource_manager_identity_client_id
+    azureClientId: ""

@@ -1,0 +1,95 @@
+{{- if eq .Values.kafka.mode "builtin" }}
+{{/* ── Compact log-compacted topics (state/presence) ─────────────────────── */}}
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: endpoint-info
+  namespace: {{ .Values.kafka.namespace }}
+  labels:
+    strimzi.io/cluster: {{ .Values.kafka.clusterName }}
+    app.kubernetes.io/component: kafka
+    {{- include "was.labels" . | nindent 4 }}
+spec:
+  partitions: 2
+  replicas: 3
+  topicName: endpoint-info
+  config:
+    retention.bytes: "-1"
+    retention.ms: "-1"
+    cleanup.policy: compact
+    min.cleanable.dirty.ratio: "0.05"
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: resource-info
+  namespace: {{ .Values.kafka.namespace }}
+  labels:
+    strimzi.io/cluster: {{ .Values.kafka.clusterName }}
+    app.kubernetes.io/component: kafka
+    {{- include "was.labels" . | nindent 4 }}
+spec:
+  partitions: 2
+  replicas: 3
+  topicName: resource-info
+  config:
+    retention.bytes: "-1"
+    retention.ms: "-1"
+    cleanup.policy: compact
+    min.cleanable.dirty.ratio: "0.05"
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: nodefile-info
+  namespace: {{ .Values.kafka.namespace }}
+  labels:
+    strimzi.io/cluster: {{ .Values.kafka.clusterName }}
+    app.kubernetes.io/component: kafka
+    {{- include "was.labels" . | nindent 4 }}
+spec:
+  partitions: 2
+  replicas: 3
+  topicName: nodefile-info
+  config:
+    retention.bytes: "-1"
+    retention.ms: "-1"
+    cleanup.policy: compact
+    min.cleanable.dirty.ratio: "0"
+    segment.ms: "100"
+---
+{{/* ── Stream topics for API request/response (missing from source manifests) */}}
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: api-request
+  namespace: {{ .Values.kafka.namespace }}
+  labels:
+    strimzi.io/cluster: {{ .Values.kafka.clusterName }}
+    app.kubernetes.io/component: kafka
+    {{- include "was.labels" . | nindent 4 }}
+spec:
+  partitions: 2
+  replicas: 3
+  topicName: api-request
+  config:
+    retention.ms: "604800000"
+    cleanup.policy: delete
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: api-response
+  namespace: {{ .Values.kafka.namespace }}
+  labels:
+    strimzi.io/cluster: {{ .Values.kafka.clusterName }}
+    app.kubernetes.io/component: kafka
+    {{- include "was.labels" . | nindent 4 }}
+spec:
+  partitions: 2
+  replicas: 3
+  topicName: api-response
+  config:
+    retention.ms: "604800000"
+    cleanup.policy: delete
+{{- end }}

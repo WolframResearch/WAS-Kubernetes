@@ -1,0 +1,184 @@
+{{define "title"}}Operations — Wolfram Application Server{{end}}
+
+{{define "content"}}
+<div class="page-heading">
+  <h1 class="page-heading__title">Operations</h1>
+</div>
+
+{{template "_ops_cloud_tabs" .}}
+
+<div id="ops-tab-body" class="content-region">
+  {{template "_ops_content_wrapper" .Tab}}
+</div>
+{{end}}
+
+{{/* ── Ops content wrapper — carries the 10-second background refresh trigger */}}
+{{define "_ops_content_wrapper"}}
+<div id="ops-content"
+     hx-trigger="load, every 10s"
+     hx-get="/operations/data?cloud={{.Cloud}}"
+     hx-target="#ops-content"
+     hx-swap="innerHTML"
+     hx-indicator="#ops-refresh-indicator">
+  {{template "_ops_tab_body" .}}
+</div>
+<span id="ops-refresh-indicator"
+      class="htmx-indicator refresh-indicator"
+      aria-hidden="true">
+  <span class="refresh-spinner"></span>
+</span>
+<span id="ops-last-updated" class="refresh-age"></span>
+{{end}}
+
+{{/* ── Ops cloud tab bar partial ──────────────────────────────────────────────
+     Mirrors _cloud_tabs in home.html. OOB=true causes hx-swap-oob="true"
+     so HTMX replaces #ops-cloud-tabs when a tab-switch HTMX request fires.
+     Tab buttons are disabled when the CLI is not installed. */}}
+{{define "_ops_cloud_tabs"}}
+<div class="cloud-tabs"
+     id="ops-cloud-tabs"
+     role="tablist"
+     aria-label="Cloud provider"{{if .OOB}} hx-swap-oob="true"{{end}}>
+
+  {{if .AWSAvail.CLIInstalled}}
+  <button class="cloud-tab__link{{if eq .ActiveCloud "aws"}} cloud-tab__link--active{{end}}"
+          role="tab"
+          aria-selected="{{if eq .ActiveCloud "aws"}}true{{else}}false{{end}}"
+          hx-get="/operations/clusters?cloud=aws"
+          hx-target="#ops-tab-body"
+          hx-swap="innerHTML"
+          hx-push-url="true"
+          hx-indicator="#ops-tab-body">
+    AWS
+    {{if ge .AWSCount 0}}<span class="cloud-tab__count">{{.AWSCount}}</span>{{end}}
+  </button>
+  {{else}}
+  <button class="cloud-tab__link cloud-tab--disabled"
+          role="tab"
+          aria-selected="false"
+          aria-disabled="true"
+          disabled
+          title="AWS CLI not installed">
+    AWS
+  </button>
+  {{end}}
+
+  {{if .AzureAvail.CLIInstalled}}
+  <button class="cloud-tab__link{{if eq .ActiveCloud "azure"}} cloud-tab__link--active{{end}}"
+          role="tab"
+          aria-selected="{{if eq .ActiveCloud "azure"}}true{{else}}false{{end}}"
+          hx-get="/operations/clusters?cloud=azure"
+          hx-target="#ops-tab-body"
+          hx-swap="innerHTML"
+          hx-push-url="true"
+          hx-indicator="#ops-tab-body">
+    Azure
+    {{if ge .AzureCount 0}}<span class="cloud-tab__count">{{.AzureCount}}</span>{{end}}
+  </button>
+  {{else}}
+  <button class="cloud-tab__link cloud-tab--disabled"
+          role="tab"
+          aria-selected="false"
+          aria-disabled="true"
+          disabled
+          title="Azure CLI not installed">
+    Azure
+  </button>
+  {{end}}
+
+</div>
+{{end}}
+
+{{/* ── Ops tab body partial */}}
+{{define "_ops_tab_body"}}
+
+{{if eq .State "not_configured"}}
+
+{{if not .Avail.CLIInstalled}}
+<div class="cloud-notice cloud-notice--cli-missing">
+  <p class="cloud-notice__title">
+    {{if eq .Cloud "azure"}}Azure CLI{{else}}AWS CLI{{end}} not installed
+  </p>
+  <p class="cloud-notice__sub">
+    Install it: <code>{{.ConfigCmd}}</code>
+  </p>
+</div>
+{{else}}
+<div class="cloud-notice cloud-notice--warning">
+  <p class="cloud-notice__title">
+    {{if eq .Cloud "azure"}}Azure{{else}}AWS{{end}} credentials not configured
+  </p>
+  <p class="cloud-notice__sub">Run <code>{{.ConfigCmd}}</code> then reload.</p>
+</div>
+{{end}}
+
+{{else if eq .State "ok"}}
+
+<div class="ops-summary-bar">
+  <div class="ops-summary-bar__stat">
+    <span class="ops-summary-bar__num">{{.Total}}</span>
+    <span class="ops-summary-bar__label">clusters</span>
+  </div>
+  <div class="ops-summary-bar__stat ops-summary-bar__stat--healthy">
+    <span class="ops-summary-bar__num">{{.Healthy}}</span>
+    <span class="ops-summary-bar__label">healthy</span>
+  </div>
+  {{if .Degraded}}
+  <div class="ops-summary-bar__stat ops-summary-bar__stat--degraded">
+    <span class="ops-summary-bar__num">{{.Degraded}}</span>
+    <span class="ops-summary-bar__label">with issues</span>
+  </div>
+  {{end}}
+</div>
+
+<div class="ops-list">
+  <div class="ops-list__head">
+    <span>Cluster</span>
+    <span>Status</span>
+    <span>Issues</span>
+    <span>Last checked</span>
+    <span>Actions</span>
+  </div>
+  {{range .Clusters}}
+  <div class="ops-list__row"
+       onclick="location.href='/clusters/{{.Name}}/operations'">
+    <div>
+      <a href="/clusters/{{.Name}}/operations" class="ops-list__name">{{.Name}}</a>
+    </div>
+    <div>
+      <span class="badge badge--{{.StatusClass}}">{{.StatusLabel}}</span>
+    </div>
+    <div class="ops-list__muted">
+      {{if .Total}}{{.Issues}} / {{.Total}}{{else}}—{{end}}
+    </div>
+    <div class="ops-list__muted">{{.LastChecked}}</div>
+    <div class="ops-list__actions">
+      <form method="POST" action="/clusters/{{.Name}}/operations/doctor/run" style="display:inline">
+        <button class="btn btn--sm btn--primary" type="submit">Run diagnostics</button>
+      </form>
+      <a href="/clusters/{{.Name}}/operations/bundle" class="btn btn--sm btn--secondary">Bundle</a>
+    </div>
+  </div>
+  {{end}}
+</div>
+
+{{else if eq .State "no_clusters"}}
+<div class="empty-state">
+  <div class="brand-marker">\[NoClusters]</div>
+  <p class="empty-state__title">
+    No {{if eq .Cloud "azure"}}Azure{{else}}AWS{{end}} clusters found
+  </p>
+  <p class="empty-state__body">
+    <a href="/install?cloud={{.Cloud}}">Install a cluster</a> to get started.
+  </p>
+</div>
+
+{{else}}
+<div class="error-state">
+  <div class="brand-marker">\[OperationsUnavailable]</div>
+  <p class="error-state__title">Could not load cluster data</p>
+  <p class="error-state__detail">{{.Error}}</p>
+</div>
+{{end}}
+
+{{end}}

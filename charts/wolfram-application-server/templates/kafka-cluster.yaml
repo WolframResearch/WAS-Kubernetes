@@ -1,0 +1,41 @@
+{{- if eq .Values.kafka.mode "builtin" }}
+apiVersion: kafka.strimzi.io/v1
+kind: Kafka
+metadata:
+  name: {{ .Values.kafka.clusterName }}
+  namespace: {{ .Values.kafka.namespace }}
+  annotations:
+    strimzi.io/node-pools: enabled
+  labels:
+    app.kubernetes.io/component: kafka
+    {{- include "was.labels" . | nindent 4 }}
+spec:
+  kafka:
+    version: {{ .Values.kafka.version | quote }}
+    metadataVersion: {{ .Values.kafka.protocolVersion | quote }}
+    listeners:
+    - name: plain
+      port: 9092
+      type: internal
+      tls: false
+      configuration:
+        useServiceDnsDomain: true
+    - name: tls
+      port: 9093
+      type: internal
+      tls: true
+      authentication:
+        type: tls
+    config:
+      offsets.topic.replication.factor: 1
+      transaction.state.log.replication.factor: 1
+      transaction.state.log.min.isr: 1
+    template:
+      pod:
+        securityContext:
+          fsGroup: 1001
+          fsGroupChangePolicy: OnRootMismatch
+  entityOperator:
+    topicOperator: {}
+    userOperator: {}
+{{- end }}

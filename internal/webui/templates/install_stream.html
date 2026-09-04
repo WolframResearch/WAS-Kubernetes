@@ -1,0 +1,67 @@
+{{define "title"}}{{.Heading}} {{.Cluster}} — Wolfram Application Server{{end}}
+
+{{define "content"}}
+<div id="stream-meta"
+     data-cluster="{{.Cluster}}"
+     data-cloud="{{.Cloud}}"
+     data-operation="install"
+     hidden></div>
+
+<div class="stream-page" id="stream-root">
+
+  <div class="stream-header">
+    <div>
+      <h1 class="page-heading__title">{{.Heading}} <span class="text-mono">{{.Cluster}}</span></h1>
+      <p class="text-muted text-sm">Do not close this tab. The run continues even if the browser disconnects.</p>
+    </div>
+    <div class="stream-elapsed">
+      Elapsed: <span id="elapsed-counter" class="text-mono">0:00</span>
+    </div>
+  </div>
+
+  <div class="stream-progress-wrap">
+    <div class="stream-progress-bar">
+      <div class="stream-progress-fill" id="progress-fill" style="width:0%"></div>
+    </div>
+    <span class="stream-progress-label" id="progress-label">Starting…</span>
+  </div>
+
+  <div class="stream-stages" id="stage-list">
+    {{range .StageList}}
+    <div class="stream-stage stream-stage--pending" id="stage-{{.Name}}">
+      <span class="stream-stage__num">{{.Num}}</span>
+      <span class="stream-stage__label">{{.Label}}</span>
+      <span class="stream-stage__eta text-muted text-sm">{{.ETA}}</span>
+      <span class="stream-stage__elapsed text-mono text-sm" style="display:none"></span>
+    </div>
+    {{end}}
+  </div>
+
+  <div class="stream-log-wrap">
+    <div class="stream-log-head">
+      <span class="section-block__title">Log</span>
+    </div>
+    <div class="stream-log" id="log-pane"></div>
+  </div>
+
+  <div id="stream-outcome" hidden></div>
+
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  window.wasctl.initStream({
+    sseUrl:          '/install/sse/{{.SessionID}}',
+    sessionID:       {{.SessionID | printf "%q"}},
+    clusterName:     {{.Cluster | printf "%q"}},
+    operation:       'install',
+    totalStages:     {{len .StageList}},
+    elapsedEl:       document.getElementById('elapsed-counter'),
+    progressEl:      document.getElementById('progress-fill'),
+    progressLabelEl: document.getElementById('progress-label'),
+    logPaneEl:       document.getElementById('log-pane'),
+    outcomeEl:       document.getElementById('stream-outcome'),
+  });
+});
+</script>
+{{end}}

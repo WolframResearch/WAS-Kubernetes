@@ -1,0 +1,27 @@
+dependencies:
+- name: ingress-nginx
+  repository: https://kubernetes.github.io/ingress-nginx
+  version: 4.11.8
+- name: strimzi-kafka-operator
+  repository: https://strimzi.io/charts/
+  version: 0.44.0
+- name: kube-prometheus-stack
+  repository: https://prometheus-community.github.io/helm-charts
+  version: 65.0.0
+- name: prometheus-adapter
+  repository: https://prometheus-community.github.io/helm-charts
+  version: 4.11.1
+- name: metrics-server
+  repository: https://kubernetes-sigs.github.io/metrics-server/
+  version: 3.12.2
+- name: aws-efs-csi-driver
+  repository: https://kubernetes-sigs.github.io/aws-efs-csi-driver
+  version: 3.0.8
+- name: azurefile-csi-driver
+  repository: https://raw.githubusercontent.com/kubernetes-sigs/azurefile-csi-driver/master/charts
+  version: v1.30.9
+- name: cert-manager
+  repository: https://charts.jetstack.io
+  version: v1.15.5
+digest: sha256:c8d51e14115d69f3fa7d803846b3ec8d9bdbdebecf404332c6c5c6b4703b3e3b
+generated: "2026-07-02T13:03:43.814941536-05:00"

@@ -1,0 +1,33 @@
+Wolfram Application Server deployed successfully.
+
+Endpoints (may take several minutes for pods to become Ready):
+
+  Base URL:       {{ include "was.publicScheme" . }}://{{ .Values.ingress.host }}/
+  Resources:      {{ include "was.publicScheme" . }}://{{ .Values.ingress.host }}/resources/
+  Endpoints:      {{ include "was.publicScheme" . }}://{{ .Values.ingress.host }}/endpoints/
+  Nodefiles:      {{ include "was.publicScheme" . }}://{{ .Values.ingress.host }}/nodefiles/
+  App info:       {{ include "was.publicScheme" . }}://{{ .Values.ingress.host }}/.applicationserver/info
+  Kernel restart: {{ include "was.publicScheme" . }}://{{ .Values.ingress.host }}/.applicationserver/kernel/restart
+                  (requires basic-auth — default user: applicationserver)
+{{- if eq (include "was.ingressTLSEnabled" .) "true" }}
+
+TLS is enabled (secret {{ .Values.ingress.tls.secretName | default "was-tls-secret" }}).
+{{- if .Values.ingress.tls.clusterIssuer }}
+  Certificate: was-certificate (issuer {{ .Values.ingress.tls.clusterIssuer }})
+  Check: kubectl get certificate was-certificate -n {{ .Values.namespace.name }}
+{{- else }}
+  Set ingress.tls.clusterIssuer (wasctl default: letsencrypt-cluster-issuer).
+{{- end }}
+{{- end }}
+
+Check pod status:
+  kubectl get pods -n {{ .Values.namespace.name }}
+  kubectl get pods -n {{ .Values.kafka.namespace }}
+
+Check Kafka cluster readiness:
+  kubectl get kafka -n {{ .Values.kafka.namespace }}
+
+To upgrade:
+  helm upgrade {{ "{{" }} .Release.Name {{ "}}" }} charts/wolfram-application-server \
+    -f values-{{ .Values.cloud }}.yaml \
+    --set ingress.host={{ .Values.ingress.host }}

@@ -1,0 +1,20 @@
+# Copy this file to terraform.tfvars in infra/azure/bootstrap/ and adjust.
+# Do not commit terraform.tfvars.
+#
+# Run once per Azure subscription before infra/azure/stack.
+# After apply, copy `backend_config_hint` into the stack backend config
+# (see ../stack/examples/backend.tfvars.example).
+
+subscription_id = "00000000-0000-0000-0000-000000000000"
+tenant_id       = "00000000-0000-0000-0000-000000000000"
+location        = "eastus"
+
+# Optional overrides — defaults match wasctl / variables.tf:
+# resource_group_name  = "wolfram-was-tfstate-rg"
+# storage_account_base = "wolframwastfstate"  # 8-char random suffix appended
+# container_name       = "tfstate"
+
+tags = {
+  Environment = "prod"
+  Team        = "platform"
+}
